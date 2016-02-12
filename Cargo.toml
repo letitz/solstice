@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["letitz"]
 
 [dependencies]
-mio = "0.5"
-log = "0.3.5"
-byteorder = "0.4.2"
+mio = "^0.5"
+log = "^0.3.5"
+byteorder = "^0.4.2"
+rust-crypto = "^0.2.34"

@@ -1,12 +1,18 @@
 mod server;
-mod message;
+mod proto;
 
 #[macro_use] extern crate log;
 extern crate mio;
 extern crate byteorder;
+extern crate crypto;
+
+use std::io;
+use std::net::ToSocketAddrs;
 
 use mio::{EventLoop, EventSet, Handler, PollOpt, Token};
+use mio::tcp::TcpStream;
 
+use proto::Connection;
 use server::ServerConnection;
 
 const SERVER_HOST : &'static str = "server.slsknet.org";
@@ -16,12 +22,17 @@ const SERVER_TOKEN : Token = Token(0);
 
 #[derive(Debug)]
 struct ConnectionHandler {
-    server: ServerConnection,
+    server_conn: Connection<ServerConnection>,
+    server_stream: TcpStream,
 }
 
 impl ConnectionHandler {
-    fn new(server: ServerConnection) -> Self {
-        ConnectionHandler{ server: server }
+    fn new(server_conn: Connection<ServerConnection>, server_stream: TcpStream)
+        -> Self {
+        ConnectionHandler{
+            server_conn: server_conn,
+            server_stream: server_stream,
+        }
     }
 }
 
@@ -33,25 +44,42 @@ impl Handler for ConnectionHandler {
              token: Token, event_set: EventSet) {
 
         match token {
-            SERVER_TOKEN => self.server.ready_to_read(),
+            SERVER_TOKEN =>
+                if event_set.is_readable() {
+                    self.server_conn.ready_to_read(&mut self.server_stream)
+                } else {
+                    self.server_conn.ready_to_write(&mut self.server_stream)
+                },
 
             _ => unreachable!("Unknown token"),
         }
     }
 }
 
-fn main() {
-    let server = ServerConnection::new(SERVER_HOST, SERVER_PORT).unwrap();
+fn connect(hostname: &str, port: u16) -> io::Result<TcpStream> {
+    for sock_addr in try!((hostname, port).to_socket_addrs()) {
+        if let Ok(stream) = TcpStream::connect(&sock_addr) {
+            return Ok(stream)
+        }
+    }
+    Err(io::Error::new(io::ErrorKind::Other,
+                   format!("Cannot connect to {}:{}", hostname, port)))
+}
 
-    println!("Connected to {:?}", &server);
+fn main() {
+    let stream = connect(SERVER_HOST, SERVER_PORT).unwrap();
+    println!("Connected to {:?}", &stream);
 
     let mut event_loop = EventLoop::new().unwrap();
 
     event_loop.register(
-        server.stream(),
+        &stream,
         SERVER_TOKEN,
-        EventSet::readable(),
+        EventSet::readable() | EventSet::writable(),
         PollOpt::edge()).unwrap();
 
-    event_loop.run(&mut ConnectionHandler::new(server)).unwrap();
+    let server_conn = Connection::new(ServerConnection::new());
+    let mut handler = ConnectionHandler::new(server_conn, stream);
+
+    event_loop.run(&mut handler).unwrap();
 }
