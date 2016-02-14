@@ -1,5 +1,6 @@
 mod server;
 mod proto;
+mod config;
 
 #[macro_use] extern crate log;
 extern crate mio;
@@ -12,11 +13,8 @@ use std::net::ToSocketAddrs;
 use mio::{EventLoop, EventSet, Handler, PollOpt, Token};
 use mio::tcp::TcpStream;
 
-use proto::Connection;
+use proto::connection::Connection;
 use server::ServerConnection;
-
-const SERVER_HOST : &'static str = "server.slsknet.org";
-const SERVER_PORT : u16 = 2242;
 
 const SERVER_TOKEN : Token = Token(0);
 
@@ -67,8 +65,10 @@ fn connect(hostname: &str, port: u16) -> io::Result<TcpStream> {
 }
 
 fn main() {
-    let stream = connect(SERVER_HOST, SERVER_PORT).unwrap();
-    println!("Connected to {:?}", &stream);
+    let host = config::SERVER_HOST;
+    let port = config::SERVER_PORT;
+    let stream = connect(host, port).unwrap();
+    println!("Connected to {}:{}", host, port);
 
     let mut event_loop = EventLoop::new().unwrap();
 

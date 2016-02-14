@@ -1,15 +1,15 @@
-use crypto::md5::Md5;
-use crypto::digest::Digest;
+use std::io;
+use std::net::Ipv4Addr;
 
-use proto::{Message, MessageCode, Peer};
+use proto::connection::{Packet, Peer};
+use proto::message::{
+    LoginRequest,
+    LoginResponse,
+    ServerRequest,
+    ServerResponse,
+};
 
-const VER_MAJOR : u32 = 181;
-const VER_MINOR : u32 = 100;
-
-const USERNAME : &'static str = "abcdefgh";
-// The password is not used for much, and sent unencrypted over the wire, so
-// why not even check it in to git
-const PASSWORD : &'static str = "ijklmnop";
+use config;
 
 #[derive(Debug, Clone, Copy)]
 enum State {
@@ -30,46 +30,89 @@ impl ServerConnection {
         }
     }
 
-    pub fn make_login_message(&mut self) -> Message {
-        let mut msg = Message::new(MessageCode::Login);
-
-        msg.write_str(USERNAME).unwrap();
-        msg.write_str(PASSWORD).unwrap();
-        msg.write_u32(VER_MAJOR).unwrap();
-
-        let userpass = USERNAME.to_string() + PASSWORD;
-        msg.write_str(&Self::md5_str(&userpass)).unwrap();
-
-        msg.write_u32(VER_MINOR).unwrap();
-
-        msg
-    }
-
-    fn md5_str(string: &str) -> String {
-        let mut hasher = Md5::new();
-        hasher.input_str(string);
-        hasher.result_str()
-    }
-}
-
-impl Peer for ServerConnection {
-
-    fn read_message(&mut self) -> Option<Message> {
+    fn read_request(&mut self) -> Option<ServerRequest> {
         match self.state {
             State::NotLoggedIn => {
                 println!("Logging in...");
                 self.state = State::LoggingIn;
-                Some(self.make_login_message())
+                Some(ServerRequest::LoginRequest(LoginRequest::new(
+                            config::USERNAME,
+                            config::PASSWORD,
+                            config::VER_MAJOR,
+                            config::VER_MINOR,
+                            ).unwrap()))
             },
+
             _ => None
         }
     }
 
-    fn write_message(&mut self, message: Message) {
-        println!("write_message: {:?}", message);
+    fn write_response(&mut self, response: ServerResponse) {
+        match response {
+            ServerResponse::LoginResponse(login) => {
+                self.handle_login(login);
+            },
+            ServerResponse::UnknownResponse(code, packet) => {
+                println!("Unknown packet code {}", code);
+            },
+        }
+    }
+
+    fn handle_login(&mut self, login: LoginResponse) -> io::Result<()> {
         match self.state {
-            State::LoggingIn => (),
-            _ => ()
+            State::LoggingIn => {
+                match login {
+                    LoginResponse::LoginOk { motd, ip, password_md5_opt } => {
+                        self.state = State::LoggedIn;
+
+                        println!("Login successful!");
+                        println!("MOTD: \"{}\"", motd);
+                        println!("IP address: {}", ip);
+
+                        match password_md5_opt {
+                            Some(password_md5) => {
+                                println!("Password MD5: \"{}\"", password_md5);
+                                println!(concat!(
+                                        "Connected to official server ",
+                                        "as official client"));
+                            },
+                            None => println!(concat!(
+                                    "Connected to official server ",
+                                    "as unofficial client")),
+                        }
+                    },
+
+                    LoginResponse::LoginFail { reason } => {
+                        self.state = State::NotLoggedIn;
+                        println!("Login failed!");
+                        println!("Reason: {}", reason);
+                    }
+                }
+                Ok(())
+            },
+
+            _ => unimplemented!(),
+        }
+    }
+}
+
+impl Peer for ServerConnection {
+    fn read_packet(&mut self) -> Option<Packet> {
+        match self.read_request() {
+            Some(request) => {
+                match request.to_packet() {
+                    Ok(packet) => Some(packet),
+                    Err(e) => unimplemented!(),
+                }
+            },
+            None => None
+        }
+    }
+
+    fn write_packet(&mut self, mut packet: Packet) {
+        match ServerResponse::from_packet(packet) {
+            Ok(response) => self.write_response(response),
+            Err(e) => unimplemented!(),
         }
     }
 }
