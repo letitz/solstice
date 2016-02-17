@@ -13,7 +13,7 @@ use std::net::ToSocketAddrs;
 use mio::{EventLoop, EventSet, Handler, PollOpt, Token};
 use mio::tcp::TcpStream;
 
-use proto::connection::Connection;
+use proto::Connection;
 use server::ServerConnection;
 
 const SERVER_TOKEN : Token = Token(0);

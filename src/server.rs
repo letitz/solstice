@@ -1,15 +1,15 @@
 use std::io;
 use std::net::Ipv4Addr;
 
-use proto::connection::{Packet, Peer};
+use config;
+
+use proto::{Peer, Packet};
 use proto::server::{
     LoginRequest,
     LoginResponse,
     ServerRequest,
     ServerResponse,
 };
-
-use config;
 
 #[derive(Debug, Clone, Copy)]
 enum State {

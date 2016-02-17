@@ -4,7 +4,7 @@ use std::net;
 use crypto::md5::Md5;
 use crypto::digest::Digest;
 
-use proto::connection::Packet;
+use super::Packet;
 
 const VERSION_MAJOR: u32 = 181;
 const VERSION_MINOR: u32 = 0;
