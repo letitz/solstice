@@ -2,7 +2,7 @@ use std::io;
 use std::net::Ipv4Addr;
 
 use proto::connection::{Packet, Peer};
-use proto::message::{
+use proto::server::{
     LoginRequest,
     LoginResponse,
     ServerRequest,
