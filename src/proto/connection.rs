@@ -4,6 +4,7 @@ use std::io::{Cursor, Read, Write};
 use std::mem;
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
+use mio::TryRead;
 use mio::tcp::TcpStream;
 
 const MAX_PACKET_SIZE: usize = 1 << 20; // 1 MiB
@@ -152,8 +153,10 @@ impl<T: Peer> Connection<T> {
 
     pub fn ready_to_read(&mut self, stream: &mut TcpStream) {
         let offset = self.buffer.len() - self.num_bytes_left;
-        match stream.read(&mut self.buffer[offset..]) {
-            Ok(num_bytes_read) => {
+        match stream.try_read(&mut self.buffer[offset..]) {
+            Ok(None) => (),
+
+            Ok(Some(num_bytes_read)) => {
                 assert!(num_bytes_read <= self.num_bytes_left);
                 self.num_bytes_left -= num_bytes_read;
             },

@@ -16,7 +16,7 @@ use mio::tcp::TcpStream;
 use proto::Connection;
 use server::ServerConnection;
 
-const SERVER_TOKEN : Token = Token(0);
+const SERVER_TOKEN: Token = Token(0);
 
 #[derive(Debug)]
 struct ConnectionHandler {
