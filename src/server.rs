@@ -1,9 +1,10 @@
 use std::io;
+use std::io::{Read, Write};
 use std::net::Ipv4Addr;
 
 use config;
 
-use proto::{Peer, Packet};
+use proto::{Packet, PacketStream};
 use proto::server::{
     LoginRequest,
     LoginResponse,
@@ -19,42 +20,53 @@ enum State {
 }
 
 #[derive(Debug)]
-pub struct ServerConnection {
+pub struct ServerConnection<T: Read + Write> {
     state: State,
+    server_stream: PacketStream<T>,
 }
 
-impl ServerConnection {
-    pub fn new() -> Self {
+impl<T: Read + Write> ServerConnection<T> {
+    pub fn new(server_stream: PacketStream<T>) -> Self {
         ServerConnection {
             state: State::NotLoggedIn,
+            server_stream: server_stream,
         }
     }
 
-    fn read_request(&mut self) -> Option<ServerRequest> {
+    pub fn server_writable(&mut self) {
         match self.state {
             State::NotLoggedIn => {
                 println!("Logging in...");
                 self.state = State::LoggingIn;
-                Some(ServerRequest::LoginRequest(LoginRequest::new(
+                let request = ServerRequest::LoginRequest(LoginRequest::new(
                             config::USERNAME,
                             config::PASSWORD,
                             config::VER_MAJOR,
                             config::VER_MINOR,
-                            ).unwrap()))
+                            ).unwrap());
+                self.server_stream.try_write(request.to_packet().unwrap());
             },
 
-            _ => None
+            _ => ()
         }
     }
 
-    fn write_response(&mut self, response: ServerResponse) {
-        match response {
-            ServerResponse::LoginResponse(login) => {
-                self.handle_login(login);
+    pub fn server_readable(&mut self) {
+        match self.server_stream.try_read() {
+            Ok(Some(packet)) => {
+                match ServerResponse::from_packet(packet).unwrap() {
+                    ServerResponse::LoginResponse(login) => {
+                        self.handle_login(login);
+                    },
+                    ServerResponse::UnknownResponse(code, packet) => {
+                        println!("Unknown packet code {}", code);
+                    },
+                }
             },
-            ServerResponse::UnknownResponse(code, packet) => {
-                println!("Unknown packet code {}", code);
-            },
+
+            Ok(None) => (),
+
+            Err(e) => error!("Could not read packet from server: {:?}", e),
         }
     }
 
@@ -92,27 +104,6 @@ impl ServerConnection {
             },
 
             _ => unimplemented!(),
-        }
-    }
-}
-
-impl Peer for ServerConnection {
-    fn read_packet(&mut self) -> Option<Packet> {
-        match self.read_request() {
-            Some(request) => {
-                match request.to_packet() {
-                    Ok(packet) => Some(packet),
-                    Err(e) => unimplemented!(),
-                }
-            },
-            None => None
-        }
-    }
-
-    fn write_packet(&mut self, mut packet: Packet) {
-        match ServerResponse::from_packet(packet) {
-            Ok(response) => self.write_response(response),
-            Err(e) => unimplemented!(),
         }
     }
 }

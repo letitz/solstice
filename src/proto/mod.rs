@@ -1,4 +1,4 @@
-mod connection;
+mod packet;
 pub mod server;
 
-pub use self::connection::{Connection, Packet, Peer};
+pub use self::packet::{PacketStream, Packet};

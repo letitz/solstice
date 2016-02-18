@@ -13,23 +13,20 @@ use std::net::ToSocketAddrs;
 use mio::{EventLoop, EventSet, Handler, PollOpt, Token};
 use mio::tcp::TcpStream;
 
-use proto::Connection;
+use proto::PacketStream;
 use server::ServerConnection;
 
 const SERVER_TOKEN: Token = Token(0);
 
 #[derive(Debug)]
 struct ConnectionHandler {
-    server_conn: Connection<ServerConnection>,
-    server_stream: TcpStream,
+    server_conn: ServerConnection<TcpStream>,
 }
 
 impl ConnectionHandler {
-    fn new(server_conn: Connection<ServerConnection>, server_stream: TcpStream)
-        -> Self {
+    fn new(server_conn: ServerConnection<TcpStream>) -> Self {
         ConnectionHandler{
             server_conn: server_conn,
-            server_stream: server_stream,
         }
     }
 }
@@ -42,12 +39,14 @@ impl Handler for ConnectionHandler {
              token: Token, event_set: EventSet) {
 
         match token {
-            SERVER_TOKEN =>
+            SERVER_TOKEN => {
                 if event_set.is_readable() {
-                    self.server_conn.ready_to_read(&mut self.server_stream)
-                } else {
-                    self.server_conn.ready_to_write(&mut self.server_stream)
-                },
+                    self.server_conn.server_readable();
+                }
+                if event_set.is_writable() {
+                    self.server_conn.server_writable();
+                }
+            },
 
             _ => unreachable!("Unknown token"),
         }
@@ -76,10 +75,11 @@ fn main() {
         &stream,
         SERVER_TOKEN,
         EventSet::readable() | EventSet::writable(),
-        PollOpt::edge()).unwrap();
+        PollOpt::level()).unwrap();
 
-    let server_conn = Connection::new(ServerConnection::new());
-    let mut handler = ConnectionHandler::new(server_conn, stream);
+    let packet_stream = PacketStream::new(stream);
+    let server_conn = ServerConnection::new(packet_stream);
+    let mut handler = ConnectionHandler::new(server_conn);
 
     event_loop.run(&mut handler).unwrap();
 }

@@ -4,7 +4,7 @@ use std::io::{Cursor, Read, Write};
 use std::mem;
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
-use mio::TryRead;
+use mio::{TryRead, TryWrite};
 use mio::tcp::TcpStream;
 
 const MAX_PACKET_SIZE: usize = 1 << 20; // 1 MiB
@@ -119,13 +119,6 @@ impl io::Read for Packet {
     }
 }
 
-
-
-pub trait Peer {
-    fn read_packet(&mut self) -> Option<Packet>;
-    fn write_packet(&mut self, packet: Packet);
-}
-
 #[derive(Debug, Clone, Copy)]
 enum State {
     ReadingLength,
@@ -133,39 +126,37 @@ enum State {
 }
 
 #[derive(Debug)]
-pub struct Connection<T: Peer> {
+pub struct PacketStream<T: Read + Write> {
+    stream: T,
     state: State,
     num_bytes_left: usize,
     buffer: Vec<u8>,
-    peer: T,
 }
 
-impl<T: Peer> Connection<T> {
+impl<T: Read + Write> PacketStream<T> {
 
-    pub fn new(peer: T) -> Self {
-        Connection {
+    pub fn new(stream: T) -> Self {
+        PacketStream {
+            stream: stream,
             state: State::ReadingLength,
             num_bytes_left: U32_SIZE,
             buffer: vec![0; U32_SIZE],
-            peer: peer,
         }
     }
 
-    pub fn ready_to_read(&mut self, stream: &mut TcpStream) {
+    pub fn try_read(&mut self) -> io::Result<Option<Packet>> {
         let offset = self.buffer.len() - self.num_bytes_left;
-        match stream.try_read(&mut self.buffer[offset..]) {
-            Ok(None) => (),
+        match try!(self.stream.try_read(&mut self.buffer[offset..])) {
+            None => (),
 
-            Ok(Some(num_bytes_read)) => {
+            Some(num_bytes_read) => {
                 assert!(num_bytes_read <= self.num_bytes_left);
                 self.num_bytes_left -= num_bytes_read;
             },
-
-            Err(e) => error!("Could not read stream: {:?}", e),
         }
 
         if self.num_bytes_left > 0 {
-            return;
+            return Ok(None);
         }
 
         match self.state {
@@ -178,6 +169,7 @@ impl<T: Peer> Connection<T> {
                 self.state = State::ReadingPacket;
                 self.num_bytes_left = message_len;
                 self.buffer.extend(repeat(0).take(message_len));
+                self.try_read()
             },
 
             State::ReadingPacket => {
@@ -185,18 +177,15 @@ impl<T: Peer> Connection<T> {
                 self.num_bytes_left = U32_SIZE;
                 let new_buffer = vec![0;U32_SIZE];
                 let old_buffer = mem::replace(&mut self.buffer, new_buffer);
-                self.peer.write_packet(Packet::from_raw_parts(old_buffer));
+                Ok(Some(Packet::from_raw_parts(old_buffer)))
             }
         }
     }
 
-    pub fn ready_to_write(&mut self, stream: &mut TcpStream) {
-        match self.peer.read_packet() {
-            Some(packet) => {
-                stream.write(&packet.finalize()).unwrap();
-                ()
-            },
-            None => (),
+    pub fn try_write(&mut self, packet: Packet) -> io::Result<Option<()>> {
+        match try!(self.stream.try_write(&packet.finalize())) {
+            None => Ok(None),
+            Some(_) => Ok(Some(()))
         }
     }
 }
