@@ -8,10 +8,15 @@ use super::Packet;
 
 const CODE_LOGIN: u32 = 1;
 const CODE_ROOM_LIST: u32 = 64;
+const CODE_PARENT_MIN_SPEED: u32 = 83;
 
 trait WriteToPacket {
     fn write_to_packet(&self, &mut Packet) -> io::Result<()>;
 }
+
+/*================*
+ * SERVER REQUEST *
+ *================*/
 
 pub enum ServerRequest {
     LoginRequest(LoginRequest),
@@ -32,9 +37,16 @@ impl ServerRequest {
     }
 }
 
+/*=================*
+ * SERVER RESPONSE *
+ *=================*/
+
 pub enum ServerResponse {
     LoginResponse(LoginResponse),
     RoomListResponse(RoomListResponse),
+
+    // Unused/unknown responses
+    ParentMinSpeedResponse(ParentMinSpeedResponse),
 
     UnknownResponse(u32, Packet),
 }
@@ -48,6 +60,10 @@ impl ServerResponse {
 
             CODE_ROOM_LIST => ServerResponse::RoomListResponse(
                 try!(RoomListResponse::from_packet(packet))
+                ),
+
+            CODE_PARENT_MIN_SPEED => ServerResponse::ParentMinSpeedResponse(
+                try!(ParentMinSpeedResponse::from_packet(packet))
                 ),
 
             code => ServerResponse::UnknownResponse(code, packet),
@@ -212,3 +228,21 @@ impl RoomListResponse {
         Ok(rooms)
     }
 }
+
+/*==================*
+ * PARENT MIN SPEED *
+ *==================*/
+
+pub struct ParentMinSpeedResponse {
+    pub value: u32,
+}
+
+impl ParentMinSpeedResponse {
+    fn from_packet(mut packet: Packet) -> io::Result<Self> {
+        let value = try!(packet.read_uint());
+        Ok(ParentMinSpeedResponse {
+            value: value,
+        })
+    }
+}
+
