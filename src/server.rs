@@ -83,11 +83,11 @@ impl ServerConnection {
             ServerResponse::RoomListResponse(response) =>
                 self.handle_room_list_response(response),
 
-            ServerResponse::ParentMinSpeedResponse(response) =>
-                self.handle_parent_min_speed_response(response),
+            ServerResponse::UnknownResponse(code, packet) =>
+                warn!("Unknown response: code {}, size {}",
+                      code, packet.bytes_remaining()),
 
-            ServerResponse::UnknownResponse(code, _) =>
-                warn!("Unknown packet code {}", code),
+            response => warn!("Unhandled response: {:?}", response),
         }
     }
 
@@ -140,12 +140,6 @@ impl ServerConnection {
         for (ref room_name, num_members) in room_list_response.rooms {
             info!("Room \"{}\" has {} members", room_name, num_members);
         }
-    }
-
-    fn handle_parent_min_speed_response(
-        &mut self, response: ParentMinSpeedResponse) {
-        debug!("Received ParentMinSpeedResponse with value {}",
-               response.value);
     }
 }
 

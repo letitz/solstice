@@ -9,6 +9,7 @@ use super::Packet;
 const CODE_LOGIN: u32 = 1;
 const CODE_ROOM_LIST: u32 = 64;
 const CODE_PARENT_MIN_SPEED: u32 = 83;
+const CODE_PARENT_SPEED_RATIO: u32 = 84;
 
 trait WriteToPacket {
     fn write_to_packet(&self, &mut Packet) -> io::Result<()>;
@@ -18,6 +19,7 @@ trait WriteToPacket {
  * SERVER REQUEST *
  *================*/
 
+#[derive(Debug)]
 pub enum ServerRequest {
     LoginRequest(LoginRequest),
     RoomListRequest(RoomListRequest),
@@ -41,12 +43,14 @@ impl ServerRequest {
  * SERVER RESPONSE *
  *=================*/
 
+#[derive(Debug)]
 pub enum ServerResponse {
     LoginResponse(LoginResponse),
     RoomListResponse(RoomListResponse),
 
-    // Unused/unknown responses
+    // Unknown purpose
     ParentMinSpeedResponse(ParentMinSpeedResponse),
+    ParentSpeedRatioResponse(ParentSpeedRatioResponse),
 
     UnknownResponse(u32, Packet),
 }
@@ -55,16 +59,24 @@ impl ServerResponse {
     pub fn from_packet(mut packet: Packet) -> io::Result<Self> {
         let code = try!(packet.read_uint());
         let resp = match code {
-            CODE_LOGIN => ServerResponse::LoginResponse(
-                try!(LoginResponse::from_packet(&mut packet))
+            CODE_LOGIN =>
+                ServerResponse::LoginResponse(
+                    try!(LoginResponse::from_packet(&mut packet))
                 ),
 
-            CODE_ROOM_LIST => ServerResponse::RoomListResponse(
-                try!(RoomListResponse::from_packet(&mut packet))
+            CODE_ROOM_LIST =>
+                ServerResponse::RoomListResponse(
+                    try!(RoomListResponse::from_packet(&mut packet))
                 ),
 
-            CODE_PARENT_MIN_SPEED => ServerResponse::ParentMinSpeedResponse(
-                try!(ParentMinSpeedResponse::from_packet(&mut packet))
+            CODE_PARENT_MIN_SPEED =>
+                ServerResponse::ParentMinSpeedResponse(
+                    try!(ParentMinSpeedResponse::from_packet(&mut packet))
+                ),
+
+            CODE_PARENT_SPEED_RATIO =>
+                ServerResponse::ParentSpeedRatioResponse(
+                    try!(ParentSpeedRatioResponse::from_packet(&mut packet))
                 ),
 
             code => return Ok(ServerResponse::UnknownResponse(code, packet)),
@@ -88,6 +100,7 @@ fn md5_str(string: &str) -> String {
  * LOGIN *
  *=======*/
 
+#[derive(Debug)]
 pub struct LoginRequest {
     username: String,
     password: String,
@@ -126,6 +139,7 @@ impl WriteToPacket for LoginRequest {
     }
 }
 
+#[derive(Debug)]
 pub enum LoginResponse {
     LoginOk {
         motd: String,
@@ -165,6 +179,7 @@ impl LoginResponse {
  * ROOM LIST *
  *===========*/
 
+#[derive(Debug)]
 pub struct RoomListRequest;
 
 impl RoomListRequest {
@@ -179,6 +194,7 @@ impl WriteToPacket for RoomListRequest {
     }
 }
 
+#[derive(Debug)]
 pub struct RoomListResponse {
     pub rooms: Vec<(String, u32)>,
     pub owned_private_rooms: Vec<(String, u32)>,
@@ -260,6 +276,7 @@ impl RoomListResponse {
  * PARENT MIN SPEED *
  *==================*/
 
+#[derive(Debug)]
 pub struct ParentMinSpeedResponse {
     pub value: u32,
 }
@@ -268,6 +285,24 @@ impl ParentMinSpeedResponse {
     fn from_packet(packet: &mut Packet) -> io::Result<Self> {
         let value = try!(packet.read_uint());
         Ok(ParentMinSpeedResponse {
+            value: value,
+        })
+    }
+}
+
+/*====================*
+ * PARENT SPEED RATIO *
+ *====================*/
+
+#[derive(Debug)]
+pub struct ParentSpeedRatioResponse {
+    pub value: u32,
+}
+
+impl ParentSpeedRatioResponse {
+    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+        let value = try!(packet.read_uint());
+        Ok(ParentSpeedRatioResponse {
             value: value,
         })
     }
