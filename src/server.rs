@@ -40,7 +40,7 @@ impl ServerConnection {
     pub fn server_writable(&mut self) {
         match self.state {
             State::NotLoggedIn => {
-                println!("Logging in...");
+                info!("Logging in...");
                 self.state = State::LoggingIn;
                 self.server_interest = EventSet::readable();
                 let request = ServerRequest::LoginRequest(LoginRequest::new(
@@ -79,7 +79,7 @@ impl ServerConnection {
                 self.handle_room_list_response(room_list_response),
 
             ServerResponse::UnknownResponse(code, _) =>
-                println!("Unknown packet code {}", code),
+                warn!("Unknown packet code {}", code),
         }
     }
 
@@ -99,18 +99,17 @@ impl ServerConnection {
                     LoginResponse::LoginOk { motd, ip, password_md5_opt } => {
                         self.state = State::LoggedIn;
 
-                        println!("Login successful!");
-                        println!("MOTD: \"{}\"", motd);
-                        println!("IP address: {}", ip);
+                        info!("Login successful!");
+                        info!("MOTD: \"{}\"", motd);
+                        info!("External IP address: {}", ip);
 
                         match password_md5_opt {
                             Some(password_md5) => {
-                                println!("Password MD5: \"{}\"", password_md5);
-                                println!(concat!(
+                                info!(concat!(
                                         "Connected to official server ",
                                         "as official client"));
                             },
-                            None => println!(concat!(
+                            None => info!(concat!(
                                     "Connected to official server ",
                                     "as unofficial client")),
                         }
@@ -118,8 +117,7 @@ impl ServerConnection {
 
                     LoginResponse::LoginFail { reason } => {
                         self.state = State::NotLoggedIn;
-                        println!("Login failed!");
-                        println!("Reason: {}", reason);
+                        error!("Login failed: \"{}\"", reason);
                     }
                 }
             },

@@ -33,7 +33,7 @@ fn main() {
     let host = config::SERVER_HOST;
     let port = config::SERVER_PORT;
     let stream = connect(host, port).unwrap();
-    println!("Connected to {}:{}", host, port);
+    info!("Connected to {}:{}", host, port);
 
     let mut event_loop = EventLoop::new().unwrap();
 
