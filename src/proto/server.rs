@@ -12,8 +12,13 @@ const VERSION_MINOR: u32 = 0;
 const CODE_LOGIN: u32 = 1;
 const CODE_ROOM_LIST: u32 = 64;
 
+trait WriteToPacket {
+    fn write_to_packet(&self, &mut Packet) -> io::Result<()>;
+}
+
 pub enum ServerRequest {
     LoginRequest(LoginRequest),
+    RoomListRequest(RoomListRequest),
 }
 
 impl ServerRequest {
@@ -21,14 +26,13 @@ impl ServerRequest {
         let (mut packet, request): (Packet, &WriteToPacket) = match *self {
             ServerRequest::LoginRequest(ref request) =>
                 (Packet::new(CODE_LOGIN), request),
+
+            ServerRequest::RoomListRequest(ref request) =>
+                (Packet::new(CODE_ROOM_LIST), request),
         };
         try!(request.write_to_packet(&mut packet));
         Ok(packet)
     }
-}
-
-trait WriteToPacket {
-    fn write_to_packet(&self, &mut Packet) -> io::Result<()>;
 }
 
 pub enum ServerResponse {
@@ -53,6 +57,10 @@ fn md5_str(string: &str) -> String {
     hasher.input_str(string);
     hasher.result_str()
 }
+
+/*=======*
+ * LOGIN *
+ *=======*/
 
 pub struct LoginRequest {
     username: String,
@@ -123,3 +131,20 @@ impl LoginResponse {
     }
 }
 
+/*===========*
+ * ROOM LIST *
+ *===========*/
+
+pub struct RoomListRequest;
+
+impl RoomListRequest {
+    pub fn new() -> Self {
+        RoomListRequest
+    }
+}
+
+impl WriteToPacket for RoomListRequest {
+    fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
+        Ok(())
+    }
+}
