@@ -183,40 +183,46 @@ pub struct RoomListResponse {
     pub rooms: Vec<(String, u32)>,
     pub owned_private_rooms: Vec<(String, u32)>,
     pub other_private_rooms: Vec<(String, u32)>,
+    pub operated_private_room_names: Vec<String>,
 }
 
 impl RoomListResponse {
     fn from_packet(packet: &mut Packet) -> io::Result<Self> {
-        let rooms = try!(Self::read_rooms(packet));
-
-        let (owned_private_rooms, other_private_rooms) =
-            match Self::read_rooms(packet) {
-
-            Err(e) => {
-                warn!("Error while parsing RoomListResponse: {}", e);
-                (Vec::new(), Vec::new())
-            },
-
-            Ok(owned_private_rooms) => match Self::read_rooms(packet) {
-                Err(e) => {
-                    warn!("Error while parsing RoomListResponse: {}", e);
-                    (owned_private_rooms, Vec::new())
-                },
-
-                Ok(other_private_rooms) =>
-                    (owned_private_rooms, other_private_rooms)
-            },
+        let mut response = RoomListResponse {
+            rooms: Vec::new(),
+            owned_private_rooms: Vec::new(),
+            other_private_rooms: Vec::new(),
+            operated_private_room_names: Vec::new(),
         };
 
-        Ok(RoomListResponse {
-            rooms: rooms,
-            owned_private_rooms: owned_private_rooms,
-            other_private_rooms: other_private_rooms,
-        })
+        try!(Self::read_rooms(packet, &mut response.rooms));
+
+        if let Err(e) =
+            Self::read_rooms(packet, &mut response.owned_private_rooms) {
+            warn!("Error parsing owned_private_rooms: {}", e);
+            return Ok(response);
+        }
+
+        if let Err(e) =
+            Self::read_rooms(packet, &mut response.other_private_rooms) {
+            warn!("Error parsing other_private_rooms: {}", e);
+            return Ok(response);
+        }
+
+        if let Err(e) =
+            Self::read_room_names(packet,
+                                  &mut response.operated_private_room_names)
+        {
+            warn!("Error parsing operated_private_rooms: {}", e);
+        }
+
+        Ok(response)
     }
 
-    fn read_rooms(packet: &mut Packet) -> io::Result<Vec<(String, u32)>> {
-        let mut rooms = Vec::new();
+    fn read_rooms(packet: &mut Packet, rooms: &mut Vec<(String, u32)>)
+        -> io::Result<()>
+    {
+        let original_rooms_len = rooms.len();
 
         let num_rooms = try!(packet.read_uint()) as usize;
         for _ in 0..num_rooms {
@@ -227,7 +233,7 @@ impl RoomListResponse {
         let num_user_counts = try!(packet.read_uint()) as usize;
         for i in 0..num_user_counts {
             let user_count = try!(packet.read_uint());
-            rooms[i].1 = user_count;
+            rooms[original_rooms_len+i].1 = user_count;
         }
 
         if num_rooms != num_user_counts {
@@ -235,7 +241,18 @@ impl RoomListResponse {
                      num_rooms, num_user_counts);
         }
 
-        Ok(rooms)
+        Ok(())
+    }
+
+    fn read_room_names(packet: &mut Packet, room_names: &mut Vec<String>)
+        -> io::Result<()>
+    {
+        let num_rooms = try!(packet.read_uint()) as usize;
+        for _ in 0..num_rooms {
+            let room_name = try!(packet.read_str());
+            room_names.push(room_name);
+        }
+        Ok(())
     }
 }
 
