@@ -95,7 +95,7 @@ impl Packet {
     pub fn finalize(mut self) -> Vec<u8> {
         let bytes_len = (self.bytes.len() - U32_SIZE) as u32;
         {
-            let mut first_word = &mut self.bytes[..4];
+            let mut first_word = &mut self.bytes[..U32_SIZE];
             first_word.write_u32::<LittleEndian>(bytes_len).unwrap();
         }
         self.bytes
@@ -116,9 +116,8 @@ impl io::Read for Packet {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let mut slice = &self.bytes[self.cursor..];
         let result = slice.read(buf);
-        match result {
-            Ok(num_bytes_read) => self.cursor += num_bytes_read,
-            Err(_) => ()
+        if let Ok(num_bytes_read) = result {
+            self.cursor += num_bytes_read
         }
         result
     }

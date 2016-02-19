@@ -143,6 +143,10 @@ impl LoginResponse {
         let resp = if ok {
             let motd = try!(packet.read_str());
             let ip = net::Ipv4Addr::from(try!(packet.read_uint()));
+            match packet.read_bool() {
+                Ok(value) => debug!("LoginResponse last field: {}", value),
+                Err(e) => debug!("Error reading LoginResponse field: {:?}", e),
+            }
             LoginResponse::LoginOk {
                 motd: motd,
                 ip: ip,
@@ -150,7 +154,7 @@ impl LoginResponse {
             }
         } else {
             LoginResponse::LoginFail {
-                reason: try!(packet.read_str()).to_string()
+                reason: try!(packet.read_str())
             }
         };
         Ok(resp)
