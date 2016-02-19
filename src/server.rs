@@ -7,12 +7,7 @@ use mio::tcp::TcpStream;
 
 use config;
 use proto::{Packet, PacketStream};
-use proto::server::{
-    LoginRequest,
-    LoginResponse,
-    ServerRequest,
-    ServerResponse,
-};
+use proto::server::*;
 
 #[derive(Debug, Clone, Copy)]
 enum State {
@@ -66,14 +61,8 @@ impl ServerConnection {
     pub fn server_readable(&mut self) {
         match self.server_stream.try_read() {
             Ok(Some(packet)) => {
-                match ServerResponse::from_packet(packet).unwrap() {
-                    ServerResponse::LoginResponse(login) => {
-                        self.handle_login(login);
-                    },
-                    ServerResponse::UnknownResponse(code, packet) => {
-                        println!("Unknown packet code {}", code);
-                    },
-                }
+                let response = ServerResponse::from_packet(packet).unwrap();
+                self.handle_server_response(response)
             },
 
             Ok(None) => (),
@@ -82,12 +71,25 @@ impl ServerConnection {
         }
     }
 
+    fn handle_server_response(&mut self, response: ServerResponse) {
+        match response {
+            ServerResponse::LoginResponse(login_response) =>
+                self.handle_login_response(login_response),
+
+            ServerResponse::RoomListResponse(room_list_response) =>
+                self.handle_room_list_response(room_list_response),
+
+            ServerResponse::UnknownResponse(code, packet) =>
+                println!("Unknown packet code {}", code),
+        }
+    }
+
     pub fn register_all<T: Handler>(&self, event_loop: &mut EventLoop<T>) {
         self.server_stream.register(event_loop, self.server_token,
                                     self.server_interest, PollOpt::edge());
     }
 
-    fn handle_login(&mut self, login: LoginResponse) -> io::Result<()> {
+    fn handle_login_response(&mut self, login: LoginResponse) {
         match self.state {
             State::LoggingIn => {
                 match login {
@@ -117,10 +119,17 @@ impl ServerConnection {
                         println!("Reason: {}", reason);
                     }
                 }
-                Ok(())
             },
 
             _ => unimplemented!(),
+        }
+    }
+
+    fn handle_room_list_response(&mut self,
+                                 room_list_response: RoomListResponse) {
+        info!("Received room list");
+        for (ref room_name, num_members) in room_list_response.rooms {
+            info!("Room \"{}\" has {} members", room_name, num_members);
         }
     }
 }

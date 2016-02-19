@@ -37,6 +37,8 @@ impl ServerRequest {
 
 pub enum ServerResponse {
     LoginResponse(LoginResponse),
+    RoomListResponse(RoomListResponse),
+
     UnknownResponse(u32, Packet),
 }
 
@@ -44,7 +46,12 @@ impl ServerResponse {
     pub fn from_packet(mut packet: Packet) -> io::Result<Self> {
         let resp = match try!(packet.read_uint()) {
             CODE_LOGIN => ServerResponse::LoginResponse(
-                try!(LoginResponse::from_packet(packet))),
+                try!(LoginResponse::from_packet(packet))
+                ),
+
+            CODE_ROOM_LIST => ServerResponse::RoomListResponse(
+                try!(RoomListResponse::from_packet(packet))
+                ),
 
             code => ServerResponse::UnknownResponse(code, packet),
         };
@@ -115,7 +122,7 @@ impl LoginResponse {
     pub fn from_packet(mut packet: Packet) -> io::Result<Self> {
         let ok = try!(packet.read_bool());
         let resp = if ok {
-            let motd = try!(packet.read_str()).to_string();
+            let motd = try!(packet.read_str());
             let ip = net::Ipv4Addr::from(try!(packet.read_uint()));
             LoginResponse::LoginOk {
                 motd: motd,
@@ -146,5 +153,59 @@ impl RoomListRequest {
 impl WriteToPacket for RoomListRequest {
     fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
         Ok(())
+    }
+}
+
+pub struct RoomListResponse {
+    pub rooms: Vec<(String, u32)>,
+    pub owned_private_rooms: Vec<(String, u32)>,
+    pub other_private_rooms: Vec<(String, u32)>,
+}
+
+impl RoomListResponse {
+    fn from_packet(mut packet: Packet) -> io::Result<Self> {
+        let rooms = try!(Self::read_rooms(&mut packet));
+
+        let (owned_private_rooms, other_private_rooms) =
+            match Self::read_rooms(&mut packet) {
+
+            Err(e) => (Vec::new(), Vec::new()),
+
+            Ok(owned_private_rooms) => match Self::read_rooms(&mut packet) {
+                Err(e) => (owned_private_rooms, Vec::new()),
+
+                Ok(other_private_rooms) =>
+                    (owned_private_rooms, other_private_rooms)
+            },
+        };
+
+        Ok(RoomListResponse {
+            rooms: rooms,
+            owned_private_rooms: owned_private_rooms,
+            other_private_rooms: other_private_rooms,
+        })
+    }
+
+    fn read_rooms(packet: &mut Packet) -> io::Result<Vec<(String, u32)>> {
+        let mut rooms = Vec::new();
+
+        let num_rooms = try!(packet.read_uint()) as usize;
+        for i in 0..num_rooms {
+            let room_name = try!(packet.read_str());
+            rooms.push((room_name, 0));
+        }
+
+        let num_user_counts = try!(packet.read_uint()) as usize;
+        for i in 0..num_user_counts {
+            let user_count = try!(packet.read_uint());
+            rooms[i].1 = user_count;
+        }
+
+        if num_rooms != num_user_counts {
+            warn!("Numbers of rooms and user counts do not match: {} != {}",
+                     num_rooms, num_user_counts);
+        }
+
+        Ok(rooms)
     }
 }

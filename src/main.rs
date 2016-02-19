@@ -2,10 +2,11 @@ mod server;
 mod proto;
 mod config;
 
-#[macro_use] extern crate log;
-extern crate mio;
 extern crate byteorder;
 extern crate crypto;
+#[macro_use] extern crate log;
+extern crate env_logger;
+extern crate mio;
 
 use std::io;
 use std::net::ToSocketAddrs;
@@ -27,6 +28,8 @@ fn connect(hostname: &str, port: u16) -> io::Result<TcpStream> {
 }
 
 fn main() {
+    env_logger::init().unwrap();
+
     let host = config::SERVER_HOST;
     let port = config::SERVER_PORT;
     let stream = connect(host, port).unwrap();
