@@ -60,13 +60,18 @@ impl ServerConnection {
     pub fn server_readable(&mut self) {
         match self.server_stream.try_read() {
             Ok(Some(packet)) => {
-                let response = ServerResponse::from_packet(packet).unwrap();
-                self.handle_server_response(response)
+                match ServerResponse::from_packet(packet) {
+                    Ok(response) =>
+                        self.handle_server_response(response),
+
+                    Err(e) =>
+                        error!("Error while parsing server packet: {}", e),
+                }
             },
 
             Ok(None) => (),
 
-            Err(e) => error!("Could not read packet from server: {:?}", e),
+            Err(e) => error!("Error while reading server packet: {:?}", e),
         }
     }
 
