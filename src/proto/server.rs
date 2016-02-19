@@ -18,14 +18,17 @@ pub enum ServerRequest {
 
 impl ServerRequest {
     pub fn to_packet(&self) -> io::Result<Packet> {
-        match *self {
-            ServerRequest::LoginRequest(ref request) => {
-                let mut packet = Packet::new(CODE_LOGIN);
-                try!(request.write_to_packet(&mut packet));
-                Ok(packet)
-            },
-        }
+        let (mut packet, request): (Packet, &WriteToPacket) = match *self {
+            ServerRequest::LoginRequest(ref request) =>
+                (Packet::new(CODE_LOGIN), request),
+        };
+        try!(request.write_to_packet(&mut packet));
+        Ok(packet)
     }
+}
+
+trait WriteToPacket {
+    fn write_to_packet(&self, &mut Packet) -> io::Result<()>;
 }
 
 pub enum ServerResponse {
@@ -72,8 +75,10 @@ impl LoginRequest {
             Err("Empty password")
         }
     }
+}
 
-    pub fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
+impl WriteToPacket for LoginRequest {
+    fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
         let userpass = String::new() + &self.username + &self.password;
         let userpass_md5 = md5_str(&userpass);
 
