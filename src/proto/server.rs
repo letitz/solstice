@@ -10,6 +10,7 @@ const VERSION_MAJOR: u32 = 181;
 const VERSION_MINOR: u32 = 0;
 
 const CODE_LOGIN: u32 = 1;
+const CODE_ROOM_LIST: u32 = 64;
 
 pub enum ServerRequest {
     LoginRequest(LoginRequest),
@@ -116,3 +117,4 @@ impl LoginResponse {
         Ok(resp)
     }
 }
+

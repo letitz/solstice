@@ -4,7 +4,9 @@ use std::io::{Cursor, Read, Write};
 use std::mem;
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
-use mio::{TryRead, TryWrite};
+use mio::{
+    Evented, EventLoop, EventSet, Handler, PollOpt, Token, TryRead, TryWrite
+};
 use mio::tcp::TcpStream;
 
 const MAX_PACKET_SIZE: usize = 1 << 20; // 1 MiB
@@ -126,14 +128,14 @@ enum State {
 }
 
 #[derive(Debug)]
-pub struct PacketStream<T: Read + Write> {
+pub struct PacketStream<T: Read + Write + Evented> {
     stream: T,
     state: State,
     num_bytes_left: usize,
     buffer: Vec<u8>,
 }
 
-impl<T: Read + Write> PacketStream<T> {
+impl<T: Read + Write + Evented> PacketStream<T> {
 
     pub fn new(stream: T) -> Self {
         PacketStream {
@@ -187,5 +189,17 @@ impl<T: Read + Write> PacketStream<T> {
             None => Ok(None),
             Some(_) => Ok(Some(()))
         }
+    }
+
+    pub fn register<U: Handler>(&self, event_loop: &mut EventLoop<U>,
+                                token: Token, event_set: EventSet,
+                                poll_opt: PollOpt) {
+        event_loop.register(&self.stream, token, event_set, poll_opt);
+    }
+
+    pub fn reregister<U: Handler>(&self, event_loop: &mut EventLoop<U>,
+                                token: Token, event_set: EventSet,
+                                poll_opt: PollOpt) {
+        event_loop.reregister(&self.stream, token, event_set, poll_opt);
     }
 }

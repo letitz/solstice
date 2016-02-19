@@ -2,8 +2,10 @@ use std::io;
 use std::io::{Read, Write};
 use std::net::Ipv4Addr;
 
-use config;
+use mio::{EventLoop, EventSet, Handler, PollOpt, Token};
+use mio::tcp::TcpStream;
 
+use config;
 use proto::{Packet, PacketStream};
 use proto::server::{
     LoginRequest,
@@ -20,16 +22,25 @@ enum State {
 }
 
 #[derive(Debug)]
-pub struct ServerConnection<T: Read + Write> {
+pub struct ServerConnection {
     state: State,
-    server_stream: PacketStream<T>,
+
+    token_counter: usize,
+
+    server_token: Token,
+    server_stream: PacketStream<TcpStream>,
+    server_interest: EventSet,
 }
 
-impl<T: Read + Write> ServerConnection<T> {
-    pub fn new(server_stream: PacketStream<T>) -> Self {
+impl ServerConnection {
+    pub fn new(server_stream: PacketStream<TcpStream>) -> Self {
+        let token_counter = 0;
         ServerConnection {
             state: State::NotLoggedIn,
+            token_counter: token_counter,
+            server_token: Token(token_counter),
             server_stream: server_stream,
+            server_interest: EventSet::writable() | EventSet::readable(),
         }
     }
 
@@ -38,6 +49,7 @@ impl<T: Read + Write> ServerConnection<T> {
             State::NotLoggedIn => {
                 println!("Logging in...");
                 self.state = State::LoggingIn;
+                self.server_interest = EventSet::readable();
                 let request = ServerRequest::LoginRequest(LoginRequest::new(
                             config::USERNAME,
                             config::PASSWORD,
@@ -68,6 +80,11 @@ impl<T: Read + Write> ServerConnection<T> {
 
             Err(e) => error!("Could not read packet from server: {:?}", e),
         }
+    }
+
+    pub fn register_all<T: Handler>(&self, event_loop: &mut EventLoop<T>) {
+        self.server_stream.register(event_loop, self.server_token,
+                                    self.server_interest, PollOpt::edge());
     }
 
     fn handle_login(&mut self, login: LoginResponse) -> io::Result<()> {
@@ -104,6 +121,28 @@ impl<T: Read + Write> ServerConnection<T> {
             },
 
             _ => unimplemented!(),
+        }
+    }
+}
+
+impl Handler for ServerConnection {
+    type Timeout = ();
+    type Message = ();
+
+    fn ready(&mut self, event_loop: &mut EventLoop<Self>,
+             token: Token, event_set: EventSet) {
+        if token == self.server_token {
+            if event_set.is_writable() {
+                self.server_writable();
+            }
+            if event_set.is_readable() {
+                self.server_readable();
+            }
+            self.server_stream.reregister(
+                event_loop, token, self.server_interest,
+                PollOpt::edge() | PollOpt::oneshot())
+        } else {
+            unreachable!("Unknown token!");
         }
     }
 }
