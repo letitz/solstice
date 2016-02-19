@@ -11,7 +11,7 @@ extern crate mio;
 use std::io;
 use std::net::ToSocketAddrs;
 
-use mio::{EventLoop, EventSet, Handler, PollOpt, Token};
+use mio::EventLoop;
 use mio::tcp::TcpStream;
 
 use proto::PacketStream;
@@ -39,7 +39,7 @@ fn main() {
 
     let packet_stream = PacketStream::new(stream);
     let mut server_conn = ServerConnection::new(packet_stream);
-    server_conn.register_all(&mut event_loop);
+    server_conn.register_all(&mut event_loop).unwrap();
 
     event_loop.run(&mut server_conn).unwrap();
 }

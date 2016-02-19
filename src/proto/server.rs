@@ -6,9 +6,6 @@ use crypto::digest::Digest;
 
 use super::Packet;
 
-const VERSION_MAJOR: u32 = 181;
-const VERSION_MINOR: u32 = 0;
-
 const CODE_LOGIN: u32 = 1;
 const CODE_ROOM_LIST: u32 = 64;
 
@@ -100,7 +97,7 @@ impl WriteToPacket for LoginRequest {
         try!(packet.write_str(&self.username));
         try!(packet.write_str(&self.password));
         try!(packet.write_uint(self.major));
-        try!(packet.write_str(&md5_str(&userpass)));
+        try!(packet.write_str(&userpass_md5));
         try!(packet.write_uint(self.minor));
 
         Ok(())
@@ -151,7 +148,7 @@ impl RoomListRequest {
 }
 
 impl WriteToPacket for RoomListRequest {
-    fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
+    fn write_to_packet(&self, _: &mut Packet) -> io::Result<()> {
         Ok(())
     }
 }
@@ -169,10 +166,16 @@ impl RoomListResponse {
         let (owned_private_rooms, other_private_rooms) =
             match Self::read_rooms(&mut packet) {
 
-            Err(e) => (Vec::new(), Vec::new()),
+            Err(e) => {
+                debug!("Error while parsing RoomListResponse: {}", e);
+                (Vec::new(), Vec::new())
+            },
 
             Ok(owned_private_rooms) => match Self::read_rooms(&mut packet) {
-                Err(e) => (owned_private_rooms, Vec::new()),
+                Err(e) => {
+                    debug!("Error while parsing RoomListResponse: {}", e);
+                    (owned_private_rooms, Vec::new())
+                },
 
                 Ok(other_private_rooms) =>
                     (owned_private_rooms, other_private_rooms)
@@ -190,7 +193,7 @@ impl RoomListResponse {
         let mut rooms = Vec::new();
 
         let num_rooms = try!(packet.read_uint()) as usize;
-        for i in 0..num_rooms {
+        for _ in 0..num_rooms {
             let room_name = try!(packet.read_str());
             rooms.push((room_name, 0));
         }

@@ -1,12 +1,10 @@
 use std::io;
-use std::io::{Read, Write};
-use std::net::Ipv4Addr;
 
 use mio::{EventLoop, EventSet, Handler, PollOpt, Token};
 use mio::tcp::TcpStream;
 
 use config;
-use proto::{Packet, PacketStream};
+use proto::{PacketStream};
 use proto::server::*;
 
 #[derive(Debug, Clone, Copy)]
@@ -51,7 +49,8 @@ impl ServerConnection {
                             config::VER_MAJOR,
                             config::VER_MINOR,
                             ).unwrap());
-                self.server_stream.try_write(request.to_packet().unwrap());
+                self.server_stream.try_write(request.to_packet().unwrap())
+                    .unwrap();
             },
 
             _ => ()
@@ -79,14 +78,18 @@ impl ServerConnection {
             ServerResponse::RoomListResponse(room_list_response) =>
                 self.handle_room_list_response(room_list_response),
 
-            ServerResponse::UnknownResponse(code, packet) =>
+            ServerResponse::UnknownResponse(code, _) =>
                 println!("Unknown packet code {}", code),
         }
     }
 
-    pub fn register_all<T: Handler>(&self, event_loop: &mut EventLoop<T>) {
-        self.server_stream.register(event_loop, self.server_token,
-                                    self.server_interest, PollOpt::edge());
+    pub fn register_all<T: Handler>(&self, event_loop: &mut EventLoop<T>)
+        -> io::Result<()>
+    {
+        try!(self.server_stream.register(
+                event_loop, self.server_token, self.server_interest,
+                PollOpt::edge()));
+        Ok(())
     }
 
     fn handle_login_response(&mut self, login: LoginResponse) {
@@ -149,7 +152,7 @@ impl Handler for ServerConnection {
             }
             self.server_stream.reregister(
                 event_loop, token, self.server_interest,
-                PollOpt::edge() | PollOpt::oneshot())
+                PollOpt::edge() | PollOpt::oneshot()).unwrap();
         } else {
             unreachable!("Unknown token!");
         }
