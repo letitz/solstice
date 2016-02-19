@@ -87,6 +87,10 @@ impl Packet {
         }
     }
 
+    pub fn bytes_remaining(&self) -> usize {
+        self.bytes.len() - self.cursor
+    }
+
 
     pub fn finalize(mut self) -> Vec<u8> {
         let bytes_len = (self.bytes.len() - U32_SIZE) as u32;

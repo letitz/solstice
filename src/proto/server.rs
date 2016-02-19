@@ -53,21 +53,27 @@ pub enum ServerResponse {
 
 impl ServerResponse {
     pub fn from_packet(mut packet: Packet) -> io::Result<Self> {
-        let resp = match try!(packet.read_uint()) {
+        let code = try!(packet.read_uint());
+        let resp = match code {
             CODE_LOGIN => ServerResponse::LoginResponse(
-                try!(LoginResponse::from_packet(packet))
+                try!(LoginResponse::from_packet(&mut packet))
                 ),
 
             CODE_ROOM_LIST => ServerResponse::RoomListResponse(
-                try!(RoomListResponse::from_packet(packet))
+                try!(RoomListResponse::from_packet(&mut packet))
                 ),
 
             CODE_PARENT_MIN_SPEED => ServerResponse::ParentMinSpeedResponse(
-                try!(ParentMinSpeedResponse::from_packet(packet))
+                try!(ParentMinSpeedResponse::from_packet(&mut packet))
                 ),
 
-            code => ServerResponse::UnknownResponse(code, packet),
+            code => return Ok(ServerResponse::UnknownResponse(code, packet)),
         };
+        let bytes_remaining = packet.bytes_remaining();
+        if bytes_remaining > 0 {
+            warn!("Packet with code {} contains {} extra bytes",
+                   code, bytes_remaining)
+        }
         Ok(resp)
     }
 }
@@ -132,7 +138,7 @@ pub enum LoginResponse {
 }
 
 impl LoginResponse {
-    pub fn from_packet(mut packet: Packet) -> io::Result<Self> {
+    pub fn from_packet(packet: &mut Packet) -> io::Result<Self> {
         let ok = try!(packet.read_bool());
         let resp = if ok {
             let motd = try!(packet.read_str());
@@ -176,20 +182,20 @@ pub struct RoomListResponse {
 }
 
 impl RoomListResponse {
-    fn from_packet(mut packet: Packet) -> io::Result<Self> {
-        let rooms = try!(Self::read_rooms(&mut packet));
+    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+        let rooms = try!(Self::read_rooms(packet));
 
         let (owned_private_rooms, other_private_rooms) =
-            match Self::read_rooms(&mut packet) {
+            match Self::read_rooms(packet) {
 
             Err(e) => {
-                debug!("Error while parsing RoomListResponse: {}", e);
+                warn!("Error while parsing RoomListResponse: {}", e);
                 (Vec::new(), Vec::new())
             },
 
-            Ok(owned_private_rooms) => match Self::read_rooms(&mut packet) {
+            Ok(owned_private_rooms) => match Self::read_rooms(packet) {
                 Err(e) => {
-                    debug!("Error while parsing RoomListResponse: {}", e);
+                    warn!("Error while parsing RoomListResponse: {}", e);
                     (owned_private_rooms, Vec::new())
                 },
 
@@ -238,11 +244,10 @@ pub struct ParentMinSpeedResponse {
 }
 
 impl ParentMinSpeedResponse {
-    fn from_packet(mut packet: Packet) -> io::Result<Self> {
+    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
         let value = try!(packet.read_uint());
         Ok(ParentMinSpeedResponse {
             value: value,
         })
     }
 }
-
