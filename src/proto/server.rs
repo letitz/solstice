@@ -10,6 +10,7 @@ const CODE_LOGIN: u32 = 1;
 const CODE_ROOM_LIST: u32 = 64;
 const CODE_PARENT_MIN_SPEED: u32 = 83;
 const CODE_PARENT_SPEED_RATIO: u32 = 84;
+const CODE_WISHLIST_INTERVAL: u32 = 104;
 
 trait WriteToPacket {
     fn write_to_packet(&self, &mut Packet) -> io::Result<()>;
@@ -47,6 +48,7 @@ impl ServerRequest {
 pub enum ServerResponse {
     LoginResponse(LoginResponse),
     RoomListResponse(RoomListResponse),
+    WishlistIntervalResponse(WishlistIntervalResponse),
 
     // Unknown purpose
     ParentMinSpeedResponse(ParentMinSpeedResponse),
@@ -68,6 +70,11 @@ impl ServerResponse {
                 ServerResponse::RoomListResponse(
                     try!(RoomListResponse::from_packet(&mut packet))
                 ),
+
+            CODE_WISHLIST_INTERVAL =>
+                ServerResponse::WishlistIntervalResponse(
+                    try!(WishlistIntervalResponse::from_packet(&mut packet))
+                    ),
 
             CODE_PARENT_MIN_SPEED =>
                 ServerResponse::ParentMinSpeedResponse(
@@ -304,6 +311,24 @@ impl ParentSpeedRatioResponse {
         let value = try!(packet.read_uint());
         Ok(ParentSpeedRatioResponse {
             value: value,
+        })
+    }
+}
+
+/*===================*
+ * WISHLIST INTERVAL *
+ *===================*/
+
+#[derive(Debug)]
+pub struct WishlistIntervalResponse {
+    pub seconds: u32,
+}
+
+impl WishlistIntervalResponse {
+    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+        let seconds = try!(packet.read_uint());
+        Ok(WishlistIntervalResponse {
+            seconds: seconds,
         })
     }
 }
