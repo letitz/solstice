@@ -6,7 +6,10 @@ use crypto::digest::Digest;
 
 use super::Packet;
 
+const MAX_PORT: u32 = 1 << 16;
+
 const CODE_LOGIN: u32 = 1;
+const CODE_CONNECT_TO_PEER: u32 = 18;
 const CODE_ROOM_LIST: u32 = 64;
 const CODE_PRIVILEGED_USERS: u32 = 69;
 const CODE_PARENT_MIN_SPEED: u32 = 83;
@@ -48,6 +51,7 @@ impl ServerRequest {
 #[derive(Debug)]
 pub enum ServerResponse {
     LoginResponse(LoginResponse),
+    ConnectToPeerResponse(ConnectToPeerResponse),
     PrivilegedUsersResponse(PrivilegedUsersResponse),
     RoomListResponse(RoomListResponse),
     WishlistIntervalResponse(WishlistIntervalResponse),
@@ -66,6 +70,11 @@ impl ServerResponse {
             CODE_LOGIN =>
                 ServerResponse::LoginResponse(
                     try!(LoginResponse::from_packet(&mut packet))
+                ),
+
+            CODE_CONNECT_TO_PEER =>
+                ServerResponse::ConnectToPeerResponse(
+                    try!(ConnectToPeerResponse::from_packet(&mut packet))
                 ),
 
             CODE_PRIVILEGED_USERS =>
@@ -347,5 +356,46 @@ impl PrivilegedUsersResponse {
         };
         try!(packet.read_array_with(Packet::read_str, &mut response.users));
         Ok(response)
+    }
+}
+
+/*=================*
+ * CONNECT TO PEER *
+ *=================*/
+
+#[derive(Debug)]
+pub struct ConnectToPeerResponse {
+    pub username: String,
+    pub connection_type: String,
+    pub ip: net::Ipv4Addr,
+    pub port: u16,
+    pub token: u32,
+    pub is_privileged: bool,
+}
+
+impl ConnectToPeerResponse {
+    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+        let username = try!(packet.read_str());
+        let connection_type = try!(packet.read_str());
+
+        let ip = net::Ipv4Addr::from(try!(packet.read_uint()));
+
+        let port = try!(packet.read_uint());
+        if port > MAX_PORT {
+            return Err(
+                io::Error::new(io::ErrorKind::Other, "Invalid port number"));
+        }
+
+        let token = try!(packet.read_uint());
+        let is_privileged = try!(packet.read_bool());
+
+        Ok(ConnectToPeerResponse {
+            username: username,
+            connection_type: connection_type,
+            ip: ip,
+            port: port as u16,
+            token: token,
+            is_privileged: is_privileged,
+        })
     }
 }
