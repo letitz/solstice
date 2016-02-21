@@ -80,6 +80,9 @@ impl ServerConnection {
             ServerResponse::LoginResponse(response) =>
                 self.handle_login_response(response),
 
+            ServerResponse::PrivilegedUsersResponse(response) =>
+                self.handle_privileged_users_response(response),
+
             ServerResponse::RoomListResponse(response) =>
                 self.handle_room_list_response(response),
 
@@ -134,12 +137,17 @@ impl ServerConnection {
         }
     }
 
-    fn handle_room_list_response(&mut self,
-                                 room_list_response: RoomListResponse) {
-        info!("Received room list");
-        for (ref room_name, num_members) in room_list_response.rooms {
-            info!("Room \"{}\" has {} members", room_name, num_members);
-        }
+    fn handle_room_list_response(
+        &mut self, response: RoomListResponse)
+    {
+        info!("Received room list: {} rooms total", response.rooms.len());
+    }
+
+    fn handle_privileged_users_response(
+        &mut self, response: PrivilegedUsersResponse)
+    {
+        info!("Received privileged users list: {} privileged users total",
+              response.users.len());
     }
 }
 

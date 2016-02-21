@@ -8,6 +8,7 @@ use super::Packet;
 
 const CODE_LOGIN: u32 = 1;
 const CODE_ROOM_LIST: u32 = 64;
+const CODE_PRIVILEGED_USERS: u32 = 69;
 const CODE_PARENT_MIN_SPEED: u32 = 83;
 const CODE_PARENT_SPEED_RATIO: u32 = 84;
 const CODE_WISHLIST_INTERVAL: u32 = 104;
@@ -47,6 +48,7 @@ impl ServerRequest {
 #[derive(Debug)]
 pub enum ServerResponse {
     LoginResponse(LoginResponse),
+    PrivilegedUsersResponse(PrivilegedUsersResponse),
     RoomListResponse(RoomListResponse),
     WishlistIntervalResponse(WishlistIntervalResponse),
 
@@ -64,6 +66,11 @@ impl ServerResponse {
             CODE_LOGIN =>
                 ServerResponse::LoginResponse(
                     try!(LoginResponse::from_packet(&mut packet))
+                ),
+
+            CODE_PRIVILEGED_USERS =>
+                ServerResponse::PrivilegedUsersResponse(
+                    try!(PrivilegedUsersResponse::from_packet(&mut packet))
                 ),
 
             CODE_ROOM_LIST =>
@@ -329,6 +336,24 @@ impl WishlistIntervalResponse {
         let seconds = try!(packet.read_uint());
         Ok(WishlistIntervalResponse {
             seconds: seconds,
+        })
+    }
+}
+
+/*==================*
+ * PRIVILEGED USERS *
+ *==================*/
+
+#[derive(Debug)]
+pub struct PrivilegedUsersResponse {
+    pub users: Vec<String>,
+}
+
+impl PrivilegedUsersResponse {
+    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+        let users = try!(packet.read_array_with(Packet::read_str));
+        Ok(PrivilegedUsersResponse {
+            users: users,
         })
     }
 }
