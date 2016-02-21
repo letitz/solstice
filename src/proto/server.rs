@@ -228,20 +228,22 @@ impl RoomListResponse {
         try!(Self::read_rooms(packet, &mut response.rooms));
 
         if let Err(e) =
-            Self::read_rooms(packet, &mut response.owned_private_rooms) {
+            Self::read_rooms(packet, &mut response.owned_private_rooms)
+        {
             warn!("Error parsing owned_private_rooms: {}", e);
             return Ok(response);
         }
 
         if let Err(e) =
-            Self::read_rooms(packet, &mut response.other_private_rooms) {
+            Self::read_rooms(packet, &mut response.other_private_rooms)
+        {
             warn!("Error parsing other_private_rooms: {}", e);
             return Ok(response);
         }
 
         if let Err(e) =
-            Self::read_room_names(packet,
-                                  &mut response.operated_private_room_names)
+            packet.read_array_with(
+                Packet::read_str, &mut response.operated_private_room_names)
         {
             warn!("Error parsing operated_private_rooms: {}", e);
         }
@@ -271,17 +273,6 @@ impl RoomListResponse {
                      num_rooms, num_user_counts);
         }
 
-        Ok(())
-    }
-
-    fn read_room_names(packet: &mut Packet, room_names: &mut Vec<String>)
-        -> io::Result<()>
-    {
-        let num_rooms = try!(packet.read_uint()) as usize;
-        for _ in 0..num_rooms {
-            let room_name = try!(packet.read_str());
-            room_names.push(room_name);
-        }
         Ok(())
     }
 }
@@ -351,9 +342,10 @@ pub struct PrivilegedUsersResponse {
 
 impl PrivilegedUsersResponse {
     fn from_packet(packet: &mut Packet) -> io::Result<Self> {
-        let users = try!(packet.read_array_with(Packet::read_str));
-        Ok(PrivilegedUsersResponse {
-            users: users,
-        })
+        let mut response = PrivilegedUsersResponse {
+            users: Vec::new(),
+        };
+        try!(packet.read_array_with(Packet::read_str, &mut response.users));
+        Ok(response)
     }
 }

@@ -87,16 +87,16 @@ impl Packet {
         }
     }
 
-    pub fn read_array_with<T, F>(&mut self, read_item: F) -> io::Result<Vec<T>>
+    pub fn read_array_with<T, F>(&mut self, read_item: F, vector: &mut Vec<T>)
+        -> io::Result<()>
         where F: Fn(&mut Self) -> io::Result<T>
     {
-        let mut vector = Vec::new();
         let num_items = try!(self.read_uint());
         for _ in 0..num_items {
             let item = try!(read_item(self));
             vector.push(item);
         }
-        Ok(vector)
+        Ok(())
     }
 
     pub fn bytes_remaining(&self) -> usize {
