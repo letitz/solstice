@@ -9,6 +9,7 @@ use super::Packet;
 const MAX_PORT: u32 = 1 << 16;
 
 const CODE_LOGIN: u32 = 1;
+const CODE_SET_LISTEN_PORT: u32 = 2;
 const CODE_CONNECT_TO_PEER: u32 = 18;
 const CODE_ROOM_LIST: u32 = 64;
 const CODE_PRIVILEGED_USERS: u32 = 69;
@@ -28,6 +29,7 @@ trait WriteToPacket {
 pub enum ServerRequest {
     LoginRequest(LoginRequest),
     RoomListRequest(RoomListRequest),
+    SetListenPortRequest(SetListenPortRequest),
 }
 
 impl ServerRequest {
@@ -38,6 +40,9 @@ impl ServerRequest {
 
             ServerRequest::RoomListRequest(ref request) =>
                 (Packet::new(CODE_ROOM_LIST), request),
+
+            ServerRequest::SetListenPortRequest(ref request) =>
+                (Packet::new(CODE_SET_LISTEN_PORT), request),
         };
         try!(request.write_to_packet(&mut packet));
         Ok(packet)
@@ -378,6 +383,30 @@ impl RoomListResponse {
                      num_rooms, num_user_counts);
         }
 
+        Ok(())
+    }
+}
+
+/*=================*
+ * SET LISTEN PORT *
+ *=================*/
+
+#[derive(Debug)]
+pub struct SetListenPortRequest {
+    port: u16,
+}
+
+impl SetListenPortRequest {
+    fn new(port: u16) -> Self {
+        SetListenPortRequest {
+            port: port,
+        }
+    }
+}
+
+impl WriteToPacket for SetListenPortRequest {
+    fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
+        try!(packet.write_uint(self.port as u32));
         Ok(())
     }
 }
