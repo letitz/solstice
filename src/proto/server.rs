@@ -67,14 +67,14 @@ impl ServerResponse {
     pub fn from_packet(mut packet: Packet) -> io::Result<Self> {
         let code = try!(packet.read_uint());
         let resp = match code {
-            CODE_LOGIN =>
-                ServerResponse::LoginResponse(
-                    try!(LoginResponse::from_packet(&mut packet))
-                ),
-
             CODE_CONNECT_TO_PEER =>
                 ServerResponse::ConnectToPeerResponse(
                     try!(ConnectToPeerResponse::from_packet(&mut packet))
+                ),
+
+            CODE_LOGIN =>
+                ServerResponse::LoginResponse(
+                    try!(LoginResponse::from_packet(&mut packet))
                 ),
 
             CODE_PRIVILEGED_USERS =>
@@ -117,6 +117,47 @@ fn md5_str(string: &str) -> String {
     let mut hasher = Md5::new();
     hasher.input_str(string);
     hasher.result_str()
+}
+
+/*=================*
+ * CONNECT TO PEER *
+ *=================*/
+
+#[derive(Debug)]
+pub struct ConnectToPeerResponse {
+    pub username: String,
+    pub connection_type: String,
+    pub ip: net::Ipv4Addr,
+    pub port: u16,
+    pub token: u32,
+    pub is_privileged: bool,
+}
+
+impl ConnectToPeerResponse {
+    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+        let username = try!(packet.read_str());
+        let connection_type = try!(packet.read_str());
+
+        let ip = net::Ipv4Addr::from(try!(packet.read_uint()));
+
+        let port = try!(packet.read_uint());
+        if port > MAX_PORT {
+            return Err(
+                io::Error::new(io::ErrorKind::Other, "Invalid port number"));
+        }
+
+        let token = try!(packet.read_uint());
+        let is_privileged = try!(packet.read_bool());
+
+        Ok(ConnectToPeerResponse {
+            username: username,
+            connection_type: connection_type,
+            ip: ip,
+            port: port as u16,
+            token: token,
+            is_privileged: is_privileged,
+        })
+    }
 }
 
 /*=======*
@@ -195,6 +236,61 @@ impl LoginResponse {
             }
         };
         Ok(resp)
+    }
+}
+
+/*==================*
+ * PARENT MIN SPEED *
+ *==================*/
+
+#[derive(Debug)]
+pub struct ParentMinSpeedResponse {
+    pub value: u32,
+}
+
+impl ParentMinSpeedResponse {
+    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+        let value = try!(packet.read_uint());
+        Ok(ParentMinSpeedResponse {
+            value: value,
+        })
+    }
+}
+
+/*====================*
+ * PARENT SPEED RATIO *
+ *====================*/
+
+#[derive(Debug)]
+pub struct ParentSpeedRatioResponse {
+    pub value: u32,
+}
+
+impl ParentSpeedRatioResponse {
+    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+        let value = try!(packet.read_uint());
+        Ok(ParentSpeedRatioResponse {
+            value: value,
+        })
+    }
+}
+
+/*==================*
+ * PRIVILEGED USERS *
+ *==================*/
+
+#[derive(Debug)]
+pub struct PrivilegedUsersResponse {
+    pub users: Vec<String>,
+}
+
+impl PrivilegedUsersResponse {
+    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+        let mut response = PrivilegedUsersResponse {
+            users: Vec::new(),
+        };
+        try!(packet.read_array_with(Packet::read_str, &mut response.users));
+        Ok(response)
     }
 }
 
@@ -286,42 +382,6 @@ impl RoomListResponse {
     }
 }
 
-/*==================*
- * PARENT MIN SPEED *
- *==================*/
-
-#[derive(Debug)]
-pub struct ParentMinSpeedResponse {
-    pub value: u32,
-}
-
-impl ParentMinSpeedResponse {
-    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
-        let value = try!(packet.read_uint());
-        Ok(ParentMinSpeedResponse {
-            value: value,
-        })
-    }
-}
-
-/*====================*
- * PARENT SPEED RATIO *
- *====================*/
-
-#[derive(Debug)]
-pub struct ParentSpeedRatioResponse {
-    pub value: u32,
-}
-
-impl ParentSpeedRatioResponse {
-    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
-        let value = try!(packet.read_uint());
-        Ok(ParentSpeedRatioResponse {
-            value: value,
-        })
-    }
-}
-
 /*===================*
  * WISHLIST INTERVAL *
  *===================*/
@@ -336,66 +396,6 @@ impl WishlistIntervalResponse {
         let seconds = try!(packet.read_uint());
         Ok(WishlistIntervalResponse {
             seconds: seconds,
-        })
-    }
-}
-
-/*==================*
- * PRIVILEGED USERS *
- *==================*/
-
-#[derive(Debug)]
-pub struct PrivilegedUsersResponse {
-    pub users: Vec<String>,
-}
-
-impl PrivilegedUsersResponse {
-    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
-        let mut response = PrivilegedUsersResponse {
-            users: Vec::new(),
-        };
-        try!(packet.read_array_with(Packet::read_str, &mut response.users));
-        Ok(response)
-    }
-}
-
-/*=================*
- * CONNECT TO PEER *
- *=================*/
-
-#[derive(Debug)]
-pub struct ConnectToPeerResponse {
-    pub username: String,
-    pub connection_type: String,
-    pub ip: net::Ipv4Addr,
-    pub port: u16,
-    pub token: u32,
-    pub is_privileged: bool,
-}
-
-impl ConnectToPeerResponse {
-    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
-        let username = try!(packet.read_str());
-        let connection_type = try!(packet.read_str());
-
-        let ip = net::Ipv4Addr::from(try!(packet.read_uint()));
-
-        let port = try!(packet.read_uint());
-        if port > MAX_PORT {
-            return Err(
-                io::Error::new(io::ErrorKind::Other, "Invalid port number"));
-        }
-
-        let token = try!(packet.read_uint());
-        let is_privileged = try!(packet.read_bool());
-
-        Ok(ConnectToPeerResponse {
-            username: username,
-            connection_type: connection_type,
-            ip: ip,
-            port: port as u16,
-            token: token,
-            is_privileged: is_privileged,
         })
     }
 }
