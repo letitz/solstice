@@ -1,6 +1,6 @@
-mod server;
-mod proto;
+mod client;
 mod config;
+mod proto;
 
 extern crate byteorder;
 extern crate crypto;
@@ -15,7 +15,7 @@ use mio::EventLoop;
 use mio::tcp::TcpStream;
 
 use proto::PacketStream;
-use server::ServerConnection;
+use client::Client;
 
 fn connect(hostname: &str, port: u16) -> io::Result<TcpStream> {
     for sock_addr in try!((hostname, port).to_socket_addrs()) {
@@ -38,7 +38,7 @@ fn main() {
     let mut event_loop = EventLoop::new().unwrap();
 
     let packet_stream = PacketStream::new(stream);
-    let mut server_conn = ServerConnection::new(packet_stream);
+    let mut server_conn = Client::new(packet_stream);
     server_conn.register_all(&mut event_loop).unwrap();
 
     event_loop.run(&mut server_conn).unwrap();

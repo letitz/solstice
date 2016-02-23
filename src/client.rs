@@ -15,7 +15,7 @@ enum State {
 }
 
 #[derive(Debug)]
-pub struct ServerConnection {
+pub struct Client {
     state: State,
 
     token_counter: usize,
@@ -25,10 +25,10 @@ pub struct ServerConnection {
     server_interest: EventSet,
 }
 
-impl ServerConnection {
+impl Client {
     pub fn new(server_stream: PacketStream<TcpStream>) -> Self {
         let token_counter = 0;
-        ServerConnection {
+        Client {
             state: State::NotLoggedIn,
             token_counter: token_counter,
             server_token: Token(token_counter),
@@ -151,7 +151,7 @@ impl ServerConnection {
     }
 }
 
-impl Handler for ServerConnection {
+impl Handler for Client {
     type Timeout = ();
     type Message = ();
 
