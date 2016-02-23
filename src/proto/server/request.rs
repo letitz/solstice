@@ -17,6 +17,7 @@ trait WriteToPacket {
 #[derive(Debug)]
 pub enum ServerRequest {
     LoginRequest(LoginRequest),
+    PeerAddressRequest(PeerAddressRequest),
     RoomListRequest(RoomListRequest),
     SetListenPortRequest(SetListenPortRequest),
 }
@@ -26,6 +27,9 @@ impl ServerRequest {
         let (mut packet, request): (Packet, &WriteToPacket) = match *self {
             ServerRequest::LoginRequest(ref request) =>
                 (Packet::new(CODE_LOGIN), request),
+
+            ServerRequest::PeerAddressRequest(ref request) =>
+                (Packet::new(CODE_PEER_ADDRESS), request),
 
             ServerRequest::RoomListRequest(ref request) =>
                 (Packet::new(CODE_ROOM_LIST), request),
@@ -83,6 +87,30 @@ impl WriteToPacket for LoginRequest {
         try!(packet.write_str(&userpass_md5));
         try!(packet.write_uint(self.minor));
 
+        Ok(())
+    }
+}
+
+/*==============*
+ * PEER ADDRESS *
+ *==============*/
+
+#[derive(Debug)]
+pub struct PeerAddressRequest {
+    username: String,
+}
+
+impl PeerAddressRequest {
+    fn new(username: &str) -> Self {
+        PeerAddressRequest {
+            username: username.to_string(),
+        }
+    }
+}
+
+impl WriteToPacket for PeerAddressRequest {
+    fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
+        try!(packet.write_str(&self.username));
         Ok(())
     }
 }
