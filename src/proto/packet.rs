@@ -1,7 +1,6 @@
+use std::{io, mem, net};
 use std::iter::repeat;
-use std::io;
 use std::io::{Read, Write};
-use std::mem;
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
 use mio::{
@@ -12,6 +11,7 @@ const MAX_PACKET_SIZE: usize = 1 << 20; // 1 MiB
 const U32_SIZE: usize = 4;
 const MAX_MESSAGE_SIZE: usize = MAX_PACKET_SIZE - U32_SIZE;
 
+const MAX_PORT: u32 = (1 << 16) - 1;
 
 #[derive(Debug)]
 pub struct Packet {
@@ -97,6 +97,21 @@ impl Packet {
             vector.push(item);
         }
         Ok(())
+    }
+
+    pub fn read_ipv4_addr(&mut self) -> io::Result<net::Ipv4Addr> {
+        let ip_u32 = try!(self.read_uint());
+        Ok(net::Ipv4Addr::from(ip_u32))
+    }
+
+    pub fn read_port(&mut self) -> io::Result<u16> {
+        let port_u32 = try!(self.read_uint());
+        if port_u32 > MAX_PORT {
+            return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("Invalid port number: {}", port_u32)));
+        }
+        Ok(port_u32 as u16)
     }
 
     pub fn bytes_remaining(&self) -> usize {

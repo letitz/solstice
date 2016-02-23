@@ -4,8 +4,6 @@ use std::net;
 use super::constants::*;
 use super::super::packet::Packet;
 
-const MAX_PORT: u32 = (1 << 16) - 1;
-
 /*=================*
  * SERVER RESPONSE *
  *=================*/
@@ -100,13 +98,8 @@ impl ConnectToPeerResponse {
         let username = try!(packet.read_str());
         let connection_type = try!(packet.read_str());
 
-        let ip = net::Ipv4Addr::from(try!(packet.read_uint()));
-
-        let port = try!(packet.read_uint());
-        if port > MAX_PORT {
-            return Err(
-                io::Error::new(io::ErrorKind::Other, "Invalid port number"));
-        }
+        let ip = try!(packet.read_ipv4_addr());
+        let port = try!(packet.read_port());
 
         let token = try!(packet.read_uint());
         let is_privileged = try!(packet.read_bool());
@@ -115,7 +108,7 @@ impl ConnectToPeerResponse {
             username: username,
             connection_type: connection_type,
             ip: ip,
-            port: port as u16,
+            port: port,
             token: token,
             is_privileged: is_privileged,
         })
@@ -141,24 +134,25 @@ pub enum LoginResponse {
 impl LoginResponse {
     pub fn from_packet(packet: &mut Packet) -> io::Result<Self> {
         let ok = try!(packet.read_bool());
-        let resp = if ok {
+        if ok {
             let motd = try!(packet.read_str());
-            let ip = net::Ipv4Addr::from(try!(packet.read_uint()));
+            let ip = try!(packet.read_ipv4_addr());
+
             match packet.read_bool() {
                 Ok(value) => debug!("LoginResponse last field: {}", value),
                 Err(e) => debug!("Error reading LoginResponse field: {:?}", e),
             }
-            LoginResponse::LoginOk {
+
+            Ok(LoginResponse::LoginOk {
                 motd: motd,
                 ip: ip,
                 password_md5_opt: None
-            }
+            })
         } else {
-            LoginResponse::LoginFail {
+            Ok(LoginResponse::LoginFail {
                 reason: try!(packet.read_str())
-            }
-        };
-        Ok(resp)
+            })
+        }
     }
 }
 
@@ -212,16 +206,13 @@ pub struct PeerAddressResponse {
 impl PeerAddressResponse {
     fn from_packet(packet: &mut Packet) -> io::Result<Self> {
         let username = try!(packet.read_str());
-        let ip = net::Ipv4Addr::from(try!(packet.read_uint()));
-        let port = try!(packet.read_uint());
-        if port > MAX_PORT {
-            return Err(
-                io::Error::new(io::ErrorKind::Other, "Invalid port number"));
-        }
+        let ip = try!(packet.read_ipv4_addr());
+        let port = try!(packet.read_port());
+
         Ok(PeerAddressResponse {
             username: username,
             ip: ip,
-            port: port as u16,
+            port: port,
         })
     }
 }
