@@ -14,6 +14,7 @@ const MAX_PORT: u32 = (1 << 16) - 1;
 pub enum ServerResponse {
     LoginResponse(LoginResponse),
     ConnectToPeerResponse(ConnectToPeerResponse),
+    PeerAddressResponse(PeerAddressResponse),
     PrivilegedUsersResponse(PrivilegedUsersResponse),
     RoomListResponse(RoomListResponse),
     WishlistIntervalResponse(WishlistIntervalResponse),
@@ -37,6 +38,11 @@ impl ServerResponse {
             CODE_LOGIN =>
                 ServerResponse::LoginResponse(
                     try!(LoginResponse::from_packet(&mut packet))
+                ),
+
+            CODE_PEER_ADDRESS =>
+                ServerResponse::PeerAddressResponse(
+                    try!(PeerAddressResponse::from_packet(&mut packet))
                 ),
 
             CODE_PRIVILEGED_USERS =>
@@ -188,6 +194,34 @@ impl ParentSpeedRatioResponse {
         let value = try!(packet.read_uint());
         Ok(ParentSpeedRatioResponse {
             value: value,
+        })
+    }
+}
+
+/*==============*
+ * PEER ADDRESS *
+ *==============*/
+
+#[derive(Debug)]
+pub struct PeerAddressResponse {
+    username: String,
+    ip: net::Ipv4Addr,
+    port: u16,
+}
+
+impl PeerAddressResponse {
+    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+        let username = try!(packet.read_str());
+        let ip = net::Ipv4Addr::from(try!(packet.read_uint()));
+        let port = try!(packet.read_uint());
+        if port > MAX_PORT {
+            return Err(
+                io::Error::new(io::ErrorKind::Other, "Invalid port number"));
+        }
+        Ok(PeerAddressResponse {
+            username: username,
+            ip: ip,
+            port: port as u16,
         })
     }
 }
