@@ -1,5 +1,6 @@
 mod client;
 mod config;
+mod control;
 mod proto;
 
 extern crate byteorder;
@@ -7,6 +8,8 @@ extern crate crypto;
 #[macro_use] extern crate log;
 extern crate env_logger;
 extern crate mio;
+extern crate rustc_serialize;
+extern crate websocket;
 
 use std::io;
 use std::net::ToSocketAddrs;
