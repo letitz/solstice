@@ -119,13 +119,13 @@ impl Packet {
     }
 
 
-    pub fn finalize(mut self) -> Vec<u8> {
+    pub fn as_slice(&mut self) -> &[u8] {
         let bytes_len = (self.bytes.len() - U32_SIZE) as u32;
         {
             let mut first_word = &mut self.bytes[..U32_SIZE];
             first_word.write_u32::<LittleEndian>(bytes_len).unwrap();
         }
-        self.bytes
+        &self.bytes
     }
 }
 
@@ -213,8 +213,8 @@ impl<T: Read + Write + Evented> PacketStream<T> {
         }
     }
 
-    pub fn try_write(&mut self, packet: Packet) -> io::Result<Option<()>> {
-        match try!(self.stream.try_write(&packet.finalize())) {
+    pub fn try_write(&mut self, packet: &mut Packet) -> io::Result<Option<()>> {
+        match try!(self.stream.try_write(packet.as_slice())) {
             None => Ok(None),
             Some(_) => Ok(Some(()))
         }

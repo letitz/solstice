@@ -5,8 +5,6 @@ use rustc_serialize::json;
 
 use mio::tcp::TcpStream;
 
-use websocket::{Server, Message};
-
 #[derive(RustcDecodable, RustcEncodable)]
 pub enum ControlRequest {
     LoginRequest(LoginRequest),

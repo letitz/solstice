@@ -1,6 +1,7 @@
 mod client;
 mod config;
 mod control;
+mod handler;
 mod proto;
 
 extern crate byteorder;
@@ -13,12 +14,14 @@ extern crate websocket;
 
 use std::io;
 use std::net::ToSocketAddrs;
+use std::sync::mpsc::channel;
+use std::thread;
 
 use mio::EventLoop;
 use mio::tcp::TcpStream;
 
-use proto::PacketStream;
 use client::Client;
+use handler::ConnectionHandler;
 
 fn connect(hostname: &str, port: u16) -> io::Result<TcpStream> {
     for sock_addr in try!((hostname, port).to_socket_addrs()) {
@@ -40,9 +43,14 @@ fn main() {
 
     let mut event_loop = EventLoop::new().unwrap();
 
-    let packet_stream = PacketStream::new(stream);
-    let mut server_conn = Client::new(packet_stream);
-    server_conn.register_all(&mut event_loop).unwrap();
+    let (tx, rx) = channel();
 
-    event_loop.run(&mut server_conn).unwrap();
+    let mut handler = ConnectionHandler::new(stream, tx, &mut event_loop);
+
+    let mut client = Client::new(event_loop.channel(), rx);
+    thread::spawn(move || {
+        client.run();
+    });
+
+    event_loop.run(&mut handler).unwrap();
 }

@@ -1,11 +1,19 @@
-use std::io;
+use std::sync::mpsc::Receiver;
 
-use mio::{EventLoop, EventSet, Handler, PollOpt, Token};
-use mio::tcp::TcpStream;
+use mio::Sender;
 
 use config;
-use proto::{PacketStream};
 use proto::server::*;
+
+#[derive(Debug)]
+pub enum Request {
+    ServerRequest(ServerRequest),
+}
+
+#[derive(Debug)]
+pub enum Response {
+    ServerResponse(ServerResponse),
+}
 
 #[derive(Debug, Clone, Copy)]
 enum State {
@@ -14,64 +22,44 @@ enum State {
     LoggedIn,
 }
 
-#[derive(Debug)]
 pub struct Client {
     state: State,
-
-    token_counter: usize,
-
-    server_token: Token,
-    server_stream: PacketStream<TcpStream>,
-    server_interest: EventSet,
+    tx: Sender<Request>,
+    rx: Receiver<Response>,
 }
 
 impl Client {
-    pub fn new(server_stream: PacketStream<TcpStream>) -> Self {
-        let token_counter = 0;
+    pub fn new(tx: Sender<Request>, rx: Receiver<Response>) -> Self {
         Client {
             state: State::NotLoggedIn,
-            token_counter: token_counter,
-            server_token: Token(token_counter),
-            server_stream: server_stream,
-            server_interest: EventSet::writable() | EventSet::readable(),
+            tx: tx,
+            rx: rx,
         }
     }
 
-    pub fn server_writable(&mut self) {
-        match self.state {
-            State::NotLoggedIn => {
-                info!("Logging in...");
-                self.state = State::LoggingIn;
-                self.server_interest = EventSet::readable();
-                let request = ServerRequest::LoginRequest(LoginRequest::new(
-                            config::USERNAME,
-                            config::PASSWORD,
-                            config::VER_MAJOR,
-                            config::VER_MINOR,
-                            ).unwrap());
-                self.server_stream.try_write(request.to_packet().unwrap())
-                    .unwrap();
-            },
+    pub fn run(&mut self) {
+        info!("Logging in...");
+        self.state = State::LoggingIn;
+        let server_request = ServerRequest::LoginRequest(LoginRequest::new(
+                config::USERNAME,
+                config::PASSWORD,
+                config::VER_MAJOR,
+                config::VER_MINOR,
+                ).unwrap());
+        self.tx.send(Request::ServerRequest(server_request)).unwrap();
 
-            _ => ()
-        }
-    }
-
-    pub fn server_readable(&mut self) {
-        match self.server_stream.try_read() {
-            Ok(Some(packet)) => {
-                match ServerResponse::from_packet(packet) {
-                    Ok(response) =>
-                        self.handle_server_response(response),
-
-                    Err(e) =>
-                        error!("Error while parsing server packet: {}", e),
-                }
-            },
-
-            Ok(None) => (),
-
-            Err(e) => error!("Error while reading server packet: {:?}", e),
+        loop {
+            let response = match self.rx.recv() {
+                Ok(response) => response,
+                Err(e) => {
+                    error!("Error receiving response: {}", e);
+                    break;
+                },
+            };
+            match response {
+                Response::ServerResponse(server_response) =>
+                    self.handle_server_response(server_response),
+            }
         }
     }
 
@@ -92,15 +80,6 @@ impl Client {
 
             response => warn!("Unhandled response: {:?}", response),
         }
-    }
-
-    pub fn register_all<T: Handler>(&self, event_loop: &mut EventLoop<T>)
-        -> io::Result<()>
-    {
-        try!(self.server_stream.register(
-                event_loop, self.server_token, self.server_interest,
-                PollOpt::edge()));
-        Ok(())
     }
 
     fn handle_login_response(&mut self, login: LoginResponse) {
@@ -148,27 +127,5 @@ impl Client {
     {
         info!("Received privileged users list: {} privileged users total",
               response.users.len());
-    }
-}
-
-impl Handler for Client {
-    type Timeout = ();
-    type Message = ();
-
-    fn ready(&mut self, event_loop: &mut EventLoop<Self>,
-             token: Token, event_set: EventSet) {
-        if token == self.server_token {
-            if event_set.is_writable() {
-                self.server_writable();
-            }
-            if event_set.is_readable() {
-                self.server_readable();
-            }
-            self.server_stream.reregister(
-                event_loop, token, self.server_interest,
-                PollOpt::edge() | PollOpt::oneshot()).unwrap();
-        } else {
-            unreachable!("Unknown token!");
-        }
     }
 }
