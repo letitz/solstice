@@ -62,6 +62,32 @@ impl ConnectionHandler {
         }
     }
 
+    fn read_server(&mut self) {
+        loop {
+            match self.read_server_once() {
+                Ok(true) => (),
+                Ok(false) => break,
+                Err(e) => {
+                    error!("Error reading server: {}", e);
+                    break;
+                }
+            }
+        }
+    }
+
+    fn write_server(&mut self) {
+        loop {
+            match self.write_server_once() {
+                Ok(true) => (),
+                Ok(false) => break,
+                Err(e) => {
+                    error!("Error writing server: {}", e);
+                    break;
+                }
+            }
+        }
+    }
+
     fn read_server_once(&mut self) -> io::Result<bool> {
         let packet = match try!(self.server_stream.try_read()) {
             Some(packet) => packet,
@@ -93,10 +119,7 @@ impl ConnectionHandler {
         }
     }
 
-    fn notify_server(
-        &mut self, event_loop: &mut EventLoop<Self>, request: ServerRequest)
-        -> io::Result<()>
-    {
+    fn notify_server(&mut self, request: ServerRequest) -> io::Result<()> {
         let packet = try!(request.to_packet());
         self.server_queue.push_back(packet);
         Ok(())
@@ -123,28 +146,10 @@ impl Handler for ConnectionHandler {
     {
         if token == self.server_token {
             if event_set.is_writable() {
-                loop {
-                    match self.write_server_once() {
-                        Ok(true) => (),
-                        Ok(false) => break,
-                        Err(e) => {
-                            error!("Error writing server: {}", e);
-                            break;
-                        }
-                    }
-                }
+                self.write_server();
             }
             if event_set.is_readable() {
-                loop {
-                    match self.read_server_once() {
-                        Ok(true) => (),
-                        Ok(false) => break,
-                        Err(e) => {
-                            error!("Error reading server: {}", e);
-                            break;
-                        }
-                    }
-                }
+                self.read_server();
             }
             self.reregister_server(event_loop);
         } else {
@@ -155,7 +160,7 @@ impl Handler for ConnectionHandler {
     fn notify(&mut self, event_loop: &mut EventLoop<Self>, request: Request) {
         match request {
             Request::ServerRequest(server_request) => {
-                match self.notify_server(event_loop, server_request) {
+                match self.notify_server(server_request) {
                     Ok(()) => (),
                     Err(e) => error!("Error processing server request: {}", e),
                 }
