@@ -1,19 +1,11 @@
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc;
 
-use mio::Sender;
+use mio;
 
 use config;
+use control::{ControlRequest, ControlResponse};
+use proto::{Request, Response};
 use proto::server::*;
-
-#[derive(Debug)]
-pub enum Request {
-    ServerRequest(ServerRequest),
-}
-
-#[derive(Debug)]
-pub enum Response {
-    ServerResponse(ServerResponse),
-}
 
 #[derive(Debug, Clone, Copy)]
 enum State {
@@ -24,16 +16,28 @@ enum State {
 
 pub struct Client {
     state: State,
-    tx: Sender<Request>,
-    rx: Receiver<Response>,
+
+    proto_tx: mio::Sender<Request>,
+    proto_rx: mpsc::Receiver<Response>,
+
+    control_tx: mpsc::Sender<ControlResponse>,
+    control_rx: mpsc::Receiver<ControlRequest>,
 }
 
 impl Client {
-    pub fn new(tx: Sender<Request>, rx: Receiver<Response>) -> Self {
+    pub fn new(
+        proto_tx: mio::Sender<Request>,
+        proto_rx: mpsc::Receiver<Response>,
+        control_tx: mpsc::Sender<ControlResponse>,
+        control_rx: mpsc::Receiver<ControlRequest>)
+        -> Self
+    {
         Client {
             state: State::NotLoggedIn,
-            tx: tx,
-            rx: rx,
+            proto_tx: proto_tx,
+            proto_rx: proto_rx,
+            control_tx: control_tx,
+            control_rx: control_rx,
         }
     }
 
@@ -46,10 +50,10 @@ impl Client {
                 config::VER_MAJOR,
                 config::VER_MINOR,
                 ).unwrap());
-        self.tx.send(Request::ServerRequest(server_request)).unwrap();
+        self.proto_tx.send(Request::ServerRequest(server_request)).unwrap();
 
         loop {
-            let response = match self.rx.recv() {
+            let response = match self.proto_rx.recv() {
                 Ok(response) => response,
                 Err(e) => {
                     error!("Error receiving response: {}", e);
@@ -57,8 +61,9 @@ impl Client {
                 },
             };
             match response {
-                Response::ServerResponse(server_response) =>
-                    self.handle_server_response(server_response),
+                Response::ServerResponse(server_response) => {
+                    self.handle_server_response(server_response);
+                },
             }
         }
     }

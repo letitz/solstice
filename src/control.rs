@@ -41,6 +41,7 @@ impl Controller {
         let port = config::CONTROL_PORT;
         loop {
             let client = Self::get_client(host, port);
+            info!("Controller client connected");
             let (mut sender, mut receiver) = client.split();
             let tx = self.client_tx.clone();
             thread::spawn(move || {
@@ -53,6 +54,7 @@ impl Controller {
     fn get_client(host: &str, port: u16) -> WebSocketClient
     {
         let mut server = websocket::Server::bind((host, port)).unwrap();
+        info!("Controller bound to {}:{}", host, port);
         loop {
             match Self::try_get_client(&mut server) {
                 Ok(client) => return client,
@@ -92,8 +94,13 @@ impl Controller {
                     continue;
                 },
             };
-            let control_request = json::decode(&payload).unwrap();
-            tx.send(control_request);
+            match json::decode(&payload) {
+                Ok(control_request) => {
+                    debug!("Received control request: {:?}", control_request);
+                    tx.send(control_request);
+                },
+                Err(e) => warn!("Error decoding control request: {}", e),
+            };
         }
     }
 
@@ -108,23 +115,23 @@ impl Controller {
     }
 }
 
-#[derive(RustcDecodable, RustcEncodable)]
+#[derive(Debug, RustcDecodable, RustcEncodable)]
 pub enum ControlRequest {
     LoginRequest(LoginRequest),
 }
 
-#[derive(RustcDecodable, RustcEncodable)]
+#[derive(Debug, RustcDecodable, RustcEncodable)]
 pub enum ControlResponse {
     LoginResponse(LoginResponse),
 }
 
-#[derive(RustcDecodable, RustcEncodable)]
+#[derive(Debug, RustcDecodable, RustcEncodable)]
 pub struct LoginRequest {
     username: String,
     password: String,
 }
 
-#[derive(RustcDecodable, RustcEncodable)]
+#[derive(Debug, RustcDecodable, RustcEncodable)]
 pub enum LoginResponse {
     LoginOk {
         motd: String,
