@@ -21,12 +21,12 @@ type WebSocketClient =
     websocket::Client<websocket::DataFrame, WebSocketSender, WebSocketReceiver>;
 
 pub struct Controller {
-    client_tx: mpsc::Sender<ControlRequest>,
+    client_tx: mpsc::Sender<client::IncomingMessage>,
     client_rx: mpsc::Receiver<ControlResponse>,
 }
 
 impl Controller {
-    pub fn new(tx: mpsc::Sender<ControlRequest>,
+    pub fn new(tx: mpsc::Sender<client::IncomingMessage>,
                rx: mpsc::Receiver<ControlResponse>)
         -> Self
     {
@@ -75,7 +75,8 @@ impl Controller {
     }
 
     fn receiver_loop(
-        mut receiver: WebSocketReceiver, tx: mpsc::Sender<ControlRequest>)
+        mut receiver: WebSocketReceiver,
+        tx: mpsc::Sender<client::IncomingMessage>)
     {
         for message_result in receiver.incoming_messages() {
             let message: websocket::Message = match message_result {
@@ -97,7 +98,8 @@ impl Controller {
             match json::decode(&payload) {
                 Ok(control_request) => {
                     debug!("Received control request: {:?}", control_request);
-                    tx.send(control_request);
+                    tx.send(client::IncomingMessage::ControlRequest(
+                            control_request));
                 },
                 Err(e) => warn!("Error decoding control request: {}", e),
             };

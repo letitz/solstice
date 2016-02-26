@@ -5,7 +5,8 @@ use std::sync::mpsc::Sender;
 use mio::{EventLoop, EventSet, Handler, PollOpt, Token};
 use mio::tcp::TcpStream;
 
-use proto::{Packet, PacketStream, Request, Response};
+use client::IncomingMessage;
+use proto::{Packet, PacketStream, Request};
 use proto::server::*;
 
 struct TokenCounter {
@@ -32,12 +33,12 @@ pub struct ConnectionHandler {
     server_stream: PacketStream<TcpStream>,
     server_queue: VecDeque<Packet>,
 
-    client_tx: Sender<Response>,
+    client_tx: Sender<IncomingMessage>,
 }
 
 impl ConnectionHandler {
     pub fn new(
-        server_tcp_stream: TcpStream, client_tx: Sender<Response>,
+        server_tcp_stream: TcpStream, client_tx: Sender<IncomingMessage>,
         event_loop: &mut EventLoop<Self>) -> Self
     {
         let mut token_counter = TokenCounter::new();
@@ -94,7 +95,8 @@ impl ConnectionHandler {
         };
 
         let server_response = try!(ServerResponse::from_packet(packet));
-        match self.client_tx.send(Response::ServerResponse(server_response)) {
+        let message = IncomingMessage::ServerResponse(server_response);
+        match self.client_tx.send(message) {
             Ok(()) => Ok(true),
             Err(e) => Err(io::Error::new(
                     io::ErrorKind::Other,

@@ -7,6 +7,11 @@ use control::{ControlRequest, ControlResponse};
 use proto::{Request, Response};
 use proto::server::*;
 
+pub enum IncomingMessage {
+    ServerResponse(ServerResponse),
+    ControlRequest(ControlRequest),
+}
+
 #[derive(Debug, Clone, Copy)]
 enum State {
     NotLoggedIn,
@@ -17,27 +22,24 @@ enum State {
 pub struct Client {
     state: State,
 
-    proto_tx: mio::Sender<Request>,
-    proto_rx: mpsc::Receiver<Response>,
+    rx: mpsc::Receiver<IncomingMessage>,
 
+    proto_tx: mio::Sender<Request>,
     control_tx: mpsc::Sender<ControlResponse>,
-    control_rx: mpsc::Receiver<ControlRequest>,
 }
 
 impl Client {
     pub fn new(
+        rx: mpsc::Receiver<IncomingMessage>,
         proto_tx: mio::Sender<Request>,
-        proto_rx: mpsc::Receiver<Response>,
-        control_tx: mpsc::Sender<ControlResponse>,
-        control_rx: mpsc::Receiver<ControlRequest>)
+        control_tx: mpsc::Sender<ControlResponse>)
         -> Self
     {
         Client {
             state: State::NotLoggedIn,
+            rx: rx,
             proto_tx: proto_tx,
-            proto_rx: proto_rx,
             control_tx: control_tx,
-            control_rx: control_rx,
         }
     }
 
@@ -53,16 +55,15 @@ impl Client {
         self.proto_tx.send(Request::ServerRequest(server_request)).unwrap();
 
         loop {
-            let response = match self.proto_rx.recv() {
-                Ok(response) => response,
+            match self.rx.recv() {
+                Ok(IncomingMessage::ServerResponse(server_response)) => {
+                    self.handle_server_response(server_response);
+                },
+                Ok(IncomingMessage::ControlRequest(control_request)) => {
+                    warn!("Unhandled control request: {:?}", control_request);
+                },
                 Err(e) => {
                     error!("Error receiving response: {}", e);
-                    break;
-                },
-            };
-            match response {
-                Response::ServerResponse(server_response) => {
-                    self.handle_server_response(server_response);
                 },
             }
         }
