@@ -8,3 +8,6 @@ pub const PASSWORD: &'static str = "ijklmnop";
 
 pub const SERVER_HOST : &'static str = "server.slsknet.org";
 pub const SERVER_PORT : u16 = 2242;
+
+pub const CONTROL_HOST: &'static str = "localhost";
+pub const CONTROL_PORT: u16 = 2244;
