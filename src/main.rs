@@ -53,13 +53,11 @@ fn main() {
 
     let mut client = Client::new(
         client_rx, client_to_handler_tx, client_to_control_tx);
-    thread::spawn(move || client.run());
 
     let mut controller =
         Controller::new(client_tx, client_to_control_rx);
-    thread::spawn(move || {
-        controller.run();
-    });
 
-    event_loop.run(&mut handler).unwrap();
+    thread::spawn(move || controller.run());
+    thread::spawn(move || event_loop.run(&mut handler).unwrap());
+    client.run();
 }
