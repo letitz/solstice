@@ -4,11 +4,11 @@ use mio;
 
 use config;
 use control::{ControlRequest, ControlResponse};
-use proto::{Request, Response};
+use proto::{Response, Request};
 use proto::server::*;
 
 pub enum IncomingMessage {
-    ServerResponse(ServerResponse),
+    ProtoResponse(Response),
     ControlRequest(ControlRequest),
 }
 
@@ -56,12 +56,15 @@ impl Client {
 
         loop {
             match self.rx.recv() {
-                Ok(IncomingMessage::ServerResponse(server_response)) => {
+                Ok(IncomingMessage::ProtoResponse(
+                        Response::ServerResponse(server_response))) => {
                     self.handle_server_response(server_response);
                 },
+
                 Ok(IncomingMessage::ControlRequest(control_request)) => {
                     warn!("Unhandled control request: {:?}", control_request);
                 },
+
                 Err(e) => {
                     error!("Error receiving response: {}", e);
                 },

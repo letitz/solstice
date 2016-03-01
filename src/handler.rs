@@ -6,7 +6,7 @@ use mio::{EventLoop, EventSet, Handler, PollOpt, Token};
 use mio::tcp::TcpStream;
 
 use client::IncomingMessage;
-use proto::{Packet, PacketStream, Request};
+use proto::{Packet, PacketStream, Request, Response};
 use proto::server::*;
 
 struct TokenCounter {
@@ -95,7 +95,8 @@ impl ConnectionHandler {
         };
 
         let server_response = try!(ServerResponse::from_packet(packet));
-        let message = IncomingMessage::ServerResponse(server_response);
+        let message = IncomingMessage::ProtoResponse(
+            Response::ServerResponse(server_response));
         match self.client_tx.send(message) {
             Ok(()) => Ok(true),
             Err(e) => Err(io::Error::new(
