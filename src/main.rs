@@ -7,6 +7,7 @@ mod handler;
 mod proto;
 
 extern crate byteorder;
+extern crate core;
 extern crate crypto;
 #[macro_use] extern crate log;
 extern crate env_logger;
