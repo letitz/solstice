@@ -1,3 +1,5 @@
+#![feature(mpsc_select)]
+
 mod client;
 mod config;
 mod control;
