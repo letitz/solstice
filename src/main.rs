@@ -47,18 +47,20 @@ fn main() {
 
     let mut event_loop = EventLoop::new().unwrap();
 
-    let (client_tx, client_rx) = channel();
+    let (handler_to_client_tx, handler_to_client_rx) = channel();
+    let (control_to_client_tx, control_to_client_rx) = channel();
     let (client_to_control_tx, client_to_control_rx) = channel();
     let client_to_handler_tx = event_loop.channel();
 
     let mut handler =
-        ConnectionHandler::new(stream, client_tx.clone(), &mut event_loop);
+        ConnectionHandler::new(stream, handler_to_client_tx, &mut event_loop);
 
     let mut client = Client::new(
-        client_rx, client_to_handler_tx, client_to_control_tx);
+        client_to_handler_tx, handler_to_client_rx,
+        client_to_control_tx, control_to_client_rx);
 
     let mut controller =
-        Controller::new(client_tx, client_to_control_rx);
+        Controller::new(control_to_client_tx, client_to_control_rx);
 
     thread::spawn(move || controller.run());
     thread::spawn(move || event_loop.run(&mut handler).unwrap());

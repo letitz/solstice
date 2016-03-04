@@ -25,7 +25,7 @@ enum Error {
     IOError(io::Error),
     JSONEncoderError(json::EncoderError),
     JSONDecoderError(json::DecoderError),
-    SendError(mpsc::SendError<client::IncomingMessage>),
+    SendError(mpsc::SendError<ControlRequest>),
     Utf8Error(str::Utf8Error),
     WebSocketError(websocket::result::WebSocketError),
 }
@@ -67,8 +67,8 @@ impl From<json::DecoderError> for Error {
     }
 }
 
-impl From<mpsc::SendError<client::IncomingMessage>> for Error {
-    fn from(err: mpsc::SendError<client::IncomingMessage>) -> Self {
+impl From<mpsc::SendError<ControlRequest>> for Error {
+    fn from(err: mpsc::SendError<ControlRequest>) -> Self {
         Error::SendError(err)
     }
 }
@@ -86,12 +86,12 @@ impl From<websocket::result::WebSocketError> for Error {
 }
 
 pub struct Controller {
-    client_tx: mpsc::Sender<client::IncomingMessage>,
+    client_tx: mpsc::Sender<ControlRequest>,
     client_rx: mpsc::Receiver<ControlResponse>,
 }
 
 impl Controller {
-    pub fn new(tx: mpsc::Sender<client::IncomingMessage>,
+    pub fn new(tx: mpsc::Sender<ControlRequest>,
                rx: mpsc::Receiver<ControlResponse>)
         -> Self
     {
@@ -108,6 +108,7 @@ impl Controller {
         info!("Controller bound to {}:{}", host, port);
 
         loop {
+            info!("Waiting for controller client");
             let client = match Self::try_get_client(&mut server) {
                 Ok(client) => client,
                 Err(e) => {
@@ -128,6 +129,8 @@ impl Controller {
             Self::sender_loop(sender, &mut self.client_rx, sender_rx);
 
             handle.join();
+
+            info!("Controller client disconnected");
         }
     }
 
@@ -144,7 +147,7 @@ impl Controller {
 
     fn receiver_loop(
         mut receiver: WebSocketReceiver,
-        client_tx: mpsc::Sender<client::IncomingMessage>,
+        client_tx: mpsc::Sender<ControlRequest>,
         sender_tx: mpsc::Sender<()>)
     {
         for message_result in receiver.incoming_messages() {
@@ -180,14 +183,12 @@ impl Controller {
 
     fn handle_text_message(
         payload_bytes: &[u8],
-        client_tx: &mpsc::Sender<client::IncomingMessage>)
+        client_tx: &mpsc::Sender<ControlRequest>)
         -> Result<(), Error>
     {
         let payload = try!(str::from_utf8(payload_bytes));
         let control_request = try!(json::decode(payload));
-
-        let message = client::IncomingMessage::ControlRequest(control_request);
-        try!(client_tx.send(message));
+        try!(client_tx.send(control_request));
         Ok(())
     }
 
@@ -232,26 +233,25 @@ impl Controller {
 
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 pub enum ControlRequest {
-    LoginRequest(LoginRequest),
+    LoginStatusRequest(LoginStatusRequest),
 }
 
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 pub enum ControlResponse {
-    LoginResponse(LoginResponse),
+    LoginStatusResponse(LoginStatusResponse),
 }
 
 #[derive(Debug, RustcDecodable, RustcEncodable)]
-pub struct LoginRequest {
-    username: String,
-    password: String,
-}
+pub struct LoginStatusRequest;
 
 #[derive(Debug, RustcDecodable, RustcEncodable)]
-pub enum LoginResponse {
+pub enum LoginStatusResponse {
     LoginOk {
+        username: String,
         motd: String,
     },
     LoginFail {
+        username: String,
         reason: String,
     }
 }
