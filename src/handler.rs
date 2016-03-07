@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 use std::io;
+use std::net::ToSocketAddrs;
 use std::sync::mpsc::Sender;
 
 use mio::{EventLoop, EventSet, Handler, PollOpt, Token};
@@ -37,20 +38,26 @@ pub struct ConnectionHandler {
 
 impl ConnectionHandler {
     pub fn new(
-        server_tcp_stream: TcpStream, client_tx: Sender<Response>,
-        event_loop: &mut EventLoop<Self>) -> Self
+        server_host: &str,
+        server_port: u16,
+        client_tx: Sender<Response>,
+        event_loop: &mut EventLoop<Self>)
+        -> io::Result<Self>
     {
+        let server_tcp_stream = try!(Self::connect(server_host, server_port));
+        let server_stream = PacketStream::new(server_tcp_stream);
+        info!("Connected to server at {}:{}", server_host, server_port);
+
         let mut token_counter = TokenCounter::new();
         let server_token = token_counter.next();
 
         let event_set = EventSet::readable();
         let poll_opt = PollOpt::edge() | PollOpt::oneshot();
 
-        let server_stream = PacketStream::new(server_tcp_stream);
-        server_stream.register(event_loop, server_token, event_set, poll_opt)
-            .unwrap();
+        try!(server_stream.register(
+                event_loop, server_token, event_set, poll_opt));
 
-        ConnectionHandler {
+        Ok(ConnectionHandler {
             token_counter: token_counter,
 
             server_token: server_token,
@@ -58,7 +65,17 @@ impl ConnectionHandler {
             server_queue: VecDeque::new(),
 
             client_tx: client_tx,
+        })
+    }
+
+    fn connect(hostname: &str, port: u16) -> io::Result<TcpStream> {
+        for sock_addr in try!((hostname, port).to_socket_addrs()) {
+            if let Ok(stream) = TcpStream::connect(&sock_addr) {
+                return Ok(stream)
+            }
         }
+        Err(io::Error::new(io::ErrorKind::Other,
+                       format!("Cannot connect to {}:{}", hostname, port)))
     }
 
     fn read_server(&mut self) {
