@@ -87,16 +87,25 @@ impl Packet {
         }
     }
 
-    pub fn read_array_with<T, F>(&mut self, read_item: F, vector: &mut Vec<T>)
-        -> io::Result<()>
+    pub fn read_array<T, F>(&mut self, vector: &mut Vec<T>, read_item: F)
+        -> io::Result<usize>
         where F: Fn(&mut Self) -> io::Result<T>
     {
-        let num_items = try!(self.read_uint());
-        for _ in 0..num_items {
-            let item = try!(read_item(self));
+        self.read_array_with(|packet, _| {
+            let item = try!(read_item(packet));
             vector.push(item);
+            Ok(())
+        })
+    }
+
+    pub fn read_array_with<F>(&mut self, mut read_item: F) -> io::Result<usize>
+        where F: FnMut(&mut Self, usize) -> io::Result<()>
+    {
+        let num_items = try!(self.read_uint()) as usize;
+        for i in 0..num_items {
+            try!(read_item(self, i));
         }
-        Ok(())
+        Ok(num_items)
     }
 
     pub fn read_ipv4_addr(&mut self) -> io::Result<net::Ipv4Addr> {

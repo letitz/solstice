@@ -231,7 +231,7 @@ impl PrivilegedUsersResponse {
         let mut response = PrivilegedUsersResponse {
             users: Vec::new(),
         };
-        try!(packet.read_array_with(Packet::read_str, &mut response.users));
+        try!(packet.read_array(&mut response.users, Packet::read_str));
         Ok(response)
     }
 }
@@ -259,23 +259,22 @@ impl RoomListResponse {
 
         try!(Self::read_rooms(packet, &mut response.rooms));
 
-        if let Err(e) =
-            Self::read_rooms(packet, &mut response.owned_private_rooms)
+        if let Err(e) = Self::read_rooms(
+            packet, &mut response.owned_private_rooms)
         {
             warn!("Error parsing owned_private_rooms: {}", e);
             return Ok(response);
         }
 
-        if let Err(e) =
-            Self::read_rooms(packet, &mut response.other_private_rooms)
+        if let Err(e) = Self::read_rooms(
+            packet, &mut response.other_private_rooms)
         {
             warn!("Error parsing other_private_rooms: {}", e);
             return Ok(response);
         }
 
-        if let Err(e) =
-            packet.read_array_with(
-                Packet::read_str, &mut response.operated_private_room_names)
+        if let Err(e) = packet.read_array(
+            &mut response.operated_private_room_names, Packet::read_str)
         {
             warn!("Error parsing operated_private_rooms: {}", e);
         }
@@ -288,17 +287,15 @@ impl RoomListResponse {
     {
         let original_rooms_len = rooms.len();
 
-        let num_rooms = try!(packet.read_uint()) as usize;
-        for _ in 0..num_rooms {
-            let room_name = try!(packet.read_str());
-            rooms.push((room_name, 0));
-        }
+        let num_rooms = try!(packet.read_array(rooms, |packet| {
+            Ok((try!(packet.read_str()), 0))
+        }));
 
-        let num_user_counts = try!(packet.read_uint()) as usize;
-        for i in 0..num_user_counts {
+        let num_user_counts = try!(packet.read_array_with(|packet, i| {
             let user_count = try!(packet.read_uint());
             rooms[original_rooms_len+i].1 = user_count;
-        }
+            Ok(())
+        }));
 
         if num_rooms != num_user_counts {
             warn!("Numbers of rooms and user counts do not match: {} != {}",
