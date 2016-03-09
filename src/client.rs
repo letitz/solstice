@@ -1,3 +1,4 @@
+use std::collections;
 use std::sync::mpsc;
 
 use mio;
@@ -6,6 +7,18 @@ use config;
 use control::{ControlRequest, ControlResponse};
 use proto::{Response, Request};
 use proto::server::*;
+
+enum RoomKind {
+    Public,
+    PrivateOwned,
+    PrivateOther,
+}
+
+struct Room {
+    kind: RoomKind,
+    user_count: usize,
+    operated: bool,
+}
 
 #[derive(Debug)]
 enum IncomingMessage {
@@ -28,6 +41,9 @@ pub struct Client {
 
     control_tx: mpsc::Sender<ControlResponse>,
     control_rx: mpsc::Receiver<ControlRequest>,
+
+    rooms: collections::HashMap<String, Room>,
+    privileged_users: collections::HashSet<String>,
 }
 
 impl Client {
@@ -44,6 +60,8 @@ impl Client {
             proto_rx: proto_rx,
             control_tx: control_tx,
             control_rx: control_rx,
+            rooms: collections::HashMap::new(),
+            privileged_users: collections::HashSet::new(),
         }
     }
 
@@ -146,15 +164,50 @@ impl Client {
     }
 
     fn handle_room_list_response(
-        &mut self, response: RoomListResponse)
+        &mut self, mut response: RoomListResponse)
     {
-        info!("Received room list: {} rooms total", response.rooms.len());
+        self.rooms.clear();
+        for (name, user_count) in response.rooms.drain(..) {
+            self.rooms.insert(name, Room{
+                kind: RoomKind::Public,
+                operated: false,
+                user_count: user_count as usize,
+            });
+        }
+        for (name, user_count) in response.owned_private_rooms.drain(..) {
+            let room = Room {
+                kind: RoomKind::PrivateOwned,
+                operated: false,
+                user_count: user_count as usize,
+            };
+            if let Some(_) = self.rooms.insert(name, room) {
+                error!("Room is both normal and owned_private");
+            }
+        }
+        for (name, user_count) in response.other_private_rooms.drain(..) {
+            let room = Room {
+                kind: RoomKind::PrivateOther,
+                operated: false,
+                user_count: user_count as usize,
+            };
+            if let Some(_) = self.rooms.insert(name, room) {
+                error!("Room is both normal and other_private");
+            }
+        }
+        for name in response.operated_private_room_names.drain(..) {
+            match self.rooms.get_mut(&name) {
+                None => error!("Room {} is operated but does not exist", name),
+                Some(room) => room.operated = true,
+            }
+        }
     }
 
     fn handle_privileged_users_response(
-        &mut self, response: PrivilegedUsersResponse)
+        &mut self, mut response: PrivilegedUsersResponse)
     {
-        info!("Received privileged users list: {} privileged users total",
-              response.users.len());
+        self.privileged_users.clear();
+        for username in response.users.drain(..) {
+            self.privileged_users.insert(username);
+        }
     }
 }
