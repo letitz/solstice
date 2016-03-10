@@ -4,7 +4,8 @@ use std::sync::mpsc;
 use mio;
 
 use config;
-use control::{ControlRequest, ControlResponse};
+use control::request::ControlRequest;
+use control::response::ControlResponse;
 use proto::{Response, Request};
 use proto::server::*;
 

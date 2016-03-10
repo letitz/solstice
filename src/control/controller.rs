@@ -11,6 +11,9 @@ use websocket::{Receiver, Sender};
 use client;
 use config;
 
+use super::request::*;
+use super::response::*;
+
 type WebSocketReceiver =
     websocket::receiver::Receiver<websocket::WebSocketStream>;
 
@@ -231,27 +234,3 @@ impl Controller {
     }
 }
 
-#[derive(Debug, RustcDecodable, RustcEncodable)]
-pub enum ControlRequest {
-    LoginStatusRequest(LoginStatusRequest),
-}
-
-#[derive(Debug, RustcDecodable, RustcEncodable)]
-pub enum ControlResponse {
-    LoginStatusResponse(LoginStatusResponse),
-}
-
-#[derive(Debug, RustcDecodable, RustcEncodable)]
-pub struct LoginStatusRequest;
-
-#[derive(Debug, RustcDecodable, RustcEncodable)]
-pub enum LoginStatusResponse {
-    LoginOk {
-        username: String,
-        motd: String,
-    },
-    LoginFail {
-        username: String,
-        reason: String,
-    }
-}
