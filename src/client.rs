@@ -130,36 +130,35 @@ impl Client {
     }
 
     fn handle_login_response(&mut self, login: LoginResponse) {
-        match self.state {
-            State::LoggingIn => {
-                match login {
-                    LoginResponse::LoginOk { motd, ip, password_md5_opt } => {
-                        self.state = State::LoggedIn;
+        if let State::LoggingIn = self.state {
+            match login {
+                LoginResponse::LoginOk { motd, ip, password_md5_opt } => {
+                    self.state = State::LoggedIn;
 
-                        info!("Login successful!");
-                        info!("MOTD: \"{}\"", motd);
-                        info!("External IP address: {}", ip);
+                    info!("Login successful!");
+                    info!("MOTD: \"{}\"", motd);
+                    info!("External IP address: {}", ip);
 
-                        match password_md5_opt {
-                            Some(_) => {
-                                info!(concat!(
-                                        "Connected to official server ",
-                                        "as official client"));
-                            },
-                            None => info!(concat!(
+                    match password_md5_opt {
+                        Some(_) => {
+                            info!(concat!(
                                     "Connected to official server ",
-                                    "as unofficial client")),
-                        }
-                    },
-
-                    LoginResponse::LoginFail { reason } => {
-                        self.state = State::NotLoggedIn;
-                        error!("Login failed: \"{}\"", reason);
+                                    "as official client"));
+                        },
+                        None => info!(concat!(
+                                "Connected to official server ",
+                                "as unofficial client")),
                     }
-                }
-            },
+                },
 
-            _ => unimplemented!(),
+                LoginResponse::LoginFail { reason } => {
+                    self.state = State::NotLoggedIn;
+                    error!("Login failed: \"{}\"", reason);
+                }
+            }
+        } else {
+            error!("Received unexpected login response, state = {:?}",
+                   self.state);
         }
     }
 
