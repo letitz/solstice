@@ -1,7 +1,5 @@
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 pub enum ControlRequest {
-    LoginStatusRequest(LoginStatusRequest),
+    LoginStatusRequest,
+    RoomListRequest,
 }
-
-#[derive(Debug, RustcDecodable, RustcEncodable)]
-pub struct LoginStatusRequest;

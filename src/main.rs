@@ -5,6 +5,7 @@ mod config;
 mod control;
 mod handler;
 mod proto;
+mod room;
 
 extern crate byteorder;
 extern crate core;

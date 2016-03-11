@@ -4,46 +4,34 @@ use std::sync::mpsc;
 use mio;
 
 use config;
-use control::request::ControlRequest;
-use control::response::ControlResponse;
+use control;
 use proto::{Response, Request};
 use proto::server::*;
-
-enum RoomKind {
-    Public,
-    PrivateOwned,
-    PrivateOther,
-}
-
-struct Room {
-    kind: RoomKind,
-    user_count: usize,
-    operated: bool,
-}
+use room;
 
 #[derive(Debug)]
 enum IncomingMessage {
     ServerResponse(ServerResponse),
-    ControlRequest(ControlRequest),
+    ControlRequest(control::ControlRequest),
 }
 
-#[derive(Debug, Clone, Copy)]
-enum State {
-    NotLoggedIn,
-    LoggingIn,
-    LoggedIn,
+#[derive(Debug, Clone)]
+enum LoginStatus {
+    Pending,
+    Success(String),
+    Failure(String),
 }
 
 pub struct Client {
-    state: State,
-
     proto_tx: mio::Sender<Request>,
     proto_rx: mpsc::Receiver<Response>,
 
-    control_tx: mpsc::Sender<ControlResponse>,
-    control_rx: mpsc::Receiver<ControlRequest>,
+    control_tx: mpsc::Sender<control::ControlResponse>,
+    control_rx: mpsc::Receiver<control::ControlRequest>,
 
-    rooms: collections::HashMap<String, Room>,
+    login_status: LoginStatus,
+
+    rooms: collections::HashMap<String, room::Room>,
     privileged_users: collections::HashSet<String>,
 }
 
@@ -51,16 +39,18 @@ impl Client {
     pub fn new(
         proto_tx: mio::Sender<Request>,
         proto_rx: mpsc::Receiver<Response>,
-        control_tx: mpsc::Sender<ControlResponse>,
-        control_rx: mpsc::Receiver<ControlRequest>)
+        control_tx: mpsc::Sender<control::ControlResponse>,
+        control_rx: mpsc::Receiver<control::ControlRequest>)
         -> Self
     {
         Client {
-            state: State::NotLoggedIn,
             proto_tx: proto_tx,
             proto_rx: proto_rx,
             control_tx: control_tx,
             control_rx: control_rx,
+
+            login_status: LoginStatus::Pending,
+
             rooms: collections::HashMap::new(),
             privileged_users: collections::HashSet::new(),
         }
@@ -68,7 +58,6 @@ impl Client {
 
     pub fn run(&mut self) {
         info!("Logging in...");
-        self.state = State::LoggingIn;
         let server_request = ServerRequest::LoginRequest(LoginRequest::new(
                 config::USERNAME,
                 config::PASSWORD,
@@ -103,12 +92,38 @@ impl Client {
         }
     }
 
-    fn handle_control_request(&mut self, request: ControlRequest) {
+    fn handle_control_request(&mut self, request: control::ControlRequest) {
         match request {
-            _ => {
+            control::ControlRequest::LoginStatusRequest =>
+                self.handle_login_status_request(),
+
+            _ =>{
                 error!("Unhandled control request: {:?}", request);
             },
         }
+    }
+
+    fn handle_login_status_request(&mut self) {
+        let username = config::USERNAME.to_string();
+
+        let response = match self.login_status {
+            LoginStatus::Pending =>
+                control::LoginStatusResponse::Pending{ username: username },
+
+            LoginStatus::Success(ref motd) =>
+                control::LoginStatusResponse::Success{
+                    username: username,
+                    motd: motd.clone(),
+                },
+
+            LoginStatus::Failure(ref reason) =>
+                control::LoginStatusResponse::Failure{
+                    username: username,
+                    reason: reason.clone(),
+                },
+        };
+        debug!("Sending control response: {:?}", response);
+        self.control_tx.send(control::ControlResponse::LoginStatusResponse(response));
     }
 
     fn handle_server_response(&mut self, response: ServerResponse) {
@@ -131,11 +146,9 @@ impl Client {
     }
 
     fn handle_login_response(&mut self, login: LoginResponse) {
-        if let State::LoggingIn = self.state {
+        if let LoginStatus::Pending = self.login_status {
             match login {
-                LoginResponse::LoginOk { motd, ip, password_md5_opt } => {
-                    self.state = State::LoggedIn;
-
+                LoginResponse::LoginOk{ motd, ip, password_md5_opt } => {
                     info!("Login successful!");
                     info!("MOTD: \"{}\"", motd);
                     info!("External IP address: {}", ip);
@@ -150,16 +163,17 @@ impl Client {
                                 "Connected to official server ",
                                 "as unofficial client")),
                     }
+                    self.login_status = LoginStatus::Success(motd);
                 },
 
-                LoginResponse::LoginFail { reason } => {
-                    self.state = State::NotLoggedIn;
+                LoginResponse::LoginFail{ reason } => {
                     error!("Login failed: \"{}\"", reason);
+                    self.login_status = LoginStatus::Failure(reason);
                 }
             }
         } else {
-            error!("Received unexpected login response, state = {:?}",
-                   self.state);
+            error!("Received unexpected login response, status = {:?}",
+                   self.login_status);
         }
     }
 
@@ -168,15 +182,15 @@ impl Client {
     {
         self.rooms.clear();
         for (name, user_count) in response.rooms.drain(..) {
-            self.rooms.insert(name, Room{
-                kind: RoomKind::Public,
+            self.rooms.insert(name, room::Room{
+                kind: room::RoomKind::Public,
                 operated: false,
                 user_count: user_count as usize,
             });
         }
         for (name, user_count) in response.owned_private_rooms.drain(..) {
-            let room = Room {
-                kind: RoomKind::PrivateOwned,
+            let room = room::Room {
+                kind: room::RoomKind::PrivateOwned,
                 operated: false,
                 user_count: user_count as usize,
             };
@@ -185,8 +199,8 @@ impl Client {
             }
         }
         for (name, user_count) in response.other_private_rooms.drain(..) {
-            let room = Room {
-                kind: RoomKind::PrivateOther,
+            let room = room::Room {
+                kind: room::RoomKind::PrivateOther,
                 operated: false,
                 user_count: user_count as usize,
             };
