@@ -131,7 +131,6 @@ impl Client {
                     reason: reason.clone(),
                 },
         };
-        debug!("Sending control response: {:?}", response);
         self.control_tx.send(control::Response::LoginStatusResponse(response));
     }
 
