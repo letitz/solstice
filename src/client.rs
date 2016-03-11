@@ -12,7 +12,7 @@ use room;
 #[derive(Debug)]
 enum IncomingMessage {
     ServerResponse(ServerResponse),
-    ControlRequest(control::ControlRequest),
+    ControlRequest(control::Request),
 }
 
 #[derive(Debug, Clone)]
@@ -26,8 +26,8 @@ pub struct Client {
     proto_tx: mio::Sender<Request>,
     proto_rx: mpsc::Receiver<Response>,
 
-    control_tx: mpsc::Sender<control::ControlResponse>,
-    control_rx: mpsc::Receiver<control::ControlRequest>,
+    control_tx: mpsc::Sender<control::Response>,
+    control_rx: mpsc::Receiver<control::Request>,
 
     login_status: LoginStatus,
 
@@ -39,8 +39,8 @@ impl Client {
     pub fn new(
         proto_tx: mio::Sender<Request>,
         proto_rx: mpsc::Receiver<Response>,
-        control_tx: mpsc::Sender<control::ControlResponse>,
-        control_rx: mpsc::Receiver<control::ControlRequest>)
+        control_tx: mpsc::Sender<control::Response>,
+        control_rx: mpsc::Receiver<control::Request>)
         -> Self
     {
         Client {
@@ -92,9 +92,9 @@ impl Client {
         }
     }
 
-    fn handle_control_request(&mut self, request: control::ControlRequest) {
+    fn handle_control_request(&mut self, request: control::Request) {
         match request {
-            control::ControlRequest::LoginStatusRequest =>
+            control::Request::LoginStatusRequest =>
                 self.handle_login_status_request(),
 
             _ =>{
@@ -123,7 +123,7 @@ impl Client {
                 },
         };
         debug!("Sending control response: {:?}", response);
-        self.control_tx.send(control::ControlResponse::LoginStatusResponse(response));
+        self.control_tx.send(control::Response::LoginStatusResponse(response));
     }
 
     fn handle_server_response(&mut self, response: ServerResponse) {

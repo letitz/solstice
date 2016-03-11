@@ -1,7 +1,7 @@
 use room;
 
 #[derive(Debug, RustcDecodable, RustcEncodable)]
-pub enum ControlResponse {
+pub enum Response {
     LoginStatusResponse(LoginStatusResponse),
     RoomListResponse(RoomListResponse),
 }

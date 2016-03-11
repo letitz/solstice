@@ -28,7 +28,7 @@ enum Error {
     IOError(io::Error),
     JSONEncoderError(json::EncoderError),
     JSONDecoderError(json::DecoderError),
-    SendError(mpsc::SendError<ControlRequest>),
+    SendError(mpsc::SendError<Request>),
     Utf8Error(str::Utf8Error),
     WebSocketError(websocket::result::WebSocketError),
 }
@@ -70,8 +70,8 @@ impl From<json::DecoderError> for Error {
     }
 }
 
-impl From<mpsc::SendError<ControlRequest>> for Error {
-    fn from(err: mpsc::SendError<ControlRequest>) -> Self {
+impl From<mpsc::SendError<Request>> for Error {
+    fn from(err: mpsc::SendError<Request>) -> Self {
         Error::SendError(err)
     }
 }
@@ -89,13 +89,13 @@ impl From<websocket::result::WebSocketError> for Error {
 }
 
 pub struct Controller {
-    client_tx: mpsc::Sender<ControlRequest>,
-    client_rx: mpsc::Receiver<ControlResponse>,
+    client_tx: mpsc::Sender<Request>,
+    client_rx: mpsc::Receiver<Response>,
 }
 
 impl Controller {
-    pub fn new(tx: mpsc::Sender<ControlRequest>,
-               rx: mpsc::Receiver<ControlResponse>)
+    pub fn new(tx: mpsc::Sender<Request>,
+               rx: mpsc::Receiver<Response>)
         -> Self
     {
         Controller {
@@ -150,7 +150,7 @@ impl Controller {
 
     fn receiver_loop(
         mut receiver: WebSocketReceiver,
-        client_tx: mpsc::Sender<ControlRequest>,
+        client_tx: mpsc::Sender<Request>,
         sender_tx: mpsc::Sender<()>)
     {
         for message_result in receiver.incoming_messages() {
@@ -186,7 +186,7 @@ impl Controller {
 
     fn handle_text_message(
         payload_bytes: &[u8],
-        client_tx: &mpsc::Sender<ControlRequest>)
+        client_tx: &mpsc::Sender<Request>)
         -> Result<(), Error>
     {
         let payload = try!(str::from_utf8(payload_bytes));
@@ -197,7 +197,7 @@ impl Controller {
 
     fn sender_loop(
         mut sender: WebSocketSender,
-        client_rx: &mut mpsc::Receiver<ControlResponse>,
+        client_rx: &mut mpsc::Receiver<Response>,
         sender_rx: mpsc::Receiver<()>)
     {
         loop {
@@ -224,7 +224,7 @@ impl Controller {
         sender.shutdown_all().unwrap();
     }
 
-    fn send_response(sender: &mut WebSocketSender, response: ControlResponse)
+    fn send_response(sender: &mut WebSocketSender, response: Response)
         -> Result<(), Error>
     {
         let encoded = try!(json::encode(&response));
