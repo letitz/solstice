@@ -25,5 +25,5 @@ pub enum LoginStatusResponse {
 
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 pub struct RoomListResponse {
-    rooms: Vec<room::Room>,
+    pub rooms: Vec<(String, room::Room)>,
 }

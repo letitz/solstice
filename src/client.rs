@@ -92,14 +92,23 @@ impl Client {
         }
     }
 
+    /*==========================*
+     * CONTROL REQUEST HANDLING *
+     *==========================*/
+
     fn handle_control_request(&mut self, request: control::Request) {
         match request {
             control::Request::LoginStatusRequest =>
                 self.handle_login_status_request(),
 
+            control::Request::RoomListRequest =>
+                self.handle_room_list_request(),
+
+            /*
             _ =>{
                 error!("Unhandled control request: {:?}", request);
             },
+            */
         }
     }
 
@@ -125,6 +134,18 @@ impl Client {
         debug!("Sending control response: {:?}", response);
         self.control_tx.send(control::Response::LoginStatusResponse(response));
     }
+
+    fn handle_room_list_request(&mut self) {
+        let mut response = control::RoomListResponse{ rooms: Vec::new() };
+        for (room_name, room) in self.rooms.iter() {
+            response.rooms.push((room_name.clone(), room.clone()));
+        }
+        self.control_tx.send(control::Response::RoomListResponse(response));
+    }
+
+    /*==========================*
+     * SERVER RESPONSE HANDLING *
+     *==========================*/
 
     fn handle_server_response(&mut self, response: ServerResponse) {
         match response {
