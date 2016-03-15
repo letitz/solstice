@@ -104,12 +104,21 @@ impl Client {
             control::Request::RoomListRequest =>
                 self.handle_room_list_request(),
 
+            control::Request::JoinRoomRequest(room_name) =>
+                self.handle_join_room_request(room_name),
+
             /*
             _ =>{
                 error!("Unhandled control request: {:?}", request);
             },
             */
         }
+    }
+
+    fn handle_join_room_request(&mut self, room_name: String) {
+        let request = JoinRoomRequest { room_name: room_name };
+        self.proto_tx.send(Request::ServerRequest(
+                ServerRequest::JoinRoomRequest(request)));
     }
 
     fn handle_login_status_request(&mut self) {

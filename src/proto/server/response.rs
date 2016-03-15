@@ -10,8 +10,9 @@ use super::super::packet::Packet;
 
 #[derive(Debug)]
 pub enum ServerResponse {
-    LoginResponse(LoginResponse),
     ConnectToPeerResponse(ConnectToPeerResponse),
+    JoinRoomResponse(JoinRoomResponse),
+    LoginResponse(LoginResponse),
     PeerAddressResponse(PeerAddressResponse),
     PrivilegedUsersResponse(PrivilegedUsersResponse),
     RoomListResponse(RoomListResponse),
@@ -31,6 +32,11 @@ impl ServerResponse {
             CODE_CONNECT_TO_PEER =>
                 ServerResponse::ConnectToPeerResponse(
                     try!(ConnectToPeerResponse::from_packet(&mut packet))
+                ),
+
+            CODE_JOIN_ROOM =>
+                ServerResponse::JoinRoomResponse(
+                    try!(JoinRoomResponse::from_packet(&mut packet))
                 ),
 
             CODE_LOGIN =>
@@ -111,6 +117,35 @@ impl ConnectToPeerResponse {
             port: port,
             token: token,
             is_privileged: is_privileged,
+        })
+    }
+}
+
+/*===========*
+ * JOIN ROOM *
+ *===========*/
+
+#[derive(Debug)]
+pub struct JoinRoomResponse {
+    room_name: String,
+    user_names: Vec<String>,
+    user_statuses: Vec<u32>,
+}
+
+impl JoinRoomResponse {
+    pub fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+        let room_name = try!(packet.read_str());
+
+        let mut user_names = Vec::new();
+        try!(packet.read_array(&mut user_names, Packet::read_str));
+
+        let mut user_statuses = Vec::new();
+        try!(packet.read_array(&mut user_statuses, Packet::read_uint));
+
+        Ok(JoinRoomResponse {
+            room_name: room_name,
+            user_names: user_names,
+            user_statuses: user_statuses,
         })
     }
 }
