@@ -77,6 +77,8 @@ impl Client {
         }
     }
 
+    // Necessary to break out in different function because self cannot be
+    // borrowed in the select arms due to *macro things*.
     fn recv(&mut self) -> IncomingMessage {
         let proto_rx = &self.proto_rx;
         let control_rx = &self.control_rx;
