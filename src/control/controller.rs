@@ -119,21 +119,32 @@ impl Controller {
                     continue;
                 }
             };
-            info!("Controller client connected");
+
+            // Empty client_rx of any messages that client has sent while
+            // no-one was connected.
+            while let Ok(_) = self.client_rx.try_recv() { /* continue */ }
+
+            // Notify client that a controller is connected.
+            self.client_tx.send(Request::ConnectNotification).unwrap();
 
             let (sender, receiver) = client.split();
             let (sender_tx, sender_rx) = mpsc::channel();
 
+            // Handle incoming messages from controller in a separate thread,
+            // and forward them to the client through client_tx.
             let tx = self.client_tx.clone();
             let handle = thread::spawn(move || {
                 Self::receiver_loop(receiver, tx, sender_tx);
             });
 
+            // Handle messages from client and forward them to the controller.
             Self::sender_loop(sender, &mut self.client_rx, sender_rx);
 
+            // Sender loop has terminated, wait for receiver loop too.
             handle.join();
 
-            info!("Controller client disconnected");
+            // Notify client that the controller has disconnected.
+            self.client_tx.send(Request::DisconnectNotification).unwrap();
         }
     }
 

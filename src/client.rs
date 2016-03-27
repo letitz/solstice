@@ -100,6 +100,12 @@ impl Client {
 
     fn handle_control_request(&mut self, request: control::Request) {
         match request {
+            control::Request::ConnectNotification =>
+                info!("Controller client connected"),
+
+            control::Request::DisconnectNotification =>
+                info!("Controller client disconnected"),
+
             control::Request::LoginStatusRequest =>
                 self.handle_login_status_request(),
 
