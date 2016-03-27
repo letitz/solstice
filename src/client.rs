@@ -168,9 +168,8 @@ impl Client {
             ServerResponse::RoomListResponse(response) =>
                 self.handle_room_list_response(response),
 
-            ServerResponse::UnknownResponse(code, packet) =>
-                warn!("Unknown response: code {}, size {}",
-                      code, packet.bytes_remaining()),
+            ServerResponse::UnknownResponse(code) =>
+                warn!("Unknown response: code {}", code),
 
             response => warn!("Unhandled response: {:?}", response),
         }

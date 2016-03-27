@@ -105,12 +105,12 @@ impl ConnectionHandler {
     }
 
     fn read_server_once(&mut self) -> io::Result<bool> {
-        let packet = match try!(self.server_stream.try_read()) {
+        let mut packet = match try!(self.server_stream.try_read()) {
             Some(packet) => packet,
             None => return Ok(false),
         };
 
-        let server_response = try!(ServerResponse::from_packet(packet));
+        let server_response = try!(ServerResponse::from_packet(&mut packet));
         match self.client_tx.send(Response::ServerResponse(server_response)) {
             Ok(()) => Ok(true),
             Err(e) => Err(io::Error::new(

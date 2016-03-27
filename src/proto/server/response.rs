@@ -4,6 +4,14 @@ use std::net;
 use super::constants::*;
 use super::super::packet::Packet;
 
+/*=============*
+ * FROM PACKET *
+ *=============*/
+
+pub trait FromPacket: Sized {
+    fn from_packet(&mut Packet) -> io::Result<Self>;
+}
+
 /*=================*
  * SERVER RESPONSE *
  *=================*/
@@ -22,59 +30,59 @@ pub enum ServerResponse {
     ParentMinSpeedResponse(ParentMinSpeedResponse),
     ParentSpeedRatioResponse(ParentSpeedRatioResponse),
 
-    UnknownResponse(u32, Packet),
+    UnknownResponse(u32),
 }
 
-impl ServerResponse {
-    pub fn from_packet(mut packet: Packet) -> io::Result<Self> {
+impl FromPacket for ServerResponse {
+    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
         let code = try!(packet.read_uint());
         let resp = match code {
             CODE_CONNECT_TO_PEER =>
                 ServerResponse::ConnectToPeerResponse(
-                    try!(ConnectToPeerResponse::from_packet(&mut packet))
+                    try!(ConnectToPeerResponse::from_packet(packet))
                 ),
 
             CODE_JOIN_ROOM =>
                 ServerResponse::JoinRoomResponse(
-                    try!(JoinRoomResponse::from_packet(&mut packet))
+                    try!(JoinRoomResponse::from_packet(packet))
                 ),
 
             CODE_LOGIN =>
                 ServerResponse::LoginResponse(
-                    try!(LoginResponse::from_packet(&mut packet))
+                    try!(LoginResponse::from_packet(packet))
                 ),
 
             CODE_PEER_ADDRESS =>
                 ServerResponse::PeerAddressResponse(
-                    try!(PeerAddressResponse::from_packet(&mut packet))
+                    try!(PeerAddressResponse::from_packet(packet))
                 ),
 
             CODE_PRIVILEGED_USERS =>
                 ServerResponse::PrivilegedUsersResponse(
-                    try!(PrivilegedUsersResponse::from_packet(&mut packet))
+                    try!(PrivilegedUsersResponse::from_packet(packet))
                 ),
 
             CODE_ROOM_LIST =>
                 ServerResponse::RoomListResponse(
-                    try!(RoomListResponse::from_packet(&mut packet))
+                    try!(RoomListResponse::from_packet(packet))
                 ),
 
             CODE_WISHLIST_INTERVAL =>
                 ServerResponse::WishlistIntervalResponse(
-                    try!(WishlistIntervalResponse::from_packet(&mut packet))
+                    try!(WishlistIntervalResponse::from_packet(packet))
                     ),
 
             CODE_PARENT_MIN_SPEED =>
                 ServerResponse::ParentMinSpeedResponse(
-                    try!(ParentMinSpeedResponse::from_packet(&mut packet))
+                    try!(ParentMinSpeedResponse::from_packet(packet))
                 ),
 
             CODE_PARENT_SPEED_RATIO =>
                 ServerResponse::ParentSpeedRatioResponse(
-                    try!(ParentSpeedRatioResponse::from_packet(&mut packet))
+                    try!(ParentSpeedRatioResponse::from_packet(packet))
                 ),
 
-            code => return Ok(ServerResponse::UnknownResponse(code, packet)),
+            code => ServerResponse::UnknownResponse(code),
         };
         let bytes_remaining = packet.bytes_remaining();
         if bytes_remaining > 0 {
@@ -99,7 +107,7 @@ pub struct ConnectToPeerResponse {
     pub is_privileged: bool,
 }
 
-impl ConnectToPeerResponse {
+impl FromPacket for ConnectToPeerResponse {
     fn from_packet(packet: &mut Packet) -> io::Result<Self> {
         let username = try!(packet.read_str());
         let connection_type = try!(packet.read_str());
@@ -132,8 +140,8 @@ pub struct JoinRoomResponse {
     user_statuses: Vec<u32>,
 }
 
-impl JoinRoomResponse {
-    pub fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+impl FromPacket for JoinRoomResponse {
+    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
         let room_name = try!(packet.read_str());
 
         let mut user_names = Vec::new();
@@ -166,8 +174,8 @@ pub enum LoginResponse {
     },
 }
 
-impl LoginResponse {
-    pub fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+impl FromPacket for LoginResponse {
+    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
         let ok = try!(packet.read_bool());
         if ok {
             let motd = try!(packet.read_str());
@@ -200,7 +208,7 @@ pub struct ParentMinSpeedResponse {
     pub value: u32,
 }
 
-impl ParentMinSpeedResponse {
+impl FromPacket for ParentMinSpeedResponse {
     fn from_packet(packet: &mut Packet) -> io::Result<Self> {
         let value = try!(packet.read_uint());
         Ok(ParentMinSpeedResponse {
@@ -218,7 +226,7 @@ pub struct ParentSpeedRatioResponse {
     pub value: u32,
 }
 
-impl ParentSpeedRatioResponse {
+impl FromPacket for ParentSpeedRatioResponse {
     fn from_packet(packet: &mut Packet) -> io::Result<Self> {
         let value = try!(packet.read_uint());
         Ok(ParentSpeedRatioResponse {
@@ -238,7 +246,7 @@ pub struct PeerAddressResponse {
     port: u16,
 }
 
-impl PeerAddressResponse {
+impl FromPacket for PeerAddressResponse {
     fn from_packet(packet: &mut Packet) -> io::Result<Self> {
         let username = try!(packet.read_str());
         let ip = try!(packet.read_ipv4_addr());
@@ -261,7 +269,7 @@ pub struct PrivilegedUsersResponse {
     pub users: Vec<String>,
 }
 
-impl PrivilegedUsersResponse {
+impl FromPacket for PrivilegedUsersResponse {
     fn from_packet(packet: &mut Packet) -> io::Result<Self> {
         let mut response = PrivilegedUsersResponse {
             users: Vec::new(),
@@ -283,7 +291,7 @@ pub struct RoomListResponse {
     pub operated_private_room_names: Vec<String>,
 }
 
-impl RoomListResponse {
+impl FromPacket for RoomListResponse {
     fn from_packet(packet: &mut Packet) -> io::Result<Self> {
         let mut response = RoomListResponse {
             rooms: Vec::new(),
@@ -316,7 +324,9 @@ impl RoomListResponse {
 
         Ok(response)
     }
+}
 
+impl RoomListResponse {
     fn read_rooms(packet: &mut Packet, rooms: &mut Vec<(String, u32)>)
         -> io::Result<()>
     {
@@ -350,7 +360,7 @@ pub struct WishlistIntervalResponse {
     pub seconds: u32,
 }
 
-impl WishlistIntervalResponse {
+impl FromPacket for WishlistIntervalResponse {
     fn from_packet(packet: &mut Packet) -> io::Result<Self> {
         let seconds = try!(packet.read_uint());
         Ok(WishlistIntervalResponse {
@@ -358,4 +368,3 @@ impl WishlistIntervalResponse {
         })
     }
 }
-
