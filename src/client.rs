@@ -28,6 +28,7 @@ pub struct Client {
 
     control_tx: mpsc::Sender<control::Response>,
     control_rx: mpsc::Receiver<control::Request>,
+    controller_connected: bool,
 
     login_status: LoginStatus,
 
@@ -46,8 +47,10 @@ impl Client {
         Client {
             proto_tx: proto_tx,
             proto_rx: proto_rx,
+
             control_tx: control_tx,
             control_rx: control_rx,
+            controller_connected: false,
 
             login_status: LoginStatus::Pending,
 
@@ -100,11 +103,15 @@ impl Client {
 
     fn handle_control_request(&mut self, request: control::Request) {
         match request {
-            control::Request::ConnectNotification =>
-                info!("Controller client connected"),
+            control::Request::ConnectNotification => {
+                info!("Controller client connected");
+                self.controller_connected = true;
+            },
 
-            control::Request::DisconnectNotification =>
-                info!("Controller client disconnected"),
+            control::Request::DisconnectNotification => {
+                info!("Controller client disconnected");
+                self.controller_connected = false;
+            },
 
             control::Request::LoginStatusRequest =>
                 self.handle_login_status_request(),
@@ -218,30 +225,30 @@ impl Client {
     {
         self.rooms.clear();
         for (name, user_count) in response.rooms.drain(..) {
-            self.rooms.insert(name, room::Room{
-                kind: room::RoomKind::Public,
+            self.rooms.insert(name, room::Room {
+                visibility: room::Visibility::Public,
                 operated: false,
                 user_count: user_count as usize,
             });
         }
         for (name, user_count) in response.owned_private_rooms.drain(..) {
             let room = room::Room {
-                kind: room::RoomKind::PrivateOwned,
+                visibility: room::Visibility::PrivateOwned,
                 operated: false,
                 user_count: user_count as usize,
             };
             if let Some(_) = self.rooms.insert(name, room) {
-                error!("Room is both normal and owned_private");
+                error!("Room is both public and owned_private");
             }
         }
         for (name, user_count) in response.other_private_rooms.drain(..) {
             let room = room::Room {
-                kind: room::RoomKind::PrivateOther,
+                visibility: room::Visibility::PrivateOther,
                 operated: false,
                 user_count: user_count as usize,
             };
             if let Some(_) = self.rooms.insert(name, room) {
-                error!("Room is both normal and other_private");
+                error!("Room is both public and other_private");
             }
         }
         for name in response.operated_private_room_names.drain(..) {
