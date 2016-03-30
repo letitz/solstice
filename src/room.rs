@@ -29,22 +29,36 @@ pub struct Room {
     pub user_count: usize,
 }
 
+/// Contains the mapping from room names to room data and provides a clean
+/// interface to interact with it.
 #[derive(Debug)]
 pub struct RoomMap {
+    /// The actual map from room names to room data.
     map: collections::HashMap<String, Room>,
 }
 
 impl RoomMap {
+    /// Creates an empty mapping.
     pub fn new() -> Self {
         RoomMap {
             map: collections::HashMap::new()
         }
     }
 
+    /// Looks up the given room name in the map, returning an immutable
+    /// reference to the associated data if found.
     pub fn get(&self, name: &str) -> Option<&Room> {
         self.map.get(name)
     }
 
+    /// Looks up the given room name in the map, returning a mutable reference
+    /// to the associated data if found.
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut Room> {
+        self.map.get_mut(name)
+    }
+
+    /// Updates the map to reflect the information contained in the given
+    /// server response.
     pub fn update(&mut self, mut response: server::RoomListResponse) {
         // First, clear the current map, keeping backing memory.
         self.map.clear();
@@ -91,6 +105,7 @@ impl RoomMap {
         }
     }
 
+    /// Creates a control response containing the list of visible rooms.
     pub fn get_room_list_response(&self)
         -> control::RoomListResponse
     {
