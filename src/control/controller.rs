@@ -8,7 +8,6 @@ use rustc_serialize::json;
 use websocket;
 use websocket::{Receiver, Sender};
 
-use client;
 use config;
 
 use super::request::*;

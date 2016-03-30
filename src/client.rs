@@ -32,7 +32,7 @@ pub struct Client {
 
     login_status: LoginStatus,
 
-    rooms: collections::HashMap<String, room::Room>,
+    rooms: room::RoomMap,
     privileged_users: collections::HashSet<String>,
 }
 
@@ -54,7 +54,7 @@ impl Client {
 
             login_status: LoginStatus::Pending,
 
-            rooms: collections::HashMap::new(),
+            rooms: room::RoomMap::new(),
             privileged_users: collections::HashSet::new(),
         }
     }
@@ -67,7 +67,7 @@ impl Client {
                 config::VER_MAJOR,
                 config::VER_MINOR,
                 ).unwrap());
-        self.proto_tx.send(Request::ServerRequest(server_request)).unwrap();
+        self.server_send(server_request);
 
         loop {
             match self.recv() {
@@ -95,6 +95,19 @@ impl Client {
             result = control_rx.recv() =>
                 IncomingMessage::ControlRequest(result.unwrap())
         }
+    }
+
+    /// Send a request to the server.
+    fn server_send(&self, request: ServerRequest) {
+        self.proto_tx.send(Request::ServerRequest(request)).unwrap();
+    }
+
+    /// Send a response to the controller client.
+    fn control_send(&self, response: control::Response) {
+        if !self.controller_connected {
+            return; // Silently drop control packets when no-one is listening.
+        }
+        self.control_tx.send(response).unwrap();
     }
 
     /*==========================*
@@ -132,8 +145,7 @@ impl Client {
 
     fn handle_join_room_request(&mut self, room_name: String) {
         let request = JoinRoomRequest { room_name: room_name };
-        self.proto_tx.send(Request::ServerRequest(
-                ServerRequest::JoinRoomRequest(request)));
+        self.server_send(ServerRequest::JoinRoomRequest(request));
     }
 
     fn handle_login_status_request(&mut self) {
@@ -155,15 +167,16 @@ impl Client {
                     reason: reason.clone(),
                 },
         };
-        self.control_tx.send(control::Response::LoginStatusResponse(response));
+        self.control_send(control::Response::LoginStatusResponse(response));
     }
 
     fn handle_room_list_request(&mut self) {
-        let mut response = control::RoomListResponse{ rooms: Vec::new() };
-        for (room_name, room) in self.rooms.iter() {
-            response.rooms.push((room_name.clone(), room.clone()));
-        }
-        self.control_tx.send(control::Response::RoomListResponse(response));
+        // First send the controller client what we have in memory.
+        let response = self.rooms.get_room_list_response();
+        self.control_send(control::Response::RoomListResponse(response));
+        // Then ask the server for an updated version, which will be forwarded
+        // to the controller client once received.
+        self.server_send(ServerRequest::RoomListRequest);
     }
 
     /*==========================*
@@ -220,43 +233,8 @@ impl Client {
         }
     }
 
-    fn handle_room_list_response(
-        &mut self, mut response: RoomListResponse)
-    {
-        self.rooms.clear();
-        for (name, user_count) in response.rooms.drain(..) {
-            self.rooms.insert(name, room::Room {
-                visibility: room::Visibility::Public,
-                operated: false,
-                user_count: user_count as usize,
-            });
-        }
-        for (name, user_count) in response.owned_private_rooms.drain(..) {
-            let room = room::Room {
-                visibility: room::Visibility::PrivateOwned,
-                operated: false,
-                user_count: user_count as usize,
-            };
-            if let Some(_) = self.rooms.insert(name, room) {
-                error!("Room is both public and owned_private");
-            }
-        }
-        for (name, user_count) in response.other_private_rooms.drain(..) {
-            let room = room::Room {
-                visibility: room::Visibility::PrivateOther,
-                operated: false,
-                user_count: user_count as usize,
-            };
-            if let Some(_) = self.rooms.insert(name, room) {
-                error!("Room is both public and other_private");
-            }
-        }
-        for name in response.operated_private_room_names.drain(..) {
-            match self.rooms.get_mut(&name) {
-                None => error!("Room {} is operated but does not exist", name),
-                Some(room) => room.operated = true,
-            }
-        }
+    fn handle_room_list_response(&mut self, response: RoomListResponse) {
+        self.rooms.update(response);
     }
 
     fn handle_privileged_users_response(
