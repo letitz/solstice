@@ -144,8 +144,42 @@ impl Client {
     }
 
     fn handle_join_room_request(&mut self, room_name: String) {
-        let request = JoinRoomRequest { room_name: room_name };
-        self.server_send(ServerRequest::JoinRoomRequest(request));
+        // First check that we are not already a member.
+        // Enclosed in a block otherwise the mutable borrow of self.rooms
+        // prevents from calling self.server_send.
+        {
+            let room = match self.rooms.get_mut(&room_name) {
+                Some(room) => room,
+                None => {
+                    error!("Cannot join inexistent room \"{}\"", room_name);
+                    return;
+                }
+            };
+            match room.membership {
+                room::Membership::NonMember => {
+                    // As expected.
+                    room.membership = room::Membership::Joining;
+                },
+
+                room::Membership::Member => {
+                    warn!(
+                        "Controller requested to re-join room \"{}\"",
+                        room_name
+                    );
+                    // TODO Send control response
+                },
+
+                membership => {
+                    error!(
+                        "Cannot join room \"{}\": current membership: {:?}",
+                        room_name, membership
+                    );
+                }
+            }
+        }
+        self.server_send(ServerRequest::JoinRoomRequest(JoinRoomRequest {
+            room_name: room_name
+        }));
     }
 
     fn handle_login_status_request(&mut self) {
@@ -185,6 +219,9 @@ impl Client {
 
     fn handle_server_response(&mut self, response: ServerResponse) {
         match response {
+            ServerResponse::JoinRoomResponse(response) =>
+                self.handle_join_room_response(response),
+
             ServerResponse::LoginResponse(response) =>
                 self.handle_login_response(response),
 
@@ -199,6 +236,21 @@ impl Client {
 
             response => warn!("Unhandled response: {:?}", response),
         }
+    }
+
+    fn handle_join_room_response(&mut self, response: JoinRoomResponse) {
+        let room = match self.rooms.get_mut(&response.room_name) {
+            Some(room) => room,
+            None => {
+                error!(
+                    "Received JoinRoomResponse for inexistent room \"{}\"",
+                    &response.room_name
+                );
+                return;
+            }
+        };
+        room.membership = room::Membership::Member;
+        room.user_count = response.user_names.len();
     }
 
     fn handle_login_response(&mut self, login: LoginResponse) {
@@ -234,7 +286,11 @@ impl Client {
     }
 
     fn handle_room_list_response(&mut self, response: RoomListResponse) {
+        // Update the room map in memory.
         self.rooms.update(response);
+        // Send the updated version to the controller.
+        let response = self.rooms.get_room_list_response();
+        self.control_send(control::Response::RoomListResponse(response));
     }
 
     fn handle_privileged_users_response(

@@ -182,10 +182,14 @@ impl Controller {
                     }
                 },
 
-                websocket::message::Type::Close => break,
+                websocket::message::Type::Close => {
+                    info!("Received close request from controller.");
+                    break;
+                },
 
-                code => warn!("Unhandled websocket message with code {:?}",
-                              code),
+                code => warn!(
+                    "Unhandled websocket message with code {:?}", code
+                ),
             }
         }
         info!("Shutting down websocket receiver");
@@ -201,6 +205,7 @@ impl Controller {
     {
         let payload = try!(str::from_utf8(payload_bytes));
         let control_request = try!(json::decode(payload));
+        debug!("Received control request: {:?}", control_request);
         try!(client_tx.send(control_request));
         Ok(())
     }
@@ -237,6 +242,7 @@ impl Controller {
     fn send_response(sender: &mut WebSocketSender, response: Response)
         -> Result<(), Error>
     {
+        debug!("Sending control response: {:?}", response);
         let encoded = try!(json::encode(&response));
         let message = websocket::Message::text(encoded);
         try!(sender.send_message(&message));

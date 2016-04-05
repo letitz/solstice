@@ -111,6 +111,8 @@ impl ConnectionHandler {
         };
 
         let server_response = try!(ServerResponse::from_packet(&mut packet));
+        debug!("Received server response: {:?}", server_response);
+
         match self.client_tx.send(Response::ServerResponse(server_response)) {
             Ok(()) => Ok(true),
             Err(e) => Err(io::Error::new(
@@ -136,6 +138,7 @@ impl ConnectionHandler {
     }
 
     fn notify_server(&mut self, request: ServerRequest) -> io::Result<()> {
+        debug!("Sending server request: {:?}", request);
         let packet = try!(request.to_packet());
         self.server_queue.push_back(packet);
         Ok(())

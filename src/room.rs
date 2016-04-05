@@ -1,7 +1,23 @@
 use std::collections;
+use std::mem;
 
 use control;
 use proto::server;
+
+/// This enumeration is the list of possible membership states for a chat room.
+#[derive(Clone, Copy, Debug, RustcDecodable, RustcEncodable)]
+pub enum Membership {
+    /// The user is not a member of this room.
+    NonMember,
+    /// The user has requested to join the room, but hasn't heard back from the
+    /// server yet.
+    Joining,
+    /// The user is a member of the room.
+    Member,
+    /// The user has request to leave the room, but hasn't heard back from the
+    /// server yet.
+    Leaving,
+}
 
 /// This enumeration is the list of visibility types for rooms that the user is
 /// a member of.
@@ -20,6 +36,8 @@ pub enum Visibility {
 /// room hash table.
 #[derive(Clone, Copy, Debug, RustcDecodable, RustcEncodable)]
 pub struct Room {
+    /// The membership state of the user for the room.
+    pub membership: Membership,
     /// The visibility of the room.
     pub visibility: Visibility,
     /// True if the user is one of the room's operators, False if the user is a
@@ -27,6 +45,14 @@ pub struct Room {
     pub operated: bool,
     /// The number of users that are members of the room.
     pub user_count: usize,
+}
+
+impl Room {
+    /// Merges the previous version of the room's information into the new
+    /// version.
+    fn merge(&mut self, old_room: &Self) {
+        self.membership = old_room.membership;
+    }
 }
 
 /// Contains the mapping from room names to room data and provides a clean
@@ -51,56 +77,69 @@ impl RoomMap {
         self.map.get(name)
     }
 
-    /// Looks up the given room name in the map, returning a mutable reference
-    /// to the associated data if found.
+    /// Looks up the given room name in the map, returning a mutable
+    /// reference to the associated data if found.
     pub fn get_mut(&mut self, name: &str) -> Option<&mut Room> {
         self.map.get_mut(name)
+    }
+
+    /// Updates one room in the mapping.
+    fn update_one(
+        &mut self, name: String, mut new_room: Room,
+        old_map: & collections::HashMap<String, Room>)
+    {
+        if let Some(old_room) = old_map.get(&name) {
+            new_room.merge(old_room);
+        }
+        if let Some(_) = self.map.insert(name, new_room) {
+            error!("Room present twice in room list response");
+        }
     }
 
     /// Updates the map to reflect the information contained in the given
     /// server response.
     pub fn update(&mut self, mut response: server::RoomListResponse) {
-        // First, clear the current map, keeping backing memory.
-        self.map.clear();
+        // Replace the old mapping with an empty one.
+        let old_map = mem::replace(&mut self.map, collections::HashMap::new());
 
         // Add all public rooms.
         for (name, user_count) in response.rooms.drain(..) {
-            self.map.insert(name, Room {
+            let new_room = Room {
+                membership: Membership::NonMember,
                 visibility: Visibility::Public,
                 operated: false,
                 user_count: user_count as usize,
-            });
+            };
+            self.update_one(name, new_room, &old_map);
         }
 
         // Add all private, owned, rooms.
         for (name, user_count) in response.owned_private_rooms.drain(..) {
-            let room = Room {
+            let new_room = Room {
+                membership: Membership::NonMember,
                 visibility: Visibility::PrivateOwned,
                 operated: false,
                 user_count: user_count as usize,
             };
-            if let Some(_) = self.map.insert(name, room) {
-                error!("Room is both public and owned_private");
-            }
+            self.update_one(name, new_room, &old_map);
         }
 
         // Add all private, unowned, rooms.
         for (name, user_count) in response.other_private_rooms.drain(..) {
-            let room = Room {
+            let new_room = Room {
+                membership: Membership::NonMember,
                 visibility: Visibility::PrivateOther,
                 operated: false,
                 user_count: user_count as usize,
             };
-            if let Some(_) = self.map.insert(name, room) {
-                error!("Room is both public and other_private");
-            }
+            self.update_one(name, new_room, &old_map);
         }
 
         // Mark all operated rooms as necessary.
         for name in response.operated_private_room_names.drain(..) {
             match self.map.get_mut(&name) {
-                None => error!("Room {} is operated but does not exist", name),
                 Some(room) => room.operated = true,
+                None => error!("Room {} is operated but does not exist", name),
             }
         }
     }
@@ -116,3 +155,4 @@ impl RoomMap {
         response
     }
 }
+

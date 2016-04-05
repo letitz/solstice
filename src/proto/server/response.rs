@@ -4,6 +4,8 @@ use std::net;
 use super::constants::*;
 use super::super::packet::Packet;
 
+use user;
+
 /*=============*
  * FROM PACKET *
  *=============*/
@@ -135,26 +137,37 @@ impl FromPacket for ConnectToPeerResponse {
 
 #[derive(Debug)]
 pub struct JoinRoomResponse {
-    room_name: String,
-    user_names: Vec<String>,
-    user_statuses: Vec<u32>,
+    pub room_name: String,
+    pub user_names: Vec<String>,
+    pub user_infos: Vec<user::User>,
+    pub user_countries: Vec<String>,
+    pub owner_and_operators: Option<(String, Vec<String>)>,
 }
 
 impl FromPacket for JoinRoomResponse {
     fn from_packet(packet: &mut Packet) -> io::Result<Self> {
-        let room_name = try!(packet.read_str());
+        let mut response = JoinRoomResponse {
+            room_name: try!(packet.read_str()),
+            user_names: Vec::new(),
+            user_infos: Vec::new(),
+            user_countries: Vec::new(),
+            owner_and_operators: None,
+        };
 
-        let mut user_names = Vec::new();
-        try!(packet.read_array(&mut user_names, Packet::read_str));
+        try!(packet.read_array(&mut response.user_names, Packet::read_str));
 
-        let mut user_statuses = Vec::new();
-        try!(packet.read_array(&mut user_statuses, Packet::read_uint));
+        try!(response.read_user_infos(packet));
 
-        Ok(JoinRoomResponse {
-            room_name: room_name,
-            user_names: user_names,
-            user_statuses: user_statuses,
-        })
+        try!(packet.read_array(&mut response.user_countries, Packet::read_str));
+
+        Ok(response)
+    }
+}
+
+impl JoinRoomResponse {
+    fn read_user_infos(&mut self, packet: &mut Packet) -> io::Result<()>
+    {
+        Ok(())
     }
 }
 
