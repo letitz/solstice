@@ -8,6 +8,7 @@ use control;
 use proto::{Response, Request};
 use proto::server::*;
 use room;
+use user;
 
 #[derive(Debug)]
 enum IncomingMessage {
@@ -33,7 +34,7 @@ pub struct Client {
     login_status: LoginStatus,
 
     rooms: room::RoomMap,
-    privileged_users: collections::HashSet<String>,
+    users: user::UserMap,
 }
 
 impl Client {
@@ -55,7 +56,7 @@ impl Client {
             login_status: LoginStatus::Pending,
 
             rooms: room::RoomMap::new(),
-            privileged_users: collections::HashSet::new(),
+            users: user::UserMap::new(),
         }
     }
 
@@ -296,9 +297,6 @@ impl Client {
     fn handle_privileged_users_response(
         &mut self, mut response: PrivilegedUsersResponse)
     {
-        self.privileged_users.clear();
-        for username in response.users.drain(..) {
-            self.privileged_users.insert(username);
-        }
+        self.users.update_privileges(response);
     }
 }
