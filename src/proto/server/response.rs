@@ -4,6 +4,7 @@ use std::net;
 use super::constants::*;
 use super::super::packet::Packet;
 
+use result;
 use user;
 
 /*=============*
@@ -11,7 +12,7 @@ use user;
  *=============*/
 
 pub trait FromPacket: Sized {
-    fn from_packet(&mut Packet) -> io::Result<Self>;
+    fn from_packet(&mut Packet) -> result::Result<Self>;
 }
 
 /*=================*
@@ -36,7 +37,7 @@ pub enum ServerResponse {
 }
 
 impl FromPacket for ServerResponse {
-    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
         let code = try!(packet.read_uint());
         let resp = match code {
             CODE_CONNECT_TO_PEER =>
@@ -110,7 +111,7 @@ pub struct ConnectToPeerResponse {
 }
 
 impl FromPacket for ConnectToPeerResponse {
-    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
         let username = try!(packet.read_str());
         let connection_type = try!(packet.read_str());
 
@@ -145,7 +146,7 @@ pub struct JoinRoomResponse {
 }
 
 impl FromPacket for JoinRoomResponse {
-    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
         let mut response = JoinRoomResponse {
             room_name: try!(packet.read_str()),
             user_names: Vec::new(),
@@ -165,8 +166,51 @@ impl FromPacket for JoinRoomResponse {
 }
 
 impl JoinRoomResponse {
-    fn read_user_infos(&mut self, packet: &mut Packet) -> io::Result<()>
+    fn read_user_infos(&mut self, packet: &mut Packet)
+        -> result::Result<()>
     {
+        let num_statuses_res: result::Result<usize> =
+            packet.read_array(&mut self.user_infos, |packet| {
+                let status_u32 = try!(packet.read_uint());
+                let status = try!(user::Status::from_u32(status_u32));
+                Ok(user::User {
+                    status:         status,
+                    average_speed:  0,
+                    num_downloads:  0,
+                    unknown:        0,
+                    num_files:      0,
+                    num_folders:    0,
+                    num_free_slots: 0,
+                })
+            });
+        let num_statuses = try!(num_statuses_res);
+
+        let num_infos_res: result::Result<usize> =
+            packet.read_array_with(|packet, i| {
+                if let Some(user) = self.user_infos.get_mut(i) {
+                    user.average_speed = try!(packet.read_uint()) as usize;
+                    user.num_downloads = try!(packet.read_uint()) as usize;
+                    user.unknown       = try!(packet.read_uint()) as usize;
+                    user.num_files     = try!(packet.read_uint()) as usize;
+                    user.num_folders   = try!(packet.read_uint()) as usize;
+                }
+                Ok(())
+            });
+        let num_infos = try!(num_infos_res);
+
+        let num_free_slots_res: result::Result<usize> =
+            packet.read_array_with(|packet, i| {
+                if let Some(user) = self.user_infos.get_mut(i) {
+                    user.num_free_slots = try!(packet.read_uint()) as usize;
+                }
+                Ok(())
+            });
+        let num_free_slots = try!(num_free_slots_res);
+
+        if num_statuses != num_infos || num_statuses != num_free_slots {
+            warn!("JoinRoomResponse: mismatched vector sizes");
+        }
+
         Ok(())
     }
 }
@@ -188,7 +232,7 @@ pub enum LoginResponse {
 }
 
 impl FromPacket for LoginResponse {
-    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
         let ok = try!(packet.read_bool());
         if ok {
             let motd = try!(packet.read_str());
@@ -222,7 +266,7 @@ pub struct ParentMinSpeedResponse {
 }
 
 impl FromPacket for ParentMinSpeedResponse {
-    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
         let value = try!(packet.read_uint());
         Ok(ParentMinSpeedResponse {
             value: value,
@@ -240,7 +284,7 @@ pub struct ParentSpeedRatioResponse {
 }
 
 impl FromPacket for ParentSpeedRatioResponse {
-    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
         let value = try!(packet.read_uint());
         Ok(ParentSpeedRatioResponse {
             value: value,
@@ -260,7 +304,7 @@ pub struct PeerAddressResponse {
 }
 
 impl FromPacket for PeerAddressResponse {
-    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
         let username = try!(packet.read_str());
         let ip = try!(packet.read_ipv4_addr());
         let port = try!(packet.read_port());
@@ -283,7 +327,7 @@ pub struct PrivilegedUsersResponse {
 }
 
 impl FromPacket for PrivilegedUsersResponse {
-    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
         let mut response = PrivilegedUsersResponse {
             users: Vec::new(),
         };
@@ -305,7 +349,7 @@ pub struct RoomListResponse {
 }
 
 impl FromPacket for RoomListResponse {
-    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
         let mut response = RoomListResponse {
             rooms: Vec::new(),
             owned_private_rooms: Vec::new(),
@@ -341,19 +385,23 @@ impl FromPacket for RoomListResponse {
 
 impl RoomListResponse {
     fn read_rooms(packet: &mut Packet, rooms: &mut Vec<(String, u32)>)
-        -> io::Result<()>
+        -> result::Result<()>
     {
         let original_rooms_len = rooms.len();
 
-        let num_rooms = try!(packet.read_array(rooms, |packet| {
-            Ok((try!(packet.read_str()), 0))
-        }));
+        let num_rooms_res: result::Result<usize> =
+            packet.read_array(rooms, |packet| {
+                Ok((try!(packet.read_str()), 0))
+            });
+        let num_rooms = try!(num_rooms_res);
 
-        let num_user_counts = try!(packet.read_array_with(|packet, i| {
-            let user_count = try!(packet.read_uint());
-            rooms[original_rooms_len+i].1 = user_count;
-            Ok(())
-        }));
+        let num_user_counts_res: result::Result<usize> =
+            packet.read_array_with(|packet, i| {
+                let user_count = try!(packet.read_uint());
+                rooms[original_rooms_len+i].1 = user_count;
+                Ok(())
+            });
+        let num_user_counts = try!(num_user_counts_res);
 
         if num_rooms != num_user_counts {
             warn!("Numbers of rooms and user counts do not match: {} != {}",
@@ -374,7 +422,7 @@ pub struct WishlistIntervalResponse {
 }
 
 impl FromPacket for WishlistIntervalResponse {
-    fn from_packet(packet: &mut Packet) -> io::Result<Self> {
+    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
         let seconds = try!(packet.read_uint());
         Ok(WishlistIntervalResponse {
             seconds: seconds,

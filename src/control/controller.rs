@@ -9,6 +9,7 @@ use websocket;
 use websocket::{Receiver, Sender};
 
 use config;
+use result;
 
 use super::request::*;
 use super::response::*;
@@ -21,71 +22,6 @@ type WebSocketSender =
 
 type WebSocketClient =
     websocket::Client<websocket::DataFrame, WebSocketSender, WebSocketReceiver>;
-
-#[derive(Debug)]
-enum Error {
-    IOError(io::Error),
-    JSONEncoderError(json::EncoderError),
-    JSONDecoderError(json::DecoderError),
-    SendError(mpsc::SendError<Request>),
-    Utf8Error(str::Utf8Error),
-    WebSocketError(websocket::result::WebSocketError),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Error::IOError(ref err) =>
-                write!(fmt, "IOError({})", err),
-            Error::JSONEncoderError(ref err) =>
-                write!(fmt, "JSONEncoderError({})", err),
-            Error::JSONDecoderError(ref err) =>
-                write!(fmt, "JSONDecoderError({})", err),
-            Error::SendError(ref err) =>
-                write!(fmt, "SendError({})", err),
-            Error::Utf8Error(ref err) =>
-                write!(fmt, "Utf8Error({})", err),
-            Error::WebSocketError(ref err) =>
-                write!(fmt, "WebSocketError({})", err),
-        }
-    }
-}
-
-impl From<io::Error> for Error {
-    fn from(err: io::Error) -> Self {
-        Error::IOError(err)
-    }
-}
-
-impl From<json::EncoderError> for Error {
-    fn from(err: json::EncoderError) -> Self {
-        Error::JSONEncoderError(err)
-    }
-}
-
-impl From<json::DecoderError> for Error {
-    fn from(err: json::DecoderError) -> Self {
-        Error::JSONDecoderError(err)
-    }
-}
-
-impl From<mpsc::SendError<Request>> for Error {
-    fn from(err: mpsc::SendError<Request>) -> Self {
-        Error::SendError(err)
-    }
-}
-
-impl From<str::Utf8Error> for Error {
-    fn from(err: str::Utf8Error) -> Self {
-        Error::Utf8Error(err)
-    }
-}
-
-impl From<websocket::result::WebSocketError> for Error {
-    fn from(err: websocket::result::WebSocketError) -> Self {
-        Error::WebSocketError(err)
-    }
-}
 
 pub struct Controller {
     client_tx: mpsc::Sender<Request>,
@@ -148,14 +84,12 @@ impl Controller {
     }
 
     fn try_get_client(server: &mut websocket::Server)
-        -> io::Result<WebSocketClient>
+        -> result::Result<WebSocketClient>
     {
         let connection = try!(server.accept());
         let request = try!(connection.read_request());
-        match request.accept().send() {
-            Ok(client) => Ok(client),
-            Err(e) => Err(io::Error::new(io::ErrorKind::Other, e)),
-        }
+        let client = try!(request.accept().send());
+        Ok(client)
     }
 
     fn receiver_loop(
@@ -201,7 +135,7 @@ impl Controller {
     fn handle_text_message(
         payload_bytes: &[u8],
         client_tx: &mpsc::Sender<Request>)
-        -> Result<(), Error>
+        -> result::Result<()>
     {
         let payload = try!(str::from_utf8(payload_bytes));
         let control_request = try!(json::decode(payload));
@@ -240,7 +174,7 @@ impl Controller {
     }
 
     fn send_response(sender: &mut WebSocketSender, response: Response)
-        -> Result<(), Error>
+        -> result::Result<()>
     {
         debug!("Sending control response: {:?}", response);
         let encoded = try!(json::encode(&response));

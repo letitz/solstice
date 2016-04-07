@@ -1,15 +1,40 @@
 use std::collections;
+
 use proto::server;
+use result;
+
+const STATUS_OFFLINE: u32 = 1;
+const STATUS_AWAY:    u32 = 2;
+const STATUS_ONLINE:  u32 = 3;
 
 /// This enumeration is the list of possible user statuses.
 #[derive(Clone, Copy, Debug)]
 pub enum Status {
     /// The user if offline.
-    Offline = 1,
+    Offline,
     /// The user is connected, but AFK.
-    Away    = 2,
+    Away,
     /// The user is present.
-    Online  = 3,
+    Online,
+}
+
+impl Status {
+    pub fn from_u32(n: u32) -> result::Result<Status> {
+        match n {
+            STATUS_OFFLINE => Ok(Status::Offline),
+            STATUS_AWAY    => Ok(Status::Away),
+            STATUS_ONLINE  => Ok(Status::Online),
+            _              => Err(result::Error::InvalidEnumError(n as usize))
+        }
+    }
+
+    pub fn to_u32(&self) -> u32 {
+        match *self {
+            Status::Offline => STATUS_OFFLINE,
+            Status::Away    => STATUS_AWAY,
+            Status::Online  => STATUS_ONLINE,
+        }
+    }
 }
 
 /// This structure contains the last known information about a fellow user.
@@ -21,8 +46,10 @@ pub struct User {
     pub status: Status,
     /// The average upload speed of the user.
     pub average_speed: usize,
-    /// ???
+    /// ??? Nicotine calls it downloadnum.
     pub num_downloads: usize,
+    /// ??? Unknown field.
+    pub unknown: usize,
     /// The number of files this user shares.
     pub num_files: usize,
     /// The number of folders this user shares.

@@ -8,6 +8,7 @@ use mio::tcp::TcpStream;
 
 use proto::{Packet, PacketStream, Request, Response};
 use proto::server::*;
+use result;
 
 struct TokenCounter {
     counter: usize,
@@ -104,22 +105,18 @@ impl ConnectionHandler {
         }
     }
 
-    fn read_server_once(&mut self) -> io::Result<bool> {
+    fn read_server_once(&mut self) -> result::Result<bool> {
         let mut packet = match try!(self.server_stream.try_read()) {
             Some(packet) => packet,
             None => return Ok(false),
         };
 
+        debug!("Read packet with size {}", packet.bytes_remaining());
         let server_response = try!(ServerResponse::from_packet(&mut packet));
         debug!("Received server response: {:?}", server_response);
 
-        match self.client_tx.send(Response::ServerResponse(server_response)) {
-            Ok(()) => Ok(true),
-            Err(e) => Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Send failed on client_tx channel: {}", e))),
-
-        }
+        try!(self.client_tx.send(Response::ServerResponse(server_response)));
+        Ok(true)
     }
 
     fn write_server_once(&mut self) -> io::Result<bool> {

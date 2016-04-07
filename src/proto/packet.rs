@@ -87,9 +87,10 @@ impl Packet {
         }
     }
 
-    pub fn read_array<T, F>(&mut self, vector: &mut Vec<T>, read_item: F)
-        -> io::Result<usize>
-        where F: Fn(&mut Self) -> io::Result<T>
+    pub fn read_array<T, E, F>(&mut self, vector: &mut Vec<T>, read_item: F)
+        -> Result<usize, E>
+        where F: Fn(&mut Self) -> Result<T, E>,
+              E: From<io::Error>
     {
         self.read_array_with(|packet, _| {
             let item = try!(read_item(packet));
@@ -98,8 +99,10 @@ impl Packet {
         })
     }
 
-    pub fn read_array_with<F>(&mut self, mut read_item: F) -> io::Result<usize>
-        where F: FnMut(&mut Self, usize) -> io::Result<()>
+    pub fn read_array_with<E, F>(&mut self, mut read_item: F)
+        -> Result<usize, E>
+        where F: FnMut(&mut Self, usize) -> Result<(), E>,
+              E: From<io::Error>
     {
         let num_items = try!(self.read_uint()) as usize;
         for i in 0..num_items {
