@@ -161,8 +161,6 @@ impl FromPacket for JoinRoomResponse {
 
         try!(response.read_user_infos(packet));
 
-        try!(packet.read_array(&mut response.user_countries, Packet::read_str));
-
         if packet.bytes_remaining() > 0 {
             response.owner = Some(try!(packet.read_str()));
             try!(packet.read_array(&mut response.operators, Packet::read_str));
@@ -188,6 +186,7 @@ impl JoinRoomResponse {
                     num_files:      0,
                     num_folders:    0,
                     num_free_slots: 0,
+                    country:        None,
                 })
             });
         let num_statuses = try!(num_statuses_res);
@@ -214,10 +213,22 @@ impl JoinRoomResponse {
             });
         let num_free_slots = try!(num_free_slots_res);
 
-        if num_statuses != num_infos || num_statuses != num_free_slots {
+        let num_countries_res: result::Result<usize> =
+            packet.read_array_with(|packet, i| {
+                if let Some(user) = self.user_infos.get_mut(i) {
+                    user.country = Some(try!(packet.read_str()));
+                }
+                Ok(())
+            });
+        let num_countries = try!(num_countries_res);
+
+        if num_statuses != num_infos ||
+            num_statuses != num_free_slots ||
+            num_statuses != num_countries
+        {
             warn!(
-                "JoinRoomResponse: mismatched vector sizes {}, {}, {}",
-                num_statuses, num_infos, num_free_slots
+                "JoinRoomResponse: mismatched vector sizes {}, {}, {}, {}",
+                num_statuses, num_infos, num_free_slots, num_countries
             );
         }
 

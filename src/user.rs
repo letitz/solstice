@@ -40,7 +40,7 @@ impl Status {
 /// This structure contains the last known information about a fellow user.
 /// It does not store the name, as that is stored implicitly as the key in the
 /// user hash table.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct User {
     /// The last known status of the user.
     pub status: Status,
@@ -56,6 +56,8 @@ pub struct User {
     pub num_folders: usize,
     /// The number of free download slots of this user.
     pub num_free_slots: usize,
+    /// The user's country code. If unknown, set to None.
+    pub country: Option<String>,
 }
 
 /// Contains the mapping from user names to user data and provides a clean
