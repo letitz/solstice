@@ -250,6 +250,14 @@ impl Client {
                 return;
             }
         };
+        if let room::Membership::Joining = room.membership {
+            info!("Joined room \"{}\"", response.room_name);
+        } else {
+            warn!(
+                "Joined room \"{}\" but membership was already {:?}",
+                response.room_name, room.membership
+            );
+        }
         room.membership = room::Membership::Member;
         room.user_count = response.user_names.len();
     }
