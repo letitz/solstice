@@ -48,9 +48,9 @@ pub struct Room {
     /// The name of the room's owner, if any.
     pub owner: Option<String>,
     /// The names of the room's operators.
-    pub operators: Vec<String>,
+    pub operators: collections::HashSet<String>,
     /// The names of the room's members.
-    pub members: Vec<String>,
+    pub members: collections::HashSet<String>,
 }
 
 impl Room {
@@ -62,8 +62,8 @@ impl Room {
             operated:   false,
             user_count: user_count,
             owner:      None,
-            operators:  Vec::new(),
-            members:    Vec::new(),
+            operators:  collections::HashSet::new(),
+            members:    collections::HashSet::new(),
         }
     }
 

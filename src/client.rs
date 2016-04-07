@@ -232,6 +232,9 @@ impl Client {
             ServerResponse::RoomListResponse(response) =>
                 self.handle_room_list_response(response),
 
+            ServerResponse::UserJoinedRoomResponse(response) =>
+                self.handle_user_joined_room_response(response),
+
             ServerResponse::UnknownResponse(code) =>
                 warn!("Unknown response: code {}", code),
 
@@ -266,9 +269,11 @@ impl Client {
         room.membership = room::Membership::Member;
         room.user_count = response.users.len();
         room.owner      = response.owner;
-        room.operators  = response.operators;
-        for &(ref name, _) in response.users.iter() {
-            room.members.push(name.clone());
+        for user_name in response.operators.drain(..) {
+            room.operators.insert(user_name.clone());
+        }
+        for &(ref user_name, _) in response.users.iter() {
+            room.members.insert(user_name.clone());
         }
 
         // Then update the user structs based on the info we just got.
@@ -321,5 +326,14 @@ impl Client {
         &mut self, mut response: PrivilegedUsersResponse)
     {
         self.users.update_privileges(response);
+    }
+
+    fn handle_user_joined_room_response(
+        &mut self, mut response: UserJoinedRoomResponse)
+    {
+        if let Some(room) = self.rooms.get_mut(&response.room_name) {
+            room.members.insert(response.user_name.clone());
+            self.users.insert(response.user_name, response.user);
+        }
     }
 }

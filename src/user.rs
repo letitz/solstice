@@ -56,8 +56,8 @@ pub struct User {
     pub num_folders: usize,
     /// The number of free download slots of this user.
     pub num_free_slots: usize,
-    /// The user's country code. If unknown, set to None.
-    pub country: Option<String>,
+    /// The user's country code.
+    pub country: String,
 }
 
 /// Contains the mapping from user names to user data and provides a clean

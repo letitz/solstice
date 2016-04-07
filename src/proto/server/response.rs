@@ -170,7 +170,7 @@ impl FromPacket for JoinRoomResponse {
                     num_files:      0,
                     num_folders:    0,
                     num_free_slots: 0,
-                    country:        None,
+                    country:        String::new(),
                 };
                 Ok((name, user))
             });
@@ -226,7 +226,7 @@ impl JoinRoomResponse {
         let num_countries_res: result::Result<usize> =
             packet.read_array_with(|packet, i| {
                 if let Some(&mut (_, ref mut user)) = self.users.get_mut(i) {
-                    user.country = Some(try!(packet.read_str()));
+                    user.country = try!(packet.read_str());
                 }
                 Ok(())
             });
@@ -454,9 +454,9 @@ impl RoomListResponse {
 
 #[derive(Debug)]
 pub struct UserJoinedRoomResponse {
-    room_name: String,
-    user_name: String,
-    user:      user::User,
+    pub room_name: String,
+    pub user_name: String,
+    pub user:      user::User,
 }
 
 impl FromPacket for UserJoinedRoomResponse {
@@ -487,7 +487,7 @@ impl FromPacket for UserJoinedRoomResponse {
                 num_files:      num_files,
                 num_folders:    num_folders,
                 num_free_slots: num_free_slots,
-                country:        Some(country),
+                country:        country,
             }
         })
     }
