@@ -239,7 +239,8 @@ impl Client {
         }
     }
 
-    fn handle_join_room_response(&mut self, response: JoinRoomResponse) {
+    fn handle_join_room_response(&mut self, mut response: JoinRoomResponse) {
+        // First look up the room struct.
         let room = match self.rooms.get_mut(&response.room_name) {
             Some(room) => room,
             None => {
@@ -250,6 +251,8 @@ impl Client {
                 return;
             }
         };
+
+        // Log what's happening.
         if let room::Membership::Joining = room.membership {
             info!("Joined room \"{}\"", response.room_name);
         } else {
@@ -258,8 +261,20 @@ impl Client {
                 response.room_name, room.membership
             );
         }
+
+        // Update the room struct.
         room.membership = room::Membership::Member;
         room.user_count = response.users.len();
+        room.owner      = response.owner;
+        room.operators  = response.operators;
+        for &(ref name, _) in response.users.iter() {
+            room.members.push(name.clone());
+        }
+
+        // Then update the user structs based on the info we just got.
+        for (name, user) in response.users.drain(..) {
+            self.users.insert(name, user);
+        }
     }
 
     fn handle_login_response(&mut self, login: LoginResponse) {

@@ -85,6 +85,11 @@ impl UserMap {
         self.map.get(name)
     }
 
+    /// Inserts the given user info for the given user name in the mapping.
+    pub fn insert(&mut self, name: String, user: User) {
+        self.map.insert(name, user);
+    }
+
     /// Update the set of privileged users based on the last server response.
     pub fn update_privileges(
         &mut self, mut response: server::PrivilegedUsersResponse)
