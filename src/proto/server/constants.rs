@@ -2,6 +2,7 @@ pub const CODE_LOGIN: u32 = 1;
 pub const CODE_SET_LISTEN_PORT: u32 = 2;
 pub const CODE_PEER_ADDRESS: u32 = 3;
 pub const CODE_JOIN_ROOM: u32 = 14;
+pub const CODE_USER_JOINED_ROOM: u32 = 16;
 pub const CODE_CONNECT_TO_PEER: u32 = 18;
 pub const CODE_ROOM_LIST: u32 = 64;
 pub const CODE_PRIVILEGED_USERS: u32 = 69;

@@ -27,6 +27,7 @@ pub enum ServerResponse {
     PeerAddressResponse(PeerAddressResponse),
     PrivilegedUsersResponse(PrivilegedUsersResponse),
     RoomListResponse(RoomListResponse),
+    UserJoinedRoomResponse(UserJoinedRoomResponse),
     WishlistIntervalResponse(WishlistIntervalResponse),
 
     // Unknown purpose
@@ -68,6 +69,11 @@ impl FromPacket for ServerResponse {
             CODE_ROOM_LIST =>
                 ServerResponse::RoomListResponse(
                     try!(RoomListResponse::from_packet(packet))
+                ),
+
+            CODE_USER_JOINED_ROOM =>
+                ServerResponse::UserJoinedRoomResponse(
+                    try!(UserJoinedRoomResponse::from_packet(packet))
                 ),
 
             CODE_WISHLIST_INTERVAL =>
@@ -425,8 +431,10 @@ impl RoomListResponse {
 
         let num_user_counts_res: result::Result<usize> =
             packet.read_array_with(|packet, i| {
-                let user_count = try!(packet.read_uint());
-                rooms[original_rooms_len+i].1 = user_count;
+                let index = original_rooms_len + i;
+                if let Some(&mut (_, ref mut count)) = rooms.get_mut(index) {
+                    *count = try!(packet.read_uint());
+                }
                 Ok(())
             });
         let num_user_counts = try!(num_user_counts_res);
@@ -437,6 +445,51 @@ impl RoomListResponse {
         }
 
         Ok(())
+    }
+}
+
+/*==================*
+ * USER JOINED ROOM *
+ *==================*/
+
+#[derive(Debug)]
+pub struct UserJoinedRoomResponse {
+    room_name: String,
+    user_name: String,
+    user:      user::User,
+}
+
+impl FromPacket for UserJoinedRoomResponse {
+    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+        let room_name = try!(packet.read_str());
+        let user_name = try!(packet.read_str());
+
+        let status_u32 = try!(packet.read_uint());
+        let status     = try!(user::Status::from_u32(status_u32));
+
+        let average_speed  = try!(packet.read_uint()) as usize;
+        let num_downloads  = try!(packet.read_uint()) as usize;
+        let unknown        = try!(packet.read_uint()) as usize;
+        let num_files      = try!(packet.read_uint()) as usize;
+        let num_folders    = try!(packet.read_uint()) as usize;
+        let num_free_slots = try!(packet.read_uint()) as usize;
+
+        let country = try!(packet.read_str());
+
+        Ok(UserJoinedRoomResponse {
+            room_name: room_name,
+            user_name: user_name,
+            user: user::User {
+                status:         status,
+                average_speed:  average_speed,
+                num_downloads:  num_downloads,
+                unknown:        unknown,
+                num_files:      num_files,
+                num_folders:    num_folders,
+                num_free_slots: num_free_slots,
+                country:        Some(country),
+            }
+        })
     }
 }
 
