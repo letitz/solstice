@@ -259,7 +259,7 @@ impl Client {
             );
         }
         room.membership = room::Membership::Member;
-        room.user_count = response.user_names.len();
+        room.user_count = response.users.len();
     }
 
     fn handle_login_response(&mut self, login: LoginResponse) {

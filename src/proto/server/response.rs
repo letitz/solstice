@@ -139,9 +139,7 @@ impl FromPacket for ConnectToPeerResponse {
 #[derive(Debug)]
 pub struct JoinRoomResponse {
     pub room_name: String,
-    pub user_names: Vec<String>,
-    pub user_infos: Vec<user::User>,
-    pub user_countries: Vec<String>,
+    pub users: Vec<(String, user::User)>,
     pub owner: Option<String>,
     pub operators: Vec<String>,
 }
@@ -150,14 +148,27 @@ impl FromPacket for JoinRoomResponse {
     fn from_packet(packet: &mut Packet) -> result::Result<Self> {
         let mut response = JoinRoomResponse {
             room_name: try!(packet.read_str()),
-            user_names: Vec::new(),
-            user_infos: Vec::new(),
-            user_countries: Vec::new(),
+            users: Vec::new(),
             owner: None,
             operators: Vec::new(),
         };
 
-        try!(packet.read_array(&mut response.user_names, Packet::read_str));
+        let result: result::Result<usize> =
+            packet.read_array(&mut response.users, |packet| {
+                let name = try!(packet.read_str());
+                let user = user::User {
+                    status:         user::Status::Offline,
+                    average_speed:  0,
+                    num_downloads:  0,
+                    unknown:        0,
+                    num_files:      0,
+                    num_folders:    0,
+                    num_free_slots: 0,
+                    country:        None,
+                };
+                Ok((name, user))
+            });
+        try!(result);
 
         try!(response.read_user_infos(packet));
 
@@ -175,25 +186,18 @@ impl JoinRoomResponse {
         -> result::Result<()>
     {
         let num_statuses_res: result::Result<usize> =
-            packet.read_array(&mut self.user_infos, |packet| {
-                let status_u32 = try!(packet.read_uint());
-                let status = try!(user::Status::from_u32(status_u32));
-                Ok(user::User {
-                    status:         status,
-                    average_speed:  0,
-                    num_downloads:  0,
-                    unknown:        0,
-                    num_files:      0,
-                    num_folders:    0,
-                    num_free_slots: 0,
-                    country:        None,
-                })
+            packet.read_array_with(|packet, i| {
+                if let Some(&mut (_, ref mut user)) = self.users.get_mut(i) {
+                    let status_u32 = try!(packet.read_uint());
+                    user.status = try!(user::Status::from_u32(status_u32));
+                }
+                Ok(())
             });
         let num_statuses = try!(num_statuses_res);
 
         let num_infos_res: result::Result<usize> =
             packet.read_array_with(|packet, i| {
-                if let Some(user) = self.user_infos.get_mut(i) {
+                if let Some(&mut (_, ref mut user)) = self.users.get_mut(i) {
                     user.average_speed = try!(packet.read_uint()) as usize;
                     user.num_downloads = try!(packet.read_uint()) as usize;
                     user.unknown       = try!(packet.read_uint()) as usize;
@@ -206,7 +210,7 @@ impl JoinRoomResponse {
 
         let num_free_slots_res: result::Result<usize> =
             packet.read_array_with(|packet, i| {
-                if let Some(user) = self.user_infos.get_mut(i) {
+                if let Some(&mut (_, ref mut user)) = self.users.get_mut(i) {
                     user.num_free_slots = try!(packet.read_uint()) as usize;
                 }
                 Ok(())
@@ -215,20 +219,23 @@ impl JoinRoomResponse {
 
         let num_countries_res: result::Result<usize> =
             packet.read_array_with(|packet, i| {
-                if let Some(user) = self.user_infos.get_mut(i) {
+                if let Some(&mut (_, ref mut user)) = self.users.get_mut(i) {
                     user.country = Some(try!(packet.read_str()));
                 }
                 Ok(())
             });
         let num_countries = try!(num_countries_res);
 
-        if num_statuses != num_infos ||
-            num_statuses != num_free_slots ||
-            num_statuses != num_countries
+        let num_users = self.users.len();
+        if num_users != num_statuses ||
+            num_users != num_infos ||
+            num_users != num_free_slots ||
+            num_users != num_countries
         {
             warn!(
-                "JoinRoomResponse: mismatched vector sizes {}, {}, {}, {}",
-                num_statuses, num_infos, num_free_slots, num_countries
+                "JoinRoomResponse: mismatched vector sizes {}, {}, {}, {}, {}",
+                num_users, num_statuses, num_infos, num_free_slots,
+                num_countries
             );
         }
 
