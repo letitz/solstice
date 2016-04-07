@@ -142,7 +142,8 @@ pub struct JoinRoomResponse {
     pub user_names: Vec<String>,
     pub user_infos: Vec<user::User>,
     pub user_countries: Vec<String>,
-    pub owner_and_operators: Option<(String, Vec<String>)>,
+    pub owner: Option<String>,
+    pub operators: Vec<String>,
 }
 
 impl FromPacket for JoinRoomResponse {
@@ -152,7 +153,8 @@ impl FromPacket for JoinRoomResponse {
             user_names: Vec::new(),
             user_infos: Vec::new(),
             user_countries: Vec::new(),
-            owner_and_operators: None,
+            owner: None,
+            operators: Vec::new(),
         };
 
         try!(packet.read_array(&mut response.user_names, Packet::read_str));
@@ -160,6 +162,11 @@ impl FromPacket for JoinRoomResponse {
         try!(response.read_user_infos(packet));
 
         try!(packet.read_array(&mut response.user_countries, Packet::read_str));
+
+        if packet.bytes_remaining() > 0 {
+            response.owner = Some(try!(packet.read_str()));
+            try!(packet.read_array(&mut response.operators, Packet::read_str));
+        }
 
         Ok(response)
     }
@@ -208,7 +215,10 @@ impl JoinRoomResponse {
         let num_free_slots = try!(num_free_slots_res);
 
         if num_statuses != num_infos || num_statuses != num_free_slots {
-            warn!("JoinRoomResponse: mismatched vector sizes");
+            warn!(
+                "JoinRoomResponse: mismatched vector sizes {}, {}, {}",
+                num_statuses, num_infos, num_free_slots
+            );
         }
 
         Ok(())
