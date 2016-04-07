@@ -34,7 +34,7 @@ pub enum Visibility {
 /// This structure contains the last known information about a chat room.
 /// It does not store the name, as that is stored implicitly as the key in the
 /// room hash table.
-#[derive(Clone, Copy, Debug, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Debug, RustcDecodable, RustcEncodable)]
 pub struct Room {
     /// The membership state of the user for the room.
     pub membership: Membership,
@@ -45,9 +45,28 @@ pub struct Room {
     pub operated: bool,
     /// The number of users that are members of the room.
     pub user_count: usize,
+    /// The name of the room's owner, if any.
+    pub owner: Option<String>,
+    /// The names of the room's operators.
+    pub operators: Vec<String>,
+    /// The names of the room's members.
+    pub members: Vec<String>,
 }
 
 impl Room {
+    /// Creates a new room with the given visibility and user count.
+    fn new(visibility: Visibility, user_count: usize) -> Self {
+        Room {
+            membership: Membership::NonMember,
+            visibility: visibility,
+            operated:   false,
+            user_count: user_count,
+            owner:      None,
+            operators:  Vec::new(),
+            members:    Vec::new(),
+        }
+    }
+
     /// Merges the previous version of the room's information into the new
     /// version.
     fn merge(&mut self, old_room: &Self) {
@@ -104,34 +123,21 @@ impl RoomMap {
 
         // Add all public rooms.
         for (name, user_count) in response.rooms.drain(..) {
-            let new_room = Room {
-                membership: Membership::NonMember,
-                visibility: Visibility::Public,
-                operated: false,
-                user_count: user_count as usize,
-            };
+            let new_room = Room::new(Visibility::Public, user_count as usize);
             self.update_one(name, new_room, &old_map);
         }
 
         // Add all private, owned, rooms.
         for (name, user_count) in response.owned_private_rooms.drain(..) {
-            let new_room = Room {
-                membership: Membership::NonMember,
-                visibility: Visibility::PrivateOwned,
-                operated: false,
-                user_count: user_count as usize,
-            };
+            let new_room = Room::new(
+                Visibility::PrivateOwned, user_count as usize);
             self.update_one(name, new_room, &old_map);
         }
 
         // Add all private, unowned, rooms.
         for (name, user_count) in response.other_private_rooms.drain(..) {
-            let new_room = Room {
-                membership: Membership::NonMember,
-                visibility: Visibility::PrivateOther,
-                operated: false,
-                user_count: user_count as usize,
-            };
+            let new_room = Room::new(
+                Visibility::PrivateOther, user_count as usize);
             self.update_one(name, new_room, &old_map);
         }
 
