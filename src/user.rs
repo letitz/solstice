@@ -86,6 +86,7 @@ impl UserMap {
     }
 
     /// Inserts the given user info for the given user name in the mapping.
+    /// If there is already data under that name, it is replaced.
     pub fn insert(&mut self, name: String, user: User) {
         self.map.insert(name, user);
     }
