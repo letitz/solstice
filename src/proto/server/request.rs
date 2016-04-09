@@ -20,6 +20,7 @@ pub enum ServerRequest {
     LoginRequest(LoginRequest),
     PeerAddressRequest(PeerAddressRequest),
     RoomListRequest,
+    SayRoomRequest(SayRoomRequest),
     SetListenPortRequest(SetListenPortRequest),
 }
 
@@ -37,6 +38,9 @@ impl ServerRequest {
 
             ServerRequest::RoomListRequest =>
                 return Ok(Packet::new(CODE_ROOM_LIST)),
+
+            ServerRequest::SayRoomRequest(ref request) =>
+                (Packet::new(CODE_SAY_ROOM), request),
 
             ServerRequest::SetListenPortRequest(ref request) =>
                 (Packet::new(CODE_SET_LISTEN_PORT), request),
@@ -131,6 +135,24 @@ impl PeerAddressRequest {
 impl WriteToPacket for PeerAddressRequest {
     fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
         try!(packet.write_str(&self.username));
+        Ok(())
+    }
+}
+
+/*==========*
+ * SAY ROOM *
+ *==========*/
+
+#[derive(Debug)]
+pub struct SayRoomRequest {
+    pub room_name: String,
+    pub message:   String,
+}
+
+impl WriteToPacket for SayRoomRequest {
+    fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
+        try!(packet.write_str(&self.room_name));
+        try!(packet.write_str(&self.message));
         Ok(())
     }
 }

@@ -1,4 +1,3 @@
-use std::io;
 use std::net;
 
 use super::constants::*;
@@ -27,6 +26,7 @@ pub enum ServerResponse {
     PeerAddressResponse(PeerAddressResponse),
     PrivilegedUsersResponse(PrivilegedUsersResponse),
     RoomListResponse(RoomListResponse),
+    SayRoomResponse(SayRoomResponse),
     UserJoinedRoomResponse(UserJoinedRoomResponse),
     WishlistIntervalResponse(WishlistIntervalResponse),
 
@@ -69,6 +69,11 @@ impl FromPacket for ServerResponse {
             CODE_ROOM_LIST =>
                 ServerResponse::RoomListResponse(
                     try!(RoomListResponse::from_packet(packet))
+                ),
+
+            CODE_SAY_ROOM =>
+                ServerResponse::SayRoomResponse(
+                    try!(SayRoomResponse::from_packet(packet))
                 ),
 
             CODE_USER_JOINED_ROOM =>
@@ -445,6 +450,30 @@ impl RoomListResponse {
         }
 
         Ok(())
+    }
+}
+
+/*==========*
+ * SAY ROOM *
+ *==========*/
+
+#[derive(Debug)]
+pub struct SayRoomResponse {
+    pub room_name: String,
+    pub user_name: String,
+    pub message:   String,
+}
+
+impl FromPacket for SayRoomResponse {
+    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+        let room_name = try!(packet.read_str());
+        let user_name = try!(packet.read_str());
+        let message   = try!(packet.read_str());
+        Ok(SayRoomResponse {
+            room_name: room_name,
+            user_name: user_name,
+            message:   message,
+        })
     }
 }
 
