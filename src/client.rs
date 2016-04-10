@@ -127,14 +127,17 @@ impl Client {
                 self.controller_connected = false;
             },
 
+            control::Request::JoinRoomRequest(room_name) =>
+                self.handle_join_room_request(room_name),
+
             control::Request::LoginStatusRequest =>
                 self.handle_login_status_request(),
 
             control::Request::RoomListRequest =>
                 self.handle_room_list_request(),
 
-            control::Request::JoinRoomRequest(room_name) =>
-                self.handle_join_room_request(room_name),
+            control::Request::SayRoomRequest(request) =>
+                self.handle_say_room_request(request),
 
             /*
             _ =>{
@@ -214,6 +217,15 @@ impl Client {
         self.server_send(ServerRequest::RoomListRequest);
     }
 
+    fn handle_say_room_request(
+        &mut self, request: control::SayRoomRequest)
+    {
+        self.server_send(ServerRequest::SayRoomRequest(SayRoomRequest {
+            room_name: request.room_name,
+            message:   request.message,
+        }));
+    }
+
     /*==========================*
      * SERVER RESPONSE HANDLING *
      *==========================*/
@@ -231,6 +243,9 @@ impl Client {
 
             ServerResponse::RoomListResponse(response) =>
                 self.handle_room_list_response(response),
+
+            ServerResponse::SayRoomResponse(response) =>
+                self.handle_say_room_response(response),
 
             ServerResponse::UserJoinedRoomResponse(response) =>
                 self.handle_user_joined_room_response(response),
@@ -314,18 +329,29 @@ impl Client {
         }
     }
 
-    fn handle_room_list_response(&mut self, response: RoomListResponse) {
-        // Update the room map in memory.
-        self.rooms.update(response);
-        // Send the updated version to the controller.
-        let response = self.rooms.get_room_list_response();
-        self.control_send(control::Response::RoomListResponse(response));
-    }
-
     fn handle_privileged_users_response(
         &mut self, mut response: PrivilegedUsersResponse)
     {
         self.users.update_privileges(response);
+    }
+
+    fn handle_room_list_response(&mut self, response: RoomListResponse) {
+        // Update the room map in memory.
+        self.rooms.update(response);
+        // Send the updated version to the controller.
+        let control_response = self.rooms.get_room_list_response();
+        self.control_send(
+            control::Response::RoomListResponse(control_response));
+    }
+
+    fn handle_say_room_response(&mut self, response: SayRoomResponse) {
+        // TODO Save the message somewhere.
+        let control_response = control::SayRoomResponse {
+            room_name: response.room_name,
+            user_name: response.user_name,
+            message:   response.message,
+        };
+        self.control_send(control::Response::SayRoomResponse(control_response));
     }
 
     fn handle_user_joined_room_response(

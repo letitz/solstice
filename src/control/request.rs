@@ -15,4 +15,15 @@ pub enum Request {
     LoginStatusRequest,
     /// The controller wants to know the list of visible chat rooms.
     RoomListRequest,
+    /// The controller wants to send a message to a chat room.
+    SayRoomRequest(SayRoomRequest),
+}
+
+/// This structure contains the chat room message request from the controller.
+#[derive(Debug, RustcDecodable, RustcEncodable)]
+pub struct SayRoomRequest {
+    /// The name of the chat room in which to say the message.
+    pub room_name: String,
+    /// The message to be said.
+    pub message: String,
 }

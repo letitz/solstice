@@ -6,6 +6,7 @@ use room;
 pub enum Response {
     LoginStatusResponse(LoginStatusResponse),
     RoomListResponse(RoomListResponse),
+    SayRoomResponse(SayRoomResponse),
 }
 
 /// This enumeration is the list of possible login states, and the associated
@@ -42,4 +43,16 @@ pub enum LoginStatusResponse {
 pub struct RoomListResponse {
     /// The list of (room name, room data) pairs.
     pub rooms: Vec<(String, room::Room)>,
+}
+
+/// This structure contains a message said in a chat room the user is a member
+/// of.
+#[derive(Debug, RustcDecodable, RustcEncodable)]
+pub struct SayRoomResponse {
+    /// The name of the room in which the message was said.
+    pub room_name: String,
+    /// The name of the user who said the message.
+    pub user_name: String,
+    /// The message itself.
+    pub message: String,
 }
