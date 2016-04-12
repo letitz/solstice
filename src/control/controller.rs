@@ -1,5 +1,3 @@
-use std::fmt;
-use std::io;
 use std::sync::mpsc;
 use std::str;
 use std::thread;
