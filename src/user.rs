@@ -1,6 +1,5 @@
 use std::collections;
 
-use proto::server;
 use result;
 
 const STATUS_OFFLINE: u32 = 1;
@@ -91,12 +90,11 @@ impl UserMap {
         self.map.insert(name, user);
     }
 
-    /// Update the set of privileged users based on the last server response.
-    pub fn update_privileges(
-        &mut self, mut response: server::PrivilegedUsersResponse)
+    /// Sets the set of privileged users to the given list.
+    pub fn set_all_privileged(&mut self, mut users: Vec<String>)
     {
         self.privileged.clear();
-        for name in response.users.drain(..) {
+        for name in users.drain(..) {
             self.privileged.insert(name);
         }
     }

@@ -311,7 +311,7 @@ impl Client {
     fn handle_privileged_users_response(
         &mut self, response: PrivilegedUsersResponse)
     {
-        self.users.update_privileges(response);
+        self.users.set_all_privileged(response.users);
     }
 
     fn handle_room_list_response(&mut self, response: RoomListResponse) {
