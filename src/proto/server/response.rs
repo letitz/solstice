@@ -26,7 +26,7 @@ pub enum ServerResponse {
     PeerAddressResponse(PeerAddressResponse),
     PrivilegedUsersResponse(PrivilegedUsersResponse),
     RoomListResponse(RoomListResponse),
-    SayRoomResponse(SayRoomResponse),
+    RoomMessageResponse(RoomMessageResponse),
     UserJoinedRoomResponse(UserJoinedRoomResponse),
     WishlistIntervalResponse(WishlistIntervalResponse),
 
@@ -71,9 +71,9 @@ impl FromPacket for ServerResponse {
                     try!(RoomListResponse::from_packet(packet))
                 ),
 
-            CODE_SAY_ROOM =>
-                ServerResponse::SayRoomResponse(
-                    try!(SayRoomResponse::from_packet(packet))
+            CODE_ROOM_MESSAGE =>
+                ServerResponse::RoomMessageResponse(
+                    try!(RoomMessageResponse::from_packet(packet))
                 ),
 
             CODE_USER_JOINED_ROOM =>
@@ -453,23 +453,23 @@ impl RoomListResponse {
     }
 }
 
-/*==========*
- * SAY ROOM *
- *==========*/
+/*==============*
+ * ROOM MESSAGE *
+ *==============*/
 
 #[derive(Debug)]
-pub struct SayRoomResponse {
+pub struct RoomMessageResponse {
     pub room_name: String,
     pub user_name: String,
     pub message:   String,
 }
 
-impl FromPacket for SayRoomResponse {
+impl FromPacket for RoomMessageResponse {
     fn from_packet(packet: &mut Packet) -> result::Result<Self> {
         let room_name = try!(packet.read_str());
         let user_name = try!(packet.read_str());
         let message   = try!(packet.read_str());
-        Ok(SayRoomResponse {
+        Ok(RoomMessageResponse {
             room_name: room_name,
             user_name: user_name,
             message:   message,

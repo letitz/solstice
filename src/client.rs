@@ -136,8 +136,8 @@ impl Client {
             control::Request::RoomListRequest =>
                 self.handle_room_list_request(),
 
-            control::Request::SayRoomRequest(request) =>
-                self.handle_say_room_request(request),
+            control::Request::RoomMessageRequest(request) =>
+                self.handle_room_message_request(request),
 
             /*
             _ =>{
@@ -219,10 +219,10 @@ impl Client {
         self.server_send(ServerRequest::RoomListRequest);
     }
 
-    fn handle_say_room_request(
-        &mut self, request: control::SayRoomRequest)
+    fn handle_room_message_request(
+        &mut self, request: control::RoomMessageRequest)
     {
-        self.server_send(ServerRequest::SayRoomRequest(SayRoomRequest {
+        self.server_send(ServerRequest::RoomMessageRequest(RoomMessageRequest {
             room_name: request.room_name,
             message:   request.message,
         }));
@@ -246,8 +246,8 @@ impl Client {
             ServerResponse::RoomListResponse(response) =>
                 self.handle_room_list_response(response),
 
-            ServerResponse::SayRoomResponse(response) =>
-                self.handle_say_room_response(response),
+            ServerResponse::RoomMessageResponse(response) =>
+                self.handle_room_message_response(response),
 
             ServerResponse::UserJoinedRoomResponse(response) =>
                 self.handle_user_joined_room_response(response),
@@ -326,18 +326,19 @@ impl Client {
             control::Response::RoomListResponse(control_response));
     }
 
-    fn handle_say_room_response(&mut self, response: SayRoomResponse) {
+    fn handle_room_message_response(&mut self, response: RoomMessageResponse) {
         self.rooms.add_message(&response.room_name, room::Message {
             user_name: response.user_name.clone(),
             message:   response.message.clone(),
         });
 
-        let control_response = control::SayRoomResponse {
+        let control_response = control::RoomMessageResponse {
             room_name: response.room_name,
             user_name: response.user_name,
             message:   response.message,
         };
-        self.control_send(control::Response::SayRoomResponse(control_response));
+        self.control_send(
+            control::Response::RoomMessageResponse(control_response));
     }
 
     fn handle_user_joined_room_response(

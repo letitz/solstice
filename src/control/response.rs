@@ -7,7 +7,7 @@ pub enum Response {
     JoinRoomResponse(JoinRoomResponse),
     LoginStatusResponse(LoginStatusResponse),
     RoomListResponse(RoomListResponse),
-    SayRoomResponse(SayRoomResponse),
+    RoomMessageResponse(RoomMessageResponse),
 }
 
 #[derive(Debug, RustcEncodable, RustcDecodable)]
@@ -54,7 +54,7 @@ pub struct RoomListResponse {
 /// This structure contains a message said in a chat room the user is a member
 /// of.
 #[derive(Debug, RustcDecodable, RustcEncodable)]
-pub struct SayRoomResponse {
+pub struct RoomMessageResponse {
     /// The name of the room in which the message was said.
     pub room_name: String,
     /// The name of the user who said the message.

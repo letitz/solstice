@@ -215,7 +215,7 @@ impl RoomMap {
         match self.get_mut(room_name) {
             None => {
                 error!(
-                    "SayRoomResponse: unknown room \"{}\"", room_name
+                    "RoomMap::add_message: unknown room \"{}\"", room_name
                 );
                 return;
             },
