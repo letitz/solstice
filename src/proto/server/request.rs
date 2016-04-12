@@ -16,7 +16,7 @@ trait WriteToPacket {
 
 #[derive(Debug)]
 pub enum ServerRequest {
-    JoinRoomRequest(JoinRoomRequest),
+    RoomJoinRequest(RoomJoinRequest),
     LoginRequest(LoginRequest),
     PeerAddressRequest(PeerAddressRequest),
     RoomListRequest,
@@ -27,8 +27,8 @@ pub enum ServerRequest {
 impl ServerRequest {
     pub fn to_packet(&self) -> io::Result<Packet> {
         let (mut packet, request): (Packet, &WriteToPacket) = match *self {
-            ServerRequest::JoinRoomRequest(ref request) =>
-                (Packet::new(CODE_JOIN_ROOM), request),
+            ServerRequest::RoomJoinRequest(ref request) =>
+                (Packet::new(CODE_ROOM_JOIN), request),
 
             ServerRequest::LoginRequest(ref request) =>
                 (Packet::new(CODE_LOGIN), request),
@@ -61,11 +61,11 @@ fn md5_str(string: &str) -> String {
  *===========*/
 
 #[derive(Debug)]
-pub struct JoinRoomRequest {
+pub struct RoomJoinRequest {
     pub room_name: String
 }
 
-impl WriteToPacket for JoinRoomRequest {
+impl WriteToPacket for RoomJoinRequest {
     fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
         try!(packet.write_str(&self.room_name));
         Ok(())

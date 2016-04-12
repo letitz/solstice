@@ -21,7 +21,7 @@ pub trait FromPacket: Sized {
 #[derive(Debug)]
 pub enum ServerResponse {
     ConnectToPeerResponse(ConnectToPeerResponse),
-    JoinRoomResponse(JoinRoomResponse),
+    RoomJoinResponse(RoomJoinResponse),
     LoginResponse(LoginResponse),
     PeerAddressResponse(PeerAddressResponse),
     PrivilegedUsersResponse(PrivilegedUsersResponse),
@@ -46,9 +46,9 @@ impl FromPacket for ServerResponse {
                     try!(ConnectToPeerResponse::from_packet(packet))
                 ),
 
-            CODE_JOIN_ROOM =>
-                ServerResponse::JoinRoomResponse(
-                    try!(JoinRoomResponse::from_packet(packet))
+            CODE_ROOM_JOIN =>
+                ServerResponse::RoomJoinResponse(
+                    try!(RoomJoinResponse::from_packet(packet))
                 ),
 
             CODE_LOGIN =>
@@ -140,117 +140,6 @@ impl FromPacket for ConnectToPeerResponse {
             token: token,
             is_privileged: is_privileged,
         })
-    }
-}
-
-/*===========*
- * JOIN ROOM *
- *===========*/
-
-#[derive(Debug)]
-pub struct JoinRoomResponse {
-    pub room_name: String,
-    pub users: Vec<(String, user::User)>,
-    pub owner: Option<String>,
-    pub operators: Vec<String>,
-}
-
-impl FromPacket for JoinRoomResponse {
-    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
-        let mut response = JoinRoomResponse {
-            room_name: try!(packet.read_str()),
-            users: Vec::new(),
-            owner: None,
-            operators: Vec::new(),
-        };
-
-        let result: result::Result<usize> =
-            packet.read_array(&mut response.users, |packet| {
-                let name = try!(packet.read_str());
-                let user = user::User {
-                    status:         user::Status::Offline,
-                    average_speed:  0,
-                    num_downloads:  0,
-                    unknown:        0,
-                    num_files:      0,
-                    num_folders:    0,
-                    num_free_slots: 0,
-                    country:        String::new(),
-                };
-                Ok((name, user))
-            });
-        try!(result);
-
-        try!(response.read_user_infos(packet));
-
-        if packet.bytes_remaining() > 0 {
-            response.owner = Some(try!(packet.read_str()));
-            try!(packet.read_array(&mut response.operators, Packet::read_str));
-        }
-
-        Ok(response)
-    }
-}
-
-impl JoinRoomResponse {
-    fn read_user_infos(&mut self, packet: &mut Packet)
-        -> result::Result<()>
-    {
-        let num_statuses_res: result::Result<usize> =
-            packet.read_array_with(|packet, i| {
-                if let Some(&mut (_, ref mut user)) = self.users.get_mut(i) {
-                    let status_u32 = try!(packet.read_uint());
-                    user.status = try!(user::Status::from_u32(status_u32));
-                }
-                Ok(())
-            });
-        let num_statuses = try!(num_statuses_res);
-
-        let num_infos_res: result::Result<usize> =
-            packet.read_array_with(|packet, i| {
-                if let Some(&mut (_, ref mut user)) = self.users.get_mut(i) {
-                    user.average_speed = try!(packet.read_uint()) as usize;
-                    user.num_downloads = try!(packet.read_uint()) as usize;
-                    user.unknown       = try!(packet.read_uint()) as usize;
-                    user.num_files     = try!(packet.read_uint()) as usize;
-                    user.num_folders   = try!(packet.read_uint()) as usize;
-                }
-                Ok(())
-            });
-        let num_infos = try!(num_infos_res);
-
-        let num_free_slots_res: result::Result<usize> =
-            packet.read_array_with(|packet, i| {
-                if let Some(&mut (_, ref mut user)) = self.users.get_mut(i) {
-                    user.num_free_slots = try!(packet.read_uint()) as usize;
-                }
-                Ok(())
-            });
-        let num_free_slots = try!(num_free_slots_res);
-
-        let num_countries_res: result::Result<usize> =
-            packet.read_array_with(|packet, i| {
-                if let Some(&mut (_, ref mut user)) = self.users.get_mut(i) {
-                    user.country = try!(packet.read_str());
-                }
-                Ok(())
-            });
-        let num_countries = try!(num_countries_res);
-
-        let num_users = self.users.len();
-        if num_users != num_statuses ||
-            num_users != num_infos ||
-            num_users != num_free_slots ||
-            num_users != num_countries
-        {
-            warn!(
-                "JoinRoomResponse: mismatched vector sizes {}, {}, {}, {}, {}",
-                num_users, num_statuses, num_infos, num_free_slots,
-                num_countries
-            );
-        }
-
-        Ok(())
     }
 }
 
@@ -372,6 +261,117 @@ impl FromPacket for PrivilegedUsersResponse {
         };
         try!(packet.read_array(&mut response.users, Packet::read_str));
         Ok(response)
+    }
+}
+
+/*===========*
+ * ROOM JOIN *
+ *===========*/
+
+#[derive(Debug)]
+pub struct RoomJoinResponse {
+    pub room_name: String,
+    pub users: Vec<(String, user::User)>,
+    pub owner: Option<String>,
+    pub operators: Vec<String>,
+}
+
+impl FromPacket for RoomJoinResponse {
+    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+        let mut response = RoomJoinResponse {
+            room_name: try!(packet.read_str()),
+            users: Vec::new(),
+            owner: None,
+            operators: Vec::new(),
+        };
+
+        let result: result::Result<usize> =
+            packet.read_array(&mut response.users, |packet| {
+                let name = try!(packet.read_str());
+                let user = user::User {
+                    status:         user::Status::Offline,
+                    average_speed:  0,
+                    num_downloads:  0,
+                    unknown:        0,
+                    num_files:      0,
+                    num_folders:    0,
+                    num_free_slots: 0,
+                    country:        String::new(),
+                };
+                Ok((name, user))
+            });
+        try!(result);
+
+        try!(response.read_user_infos(packet));
+
+        if packet.bytes_remaining() > 0 {
+            response.owner = Some(try!(packet.read_str()));
+            try!(packet.read_array(&mut response.operators, Packet::read_str));
+        }
+
+        Ok(response)
+    }
+}
+
+impl RoomJoinResponse {
+    fn read_user_infos(&mut self, packet: &mut Packet)
+        -> result::Result<()>
+    {
+        let num_statuses_res: result::Result<usize> =
+            packet.read_array_with(|packet, i| {
+                if let Some(&mut (_, ref mut user)) = self.users.get_mut(i) {
+                    let status_u32 = try!(packet.read_uint());
+                    user.status = try!(user::Status::from_u32(status_u32));
+                }
+                Ok(())
+            });
+        let num_statuses = try!(num_statuses_res);
+
+        let num_infos_res: result::Result<usize> =
+            packet.read_array_with(|packet, i| {
+                if let Some(&mut (_, ref mut user)) = self.users.get_mut(i) {
+                    user.average_speed = try!(packet.read_uint()) as usize;
+                    user.num_downloads = try!(packet.read_uint()) as usize;
+                    user.unknown       = try!(packet.read_uint()) as usize;
+                    user.num_files     = try!(packet.read_uint()) as usize;
+                    user.num_folders   = try!(packet.read_uint()) as usize;
+                }
+                Ok(())
+            });
+        let num_infos = try!(num_infos_res);
+
+        let num_free_slots_res: result::Result<usize> =
+            packet.read_array_with(|packet, i| {
+                if let Some(&mut (_, ref mut user)) = self.users.get_mut(i) {
+                    user.num_free_slots = try!(packet.read_uint()) as usize;
+                }
+                Ok(())
+            });
+        let num_free_slots = try!(num_free_slots_res);
+
+        let num_countries_res: result::Result<usize> =
+            packet.read_array_with(|packet, i| {
+                if let Some(&mut (_, ref mut user)) = self.users.get_mut(i) {
+                    user.country = try!(packet.read_str());
+                }
+                Ok(())
+            });
+        let num_countries = try!(num_countries_res);
+
+        let num_users = self.users.len();
+        if num_users != num_statuses ||
+            num_users != num_infos ||
+            num_users != num_free_slots ||
+            num_users != num_countries
+        {
+            warn!(
+                "RoomJoinResponse: mismatched vector sizes {}, {}, {}, {}, {}",
+                num_users, num_statuses, num_infos, num_free_slots,
+                num_countries
+            );
+        }
+
+        Ok(())
     }
 }
 

@@ -1,7 +1,6 @@
 use std::collections;
 use std::mem;
 
-use control;
 use proto::server;
 use user;
 

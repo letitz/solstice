@@ -1,4 +1,3 @@
-use std::collections;
 use std::sync::mpsc;
 
 use mio;
@@ -127,8 +126,8 @@ impl Client {
                 self.controller_connected = false;
             },
 
-            control::Request::JoinRoomRequest(room_name) =>
-                self.handle_join_room_request(room_name),
+            control::Request::RoomJoinRequest(room_name) =>
+                self.handle_room_join_request(room_name),
 
             control::Request::LoginStatusRequest =>
                 self.handle_login_status_request(),
@@ -147,7 +146,7 @@ impl Client {
         }
     }
 
-    fn handle_join_room_request(&mut self, room_name: String) {
+    fn handle_room_join_request(&mut self, room_name: String) {
         // First check that we are not already a member.
         // Enclosed in a block otherwise the mutable borrow of self.rooms
         // prevents from calling self.server_send.
@@ -181,7 +180,7 @@ impl Client {
                 }
             }
         }
-        self.server_send(ServerRequest::JoinRoomRequest(JoinRoomRequest {
+        self.server_send(ServerRequest::RoomJoinRequest(RoomJoinRequest {
             room_name: room_name
         }));
     }
@@ -234,14 +233,14 @@ impl Client {
 
     fn handle_server_response(&mut self, response: ServerResponse) {
         match response {
-            ServerResponse::JoinRoomResponse(response) =>
-                self.handle_join_room_response(response),
-
             ServerResponse::LoginResponse(response) =>
                 self.handle_login_response(response),
 
             ServerResponse::PrivilegedUsersResponse(response) =>
                 self.handle_privileged_users_response(response),
+
+            ServerResponse::RoomJoinResponse(response) =>
+                self.handle_room_join_response(response),
 
             ServerResponse::RoomListResponse(response) =>
                 self.handle_room_list_response(response),
@@ -259,7 +258,7 @@ impl Client {
         }
     }
 
-    fn handle_join_room_response(&mut self, mut response: JoinRoomResponse) {
+    fn handle_room_join_response(&mut self, mut response: RoomJoinResponse) {
         // Join the room and store the received information.
         self.rooms.join(
             &response.room_name, response.owner, response.operators,
@@ -270,10 +269,10 @@ impl Client {
             self.users.insert(name, user);
         }
 
-        let control_response = control::JoinRoomResponse {
+        let control_response = control::RoomJoinResponse {
             room_name: response.room_name
         };
-        self.control_send(control::Response::JoinRoomResponse(
+        self.control_send(control::Response::RoomJoinResponse(
                 control_response));
     }
 
@@ -310,7 +309,7 @@ impl Client {
     }
 
     fn handle_privileged_users_response(
-        &mut self, mut response: PrivilegedUsersResponse)
+        &mut self, response: PrivilegedUsersResponse)
     {
         self.users.update_privileges(response);
     }
@@ -342,7 +341,7 @@ impl Client {
     }
 
     fn handle_user_joined_room_response(
-        &mut self, mut response: UserJoinedRoomResponse)
+        &mut self, response: UserJoinedRoomResponse)
     {
         if let Some(room) = self.rooms.get_mut(&response.room_name) {
             room.members.insert(response.user_name.clone());
