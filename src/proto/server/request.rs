@@ -16,9 +16,10 @@ trait WriteToPacket {
 
 #[derive(Debug)]
 pub enum ServerRequest {
-    RoomJoinRequest(RoomJoinRequest),
     LoginRequest(LoginRequest),
     PeerAddressRequest(PeerAddressRequest),
+    RoomJoinRequest(RoomJoinRequest),
+    RoomLeaveRequest(RoomLeaveRequest),
     RoomListRequest,
     RoomMessageRequest(RoomMessageRequest),
     SetListenPortRequest(SetListenPortRequest),
@@ -27,14 +28,17 @@ pub enum ServerRequest {
 impl ServerRequest {
     pub fn to_packet(&self) -> io::Result<Packet> {
         let (mut packet, request): (Packet, &WriteToPacket) = match *self {
-            ServerRequest::RoomJoinRequest(ref request) =>
-                (Packet::new(CODE_ROOM_JOIN), request),
-
             ServerRequest::LoginRequest(ref request) =>
                 (Packet::new(CODE_LOGIN), request),
 
             ServerRequest::PeerAddressRequest(ref request) =>
                 (Packet::new(CODE_PEER_ADDRESS), request),
+
+            ServerRequest::RoomJoinRequest(ref request) =>
+                (Packet::new(CODE_ROOM_JOIN), request),
+
+            ServerRequest::RoomLeaveRequest(ref request) =>
+                (Packet::new(CODE_ROOM_LEAVE), request),
 
             ServerRequest::RoomListRequest =>
                 return Ok(Packet::new(CODE_ROOM_LIST)),
@@ -54,22 +58,6 @@ fn md5_str(string: &str) -> String {
     let mut hasher = Md5::new();
     hasher.input_str(string);
     hasher.result_str()
-}
-
-/*===========*
- * JOIN ROOM *
- *===========*/
-
-#[derive(Debug)]
-pub struct RoomJoinRequest {
-    pub room_name: String
-}
-
-impl WriteToPacket for RoomJoinRequest {
-    fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
-        try!(packet.write_str(&self.room_name));
-        Ok(())
-    }
 }
 
 /*=======*
@@ -135,6 +123,38 @@ impl PeerAddressRequest {
 impl WriteToPacket for PeerAddressRequest {
     fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
         try!(packet.write_str(&self.username));
+        Ok(())
+    }
+}
+
+/*===========*
+ * ROOM JOIN *
+ *===========*/
+
+#[derive(Debug)]
+pub struct RoomJoinRequest {
+    pub room_name: String
+}
+
+impl WriteToPacket for RoomJoinRequest {
+    fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
+        try!(packet.write_str(&self.room_name));
+        Ok(())
+    }
+}
+
+/*============*
+ * ROOM LEAVE *
+ *============*/
+
+#[derive(Debug)]
+pub struct RoomLeaveRequest {
+    pub room_name: String
+}
+
+impl WriteToPacket for RoomLeaveRequest {
+    fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
+        try!(packet.write_str(&self.room_name));
         Ok(())
     }
 }

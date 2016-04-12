@@ -21,10 +21,11 @@ pub trait FromPacket: Sized {
 #[derive(Debug)]
 pub enum ServerResponse {
     ConnectToPeerResponse(ConnectToPeerResponse),
-    RoomJoinResponse(RoomJoinResponse),
     LoginResponse(LoginResponse),
     PeerAddressResponse(PeerAddressResponse),
     PrivilegedUsersResponse(PrivilegedUsersResponse),
+    RoomJoinResponse(RoomJoinResponse),
+    RoomLeaveResponse(RoomLeaveResponse),
     RoomListResponse(RoomListResponse),
     RoomMessageResponse(RoomMessageResponse),
     UserJoinedRoomResponse(UserJoinedRoomResponse),
@@ -46,11 +47,6 @@ impl FromPacket for ServerResponse {
                     try!(ConnectToPeerResponse::from_packet(packet))
                 ),
 
-            CODE_ROOM_JOIN =>
-                ServerResponse::RoomJoinResponse(
-                    try!(RoomJoinResponse::from_packet(packet))
-                ),
-
             CODE_LOGIN =>
                 ServerResponse::LoginResponse(
                     try!(LoginResponse::from_packet(packet))
@@ -64,6 +60,16 @@ impl FromPacket for ServerResponse {
             CODE_PRIVILEGED_USERS =>
                 ServerResponse::PrivilegedUsersResponse(
                     try!(PrivilegedUsersResponse::from_packet(packet))
+                ),
+
+            CODE_ROOM_JOIN =>
+                ServerResponse::RoomJoinResponse(
+                    try!(RoomJoinResponse::from_packet(packet))
+                ),
+
+            CODE_ROOM_LEAVE =>
+                ServerResponse::RoomLeaveResponse(
+                    try!(RoomLeaveResponse::from_packet(packet))
                 ),
 
             CODE_ROOM_LIST =>
@@ -372,6 +378,23 @@ impl RoomJoinResponse {
         }
 
         Ok(())
+    }
+}
+
+/*============*
+ * ROOM LEAVE *
+ *============*/
+
+#[derive(Debug)]
+pub struct RoomLeaveResponse {
+    pub room_name: String,
+}
+
+impl FromPacket for RoomLeaveResponse {
+    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+        Ok(RoomLeaveResponse {
+            room_name: try!(packet.read_str()),
+        })
     }
 }
 

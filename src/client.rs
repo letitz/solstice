@@ -126,11 +126,11 @@ impl Client {
                 self.controller_connected = false;
             },
 
-            control::Request::RoomJoinRequest(room_name) =>
-                self.handle_room_join_request(room_name),
-
             control::Request::LoginStatusRequest =>
                 self.handle_login_status_request(),
+
+            control::Request::RoomJoinRequest(room_name) =>
+                self.handle_room_join_request(room_name),
 
             control::Request::RoomListRequest =>
                 self.handle_room_list_request(),
@@ -242,6 +242,9 @@ impl Client {
             ServerResponse::RoomJoinResponse(response) =>
                 self.handle_room_join_response(response),
 
+            ServerResponse::RoomLeaveResponse(response) =>
+                self.handle_room_leave_response(response),
+
             ServerResponse::RoomListResponse(response) =>
                 self.handle_room_list_response(response),
 
@@ -256,24 +259,6 @@ impl Client {
 
             response => warn!("Unhandled response: {:?}", response),
         }
-    }
-
-    fn handle_room_join_response(&mut self, mut response: RoomJoinResponse) {
-        // Join the room and store the received information.
-        self.rooms.join(
-            &response.room_name, response.owner, response.operators,
-            &response.users);
-
-        // Then update the user structs based on the info we just got.
-        for (name, user) in response.users.drain(..) {
-            self.users.insert(name, user);
-        }
-
-        let control_response = control::RoomJoinResponse {
-            room_name: response.room_name
-        };
-        self.control_send(control::Response::RoomJoinResponse(
-                control_response));
     }
 
     fn handle_login_response(&mut self, login: LoginResponse) {
@@ -312,6 +297,28 @@ impl Client {
         &mut self, response: PrivilegedUsersResponse)
     {
         self.users.set_all_privileged(response.users);
+    }
+
+    fn handle_room_join_response(&mut self, mut response: RoomJoinResponse) {
+        // Join the room and store the received information.
+        self.rooms.join(
+            &response.room_name, response.owner, response.operators,
+            &response.users);
+
+        // Then update the user structs based on the info we just got.
+        for (name, user) in response.users.drain(..) {
+            self.users.insert(name, user);
+        }
+
+        let control_response = control::RoomJoinResponse {
+            room_name: response.room_name
+        };
+        self.control_send(control::Response::RoomJoinResponse(
+                control_response));
+    }
+
+    fn handle_room_leave_response(&mut self, response: RoomLeaveResponse) {
+        // TODO handle it.
     }
 
     fn handle_room_list_response(&mut self, response: RoomListResponse) {
