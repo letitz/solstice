@@ -4,9 +4,15 @@ use room;
 /// to the controller.
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 pub enum Response {
+    JoinRoomResponse(JoinRoomResponse),
     LoginStatusResponse(LoginStatusResponse),
     RoomListResponse(RoomListResponse),
     SayRoomResponse(SayRoomResponse),
+}
+
+#[derive(Debug, RustcEncodable, RustcDecodable)]
+pub struct JoinRoomResponse {
+    pub room_name: String,
 }
 
 /// This enumeration is the list of possible login states, and the associated

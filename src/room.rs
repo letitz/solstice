@@ -3,6 +3,7 @@ use std::mem;
 
 use control;
 use proto::server;
+use user;
 
 /// This enumeration is the list of possible membership states for a chat room.
 #[derive(Clone, Copy, Debug, RustcDecodable, RustcEncodable)]
@@ -31,6 +32,13 @@ pub enum Visibility {
     PrivateOther,
 }
 
+/// This structure contains a chat room message.
+#[derive(Clone, Debug, RustcDecodable, RustcEncodable)]
+pub struct Message {
+    pub user_name: String,
+    pub message:   String,
+}
+
 /// This structure contains the last known information about a chat room.
 /// It does not store the name, as that is stored implicitly as the key in the
 /// room hash table.
@@ -51,6 +59,8 @@ pub struct Room {
     pub operators: collections::HashSet<String>,
     /// The names of the room's members.
     pub members: collections::HashSet<String>,
+    /// The messages sent to this chat room, in chronological order.
+    pub messages: Vec<Message>,
 }
 
 impl Room {
@@ -64,13 +74,8 @@ impl Room {
             owner:      None,
             operators:  collections::HashSet::new(),
             members:    collections::HashSet::new(),
+            messages:   Vec::new(),
         }
-    }
-
-    /// Merges the previous version of the room's information into the new
-    /// version.
-    fn merge(&mut self, old_room: &Self) {
-        self.membership = old_room.membership;
     }
 }
 
@@ -102,63 +107,120 @@ impl RoomMap {
         self.map.get_mut(name)
     }
 
-    /// Updates one room in the mapping.
+    /// Updates one room in the map based on the information received in
+    /// a RoomListResponse and the potential previously stored information.
     fn update_one(
-        &mut self, name: String, mut new_room: Room,
-        old_map: & collections::HashMap<String, Room>)
+        &mut self, name: String, visibility: Visibility, user_count: u32,
+        old_map: &mut collections::HashMap<String, Room>)
     {
-        if let Some(old_room) = old_map.get(&name) {
-            new_room.merge(old_room);
-        }
-        if let Some(_) = self.map.insert(name, new_room) {
+        let room = match old_map.remove(&name) {
+            None => Room::new(Visibility::Public, user_count as usize),
+            Some(mut room) => {
+                room.visibility = visibility;
+                room.user_count = user_count as usize;
+                room
+            }
+        };
+        if let Some(_) = self.map.insert(name, room) {
             error!("Room present twice in room list response");
         }
     }
 
     /// Updates the map to reflect the information contained in the given
     /// server response.
-    pub fn update(&mut self, mut response: server::RoomListResponse) {
+    pub fn set_room_list(&mut self, mut response: server::RoomListResponse) {
         // Replace the old mapping with an empty one.
-        let old_map = mem::replace(&mut self.map, collections::HashMap::new());
+        let mut old_map =
+            mem::replace(&mut self.map, collections::HashMap::new());
 
         // Add all public rooms.
         for (name, user_count) in response.rooms.drain(..) {
-            let new_room = Room::new(Visibility::Public, user_count as usize);
-            self.update_one(name, new_room, &old_map);
+            self.update_one(
+                name, Visibility::Public, user_count, &mut old_map);
         }
 
         // Add all private, owned, rooms.
         for (name, user_count) in response.owned_private_rooms.drain(..) {
-            let new_room = Room::new(
-                Visibility::PrivateOwned, user_count as usize);
-            self.update_one(name, new_room, &old_map);
+            self.update_one(
+                name, Visibility::PrivateOwned, user_count, &mut old_map);
         }
 
         // Add all private, unowned, rooms.
         for (name, user_count) in response.other_private_rooms.drain(..) {
-            let new_room = Room::new(
-                Visibility::PrivateOther, user_count as usize);
-            self.update_one(name, new_room, &old_map);
+            self.update_one(
+                name, Visibility::PrivateOther, user_count, &mut old_map);
         }
 
         // Mark all operated rooms as necessary.
-        for name in response.operated_private_room_names.drain(..) {
-            match self.map.get_mut(&name) {
+        for name in response.operated_private_room_names.iter() {
+            match self.map.get_mut(name) {
                 Some(room) => room.operated = true,
                 None => error!("Room {} is operated but does not exist", name),
             }
         }
     }
 
-    /// Creates a control response containing the list of visible rooms.
-    pub fn get_room_list_response(&self)
-        -> control::RoomListResponse
+    /// Returns the list of (room name, room data) representing all known rooms.
+    pub fn get_room_list(&self) -> Vec<(String, Room)>
     {
-        let mut response = control::RoomListResponse{ rooms: Vec::new() };
+        let mut rooms = Vec::new();
         for (room_name, room) in self.map.iter() {
-            response.rooms.push((room_name.clone(), room.clone()));
+            rooms.push((room_name.clone(), room.clone()));
         }
-        response
+        rooms
+    }
+
+    pub fn join(
+        &mut self, room_name: &str,
+        owner: Option<String>,
+        mut operators: Vec<String>,
+        members: &Vec<(String, user::User)>)
+    {
+        // First look up the room struct.
+        let room = match self.map.get_mut(room_name) {
+            Some(room) => room,
+            None => {
+                error!(
+                    "RoomMap::join: unknown room \"{}\"",
+                    room_name
+                );
+                return;
+            }
+        };
+
+        // Log what's happening.
+        if let Membership::Joining = room.membership {
+            info!("Joined room \"{}\"", room_name);
+        } else {
+            warn!(
+                "Joined room \"{}\" but membership was already {:?}",
+                room_name, room.membership
+            );
+        }
+
+        // Update the room struct.
+        room.membership = Membership::Member;
+        room.user_count = members.len();
+        room.owner      = owner;
+        for user_name in operators.drain(..) {
+            room.operators.insert(user_name);
+        }
+        for &(ref user_name, _) in members.iter() {
+            room.members.insert(user_name.clone());
+        }
+    }
+
+    /// Saves the given message as the last one in the given room.
+    pub fn add_message(&mut self, room_name: &str, message: Message) {
+        match self.get_mut(room_name) {
+            None => {
+                error!(
+                    "SayRoomResponse: unknown room \"{}\"", room_name
+                );
+                return;
+            },
+            Some(room) => room.messages.push(message),
+        }
     }
 }
 

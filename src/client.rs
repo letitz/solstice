@@ -210,7 +210,9 @@ impl Client {
 
     fn handle_room_list_request(&mut self) {
         // First send the controller client what we have in memory.
-        let response = self.rooms.get_room_list_response();
+        let response = control::RoomListResponse {
+            rooms: self.rooms.get_room_list(),
+        };
         self.control_send(control::Response::RoomListResponse(response));
         // Then ask the server for an updated version, which will be forwarded
         // to the controller client once received.
@@ -258,43 +260,21 @@ impl Client {
     }
 
     fn handle_join_room_response(&mut self, mut response: JoinRoomResponse) {
-        // First look up the room struct.
-        let room = match self.rooms.get_mut(&response.room_name) {
-            Some(room) => room,
-            None => {
-                error!(
-                    "Received JoinRoomResponse for inexistent room \"{}\"",
-                    &response.room_name
-                );
-                return;
-            }
-        };
-
-        // Log what's happening.
-        if let room::Membership::Joining = room.membership {
-            info!("Joined room \"{}\"", response.room_name);
-        } else {
-            warn!(
-                "Joined room \"{}\" but membership was already {:?}",
-                response.room_name, room.membership
-            );
-        }
-
-        // Update the room struct.
-        room.membership = room::Membership::Member;
-        room.user_count = response.users.len();
-        room.owner      = response.owner;
-        for user_name in response.operators.drain(..) {
-            room.operators.insert(user_name.clone());
-        }
-        for &(ref user_name, _) in response.users.iter() {
-            room.members.insert(user_name.clone());
-        }
+        // Join the room and store the received information.
+        self.rooms.join(
+            &response.room_name, response.owner, response.operators,
+            &response.users);
 
         // Then update the user structs based on the info we just got.
         for (name, user) in response.users.drain(..) {
             self.users.insert(name, user);
         }
+
+        let control_response = control::JoinRoomResponse {
+            room_name: response.room_name
+        };
+        self.control_send(control::Response::JoinRoomResponse(
+                control_response));
     }
 
     fn handle_login_response(&mut self, login: LoginResponse) {
@@ -337,15 +317,21 @@ impl Client {
 
     fn handle_room_list_response(&mut self, response: RoomListResponse) {
         // Update the room map in memory.
-        self.rooms.update(response);
+        self.rooms.set_room_list(response);
         // Send the updated version to the controller.
-        let control_response = self.rooms.get_room_list_response();
+        let control_response = control::RoomListResponse {
+            rooms: self.rooms.get_room_list(),
+        };
         self.control_send(
             control::Response::RoomListResponse(control_response));
     }
 
     fn handle_say_room_response(&mut self, response: SayRoomResponse) {
-        // TODO Save the message somewhere.
+        self.rooms.add_message(&response.room_name, room::Message {
+            user_name: response.user_name.clone(),
+            message:   response.message.clone(),
+        });
+
         let control_response = control::SayRoomResponse {
             room_name: response.room_name,
             user_name: response.user_name,
@@ -360,6 +346,11 @@ impl Client {
         if let Some(room) = self.rooms.get_mut(&response.room_name) {
             room.members.insert(response.user_name.clone());
             self.users.insert(response.user_name, response.user);
+        } else {
+            error!(
+                "UserJoinedRoomResponse: unknown room \"{}\"",
+                response.room_name
+            );
         }
     }
 }
