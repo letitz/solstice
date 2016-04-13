@@ -11,6 +11,8 @@ pub enum Request {
     DisconnectNotification,
     /// The controller wants to join a room. Contains the room name.
     RoomJoinRequest(String),
+    /// The controller wants to leave a rom. Contains the room name.
+    RoomLeaveRequest(String),
     /// The controller wants to know what the login status is.
     LoginStatusRequest,
     /// The controller wants to know the list of visible chat rooms.

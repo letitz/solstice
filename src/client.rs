@@ -132,6 +132,9 @@ impl Client {
             control::Request::RoomJoinRequest(room_name) =>
                 self.handle_room_join_request(room_name),
 
+            control::Request::RoomLeaveRequest(room_name) =>
+                self.handle_room_leave_request(room_name),
+
             control::Request::RoomListRequest =>
                 self.handle_room_list_request(),
 
@@ -144,6 +147,28 @@ impl Client {
             },
             */
         }
+    }
+
+    fn handle_login_status_request(&mut self) {
+        let username = config::USERNAME.to_string();
+
+        let response = match self.login_status {
+            LoginStatus::Pending =>
+                control::LoginStatusResponse::Pending{ username: username },
+
+            LoginStatus::Success(ref motd) =>
+                control::LoginStatusResponse::Success{
+                    username: username,
+                    motd: motd.clone(),
+                },
+
+            LoginStatus::Failure(ref reason) =>
+                control::LoginStatusResponse::Failure{
+                    username: username,
+                    reason: reason.clone(),
+                },
+        };
+        self.control_send(control::Response::LoginStatusResponse(response));
     }
 
     fn handle_room_join_request(&mut self, room_name: String) {
@@ -180,31 +205,40 @@ impl Client {
                 }
             }
         }
+
         self.server_send(ServerRequest::RoomJoinRequest(RoomJoinRequest {
             room_name: room_name
         }));
     }
 
-    fn handle_login_status_request(&mut self) {
-        let username = config::USERNAME.to_string();
+    fn handle_room_leave_request(&mut self, room_name: String) {
+        {
+            let room = match self.rooms.get_mut(&room_name) {
+                Some(room) => room,
+                None => {
+                    error!("Cannot leave unknown room {:?}", room_name);
+                    return;
+                }
+            };
 
-        let response = match self.login_status {
-            LoginStatus::Pending =>
-                control::LoginStatusResponse::Pending{ username: username },
-
-            LoginStatus::Success(ref motd) =>
-                control::LoginStatusResponse::Success{
-                    username: username,
-                    motd: motd.clone(),
+            match room.membership {
+                room::Membership::Member => {
+                    room.membership = room::Membership::Leaving;
                 },
 
-            LoginStatus::Failure(ref reason) =>
-                control::LoginStatusResponse::Failure{
-                    username: username,
-                    reason: reason.clone(),
-                },
-        };
-        self.control_send(control::Response::LoginStatusResponse(response));
+                membership => {
+                    error!(
+                        "Cannot leave room {:?}: current membership: {:?}",
+                        room_name, membership
+                    );
+                    return;
+                }
+            }
+        }
+
+        self.server_send(ServerRequest::RoomLeaveRequest(RoomLeaveRequest {
+            room_name: room_name
+        }));
     }
 
     fn handle_room_list_request(&mut self) {
@@ -314,11 +348,40 @@ impl Client {
             room_name: response.room_name
         };
         self.control_send(control::Response::RoomJoinResponse(
-                control_response));
+                control_response
+        ));
     }
 
     fn handle_room_leave_response(&mut self, response: RoomLeaveResponse) {
-        // TODO handle it.
+        {
+            let room = match self.rooms.get_mut(&response.room_name) {
+                Some(room) => room,
+                None => {
+                    error!(
+                        "Cannot leave room: unknown room {:?}",
+                        response.room_name,
+                    );
+                    return;
+                }
+            };
+
+            match room.membership {
+                room::Membership::Leaving => info!(
+                    "Leaving room {:?}", response.room_name
+                ),
+
+                membership => warn!(
+                    "Leaving room {:?} with wrong membership: {:?}",
+                    response.room_name, membership
+                ),
+            }
+
+            room.membership = room::Membership::NonMember;
+        }
+
+        self.control_send(control::Response::RoomLeaveResponse(
+                response.room_name
+        ));
     }
 
     fn handle_room_list_response(&mut self, response: RoomListResponse) {

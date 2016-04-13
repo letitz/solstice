@@ -4,8 +4,9 @@ use room;
 /// to the controller.
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 pub enum Response {
-    RoomJoinResponse(RoomJoinResponse),
     LoginStatusResponse(LoginStatusResponse),
+    RoomJoinResponse(RoomJoinResponse),
+    RoomLeaveResponse(String),
     RoomListResponse(RoomListResponse),
     RoomMessageResponse(RoomMessageResponse),
 }
