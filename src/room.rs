@@ -1,4 +1,6 @@
 use std::collections;
+use std::error;
+use std::fmt;
 use std::mem;
 
 use proto::server;
@@ -75,6 +77,24 @@ impl Room {
             members:    collections::HashSet::new(),
             messages:   Vec::new(),
         }
+    }
+}
+
+/// The error returned when a room name was not found in the room map.
+#[derive(Debug)]
+pub struct RoomNotFoundError {
+    room_name: String,
+}
+
+impl fmt::Display for RoomNotFoundError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "room \"{}\" not found", self.room_name)
+    }
+}
+
+impl error::Error for RoomNotFoundError {
+    fn description(&self) -> &str {
+        "room not found"
     }
 }
 
@@ -174,17 +194,14 @@ impl RoomMap {
         owner: Option<String>,
         mut operators: Vec<String>,
         members: &Vec<(String, user::User)>)
+        -> Result<(), RoomNotFoundError>
     {
         // First look up the room struct.
         let room = match self.map.get_mut(room_name) {
             Some(room) => room,
-            None => {
-                error!(
-                    "RoomMap::join: unknown room \"{}\"",
-                    room_name
-                );
-                return;
-            }
+            None => return Err(
+                RoomNotFoundError{ room_name: room_name.to_string() }
+            ),
         };
 
         // Log what's happening.
@@ -201,12 +218,18 @@ impl RoomMap {
         room.membership = Membership::Member;
         room.user_count = members.len();
         room.owner      = owner;
+
+        room.operators.clear();
         for user_name in operators.drain(..) {
             room.operators.insert(user_name);
         }
+
+        room.members.clear();
         for &(ref user_name, _) in members.iter() {
             room.members.insert(user_name.clone());
         }
+
+        Ok(())
     }
 
     /// Saves the given message as the last one in the given room.

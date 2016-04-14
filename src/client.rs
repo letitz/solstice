@@ -340,7 +340,9 @@ impl Client {
         // Join the room and store the received information.
         self.rooms.join(
             &response.room_name, response.owner, response.operators,
-            &response.users);
+            &response.users).unwrap_or_else(
+                |err| error!("RoomJoinResponse: {}", err)
+        );
 
         // Then update the user structs based on the info we just got.
         for (name, user) in response.users.drain(..) {
