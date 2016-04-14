@@ -182,7 +182,7 @@ impl Client {
                 );
             },
 
-            Err(err) => error!("RoomJoinRequest: {}", err)
+            Err(err) => error!("RoomLeaveRequest: {}", err)
         }
     }
 
@@ -244,6 +244,9 @@ impl Client {
 
             ServerResponse::RoomMessageResponse(response) =>
                 self.handle_room_message_response(response),
+
+            ServerResponse::RoomUserLeftResponse(response) =>
+                self.handle_room_user_left_response(response),
 
             ServerResponse::UserJoinedRoomResponse(response) =>
                 self.handle_user_joined_room_response(response),
@@ -360,6 +363,20 @@ impl Client {
             control::Response::RoomMessageResponse(control_response));
     }
 
+    fn handle_room_user_left_response(
+        &mut self, response: RoomUserLeftResponse)
+    {
+        let result = self.rooms.remove_member(
+            &response.room_name, &response.user_name
+        );
+        match result {
+            Ok(()) => {
+                // TODO send control response
+            },
+            Err(err) => error!("RoomUserLeftResponse: {}", err)
+        }
+    }
+
     fn handle_user_joined_room_response(
         &mut self, response: UserJoinedRoomResponse)
     {
@@ -367,7 +384,10 @@ impl Client {
             &response.room_name, response.user_name.clone()
         );
         match result {
-            Ok(()) => self.users.insert(response.user_name, response.user),
+            Ok(()) => {
+                self.users.insert(response.user_name, response.user);
+                // TODO send control response
+            },
             Err(err) => error!("UserJoinedRoomResponse: {}", err)
         }
     }

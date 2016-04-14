@@ -329,6 +329,7 @@ impl RoomMap {
     }
 
     /// Inserts the given user in the given room's set of members.
+    /// Returns an error if the room is not found.
     pub fn insert_member(&mut self, room_name: &str, user_name: String)
         -> Result<(), Error>
     {
@@ -338,6 +339,20 @@ impl RoomMap {
                 Ok(())
             },
             None => Err(Error::RoomNotFound(room_name.to_string())),
+        }
+    }
+
+    /// Removes the given user from the given room's set of members.
+    /// Returns an error if the room is not found.
+    pub fn remove_member(&mut self, room_name: &str, user_name: &str)
+        -> Result<(), Error>
+    {
+        match self.map.get_mut(room_name) {
+            Some(room) => {
+                room.members.remove(user_name);
+                Ok(())
+            },
+            None => Err(Error::RoomNotFound(room_name.to_string()))
         }
     }
 }

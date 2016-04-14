@@ -28,6 +28,7 @@ pub enum ServerResponse {
     RoomLeaveResponse(RoomLeaveResponse),
     RoomListResponse(RoomListResponse),
     RoomMessageResponse(RoomMessageResponse),
+    RoomUserLeftResponse(RoomUserLeftResponse),
     UserJoinedRoomResponse(UserJoinedRoomResponse),
     UserStatusResponse(UserStatusResponse),
     WishlistIntervalResponse(WishlistIntervalResponse),
@@ -81,6 +82,11 @@ impl FromPacket for ServerResponse {
             CODE_ROOM_MESSAGE =>
                 ServerResponse::RoomMessageResponse(
                     try!(RoomMessageResponse::from_packet(packet))
+                ),
+
+            CODE_ROOM_USER_LEFT =>
+                ServerResponse::RoomUserLeftResponse(
+                    try!(RoomUserLeftResponse::from_packet(packet))
                 ),
 
             CODE_USER_JOINED_ROOM =>
@@ -547,6 +553,27 @@ impl FromPacket for UserJoinedRoomResponse {
                 num_free_slots: num_free_slots,
                 country:        country,
             }
+        })
+    }
+}
+
+/*================*
+ * ROOM USER LEFT *
+ *================*/
+
+#[derive(Debug)]
+pub struct RoomUserLeftResponse {
+    pub room_name: String,
+    pub user_name: String,
+}
+
+impl FromPacket for RoomUserLeftResponse {
+    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+        let room_name = try!(packet.read_str());
+        let user_name = try!(packet.read_str());
+        Ok(RoomUserLeftResponse {
+            room_name: room_name,
+            user_name: user_name,
         })
     }
 }

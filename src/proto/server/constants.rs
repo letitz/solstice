@@ -6,6 +6,7 @@ pub const CODE_ROOM_MESSAGE:       u32 = 13;
 pub const CODE_ROOM_JOIN:          u32 = 14;
 pub const CODE_ROOM_LEAVE:         u32 = 15;
 pub const CODE_USER_JOINED_ROOM:   u32 = 16;
+pub const CODE_ROOM_USER_LEFT:     u32 = 17;
 pub const CODE_CONNECT_TO_PEER:    u32 = 18;
 pub const CODE_ROOM_LIST:          u32 = 64;
 pub const CODE_PRIVILEGED_USERS:   u32 = 69;
