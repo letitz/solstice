@@ -189,6 +189,8 @@ impl RoomMap {
         rooms
     }
 
+    /// Records that we are now a member of the given room and updates the room
+    /// information.
     pub fn join(
         &mut self, room_name: &str,
         owner: Option<String>,
@@ -232,16 +234,52 @@ impl RoomMap {
         Ok(())
     }
 
+    /// Records that we are now no longer a member of the given room.
+    pub fn leave(&mut self, room_name: &str) -> Result<(), RoomNotFoundError> {
+        let room = match self.map.get_mut(room_name) {
+            Some(room) => room,
+            None => return Err(RoomNotFoundError {
+                room_name: room_name.to_string()
+            }),
+        };
+
+        match room.membership {
+            Membership::Leaving => info!(
+                "Leaving room {:?}", room_name
+            ),
+            membership => warn!(
+                "Leaving room {:?} with wrong membership: {:?}",
+                room_name, membership
+            ),
+        }
+
+        room.membership = Membership::NonMember;
+        Ok(())
+    }
+
     /// Saves the given message as the last one in the given room.
-    pub fn add_message(&mut self, room_name: &str, message: Message) {
-        match self.get_mut(room_name) {
-            None => {
-                error!(
-                    "RoomMap::add_message: unknown room \"{}\"", room_name
-                );
-                return;
+    pub fn add_message(&mut self, room_name: &str, message: Message)
+        -> Result<(), RoomNotFoundError>
+    {
+        match self.map.get_mut(room_name) {
+            Some(room) => {
+                room.messages.push(message);
+                Ok(())
             },
-            Some(room) => room.messages.push(message),
+            None => Err(RoomNotFoundError{ room_name: room_name.to_string() }),
+        }
+    }
+
+    /// Inserts the given user in the given room's set of members.
+    pub fn insert_member(&mut self, room_name: &str, user_name: String)
+        -> Result<(), RoomNotFoundError>
+    {
+        match self.map.get_mut(room_name) {
+            Some(room) => {
+                room.members.insert(user_name);
+                Ok(())
+            },
+            None => Err(RoomNotFoundError{ room_name: room_name.to_string() }),
         }
     }
 }

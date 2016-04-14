@@ -338,11 +338,14 @@ impl Client {
 
     fn handle_room_join_response(&mut self, mut response: RoomJoinResponse) {
         // Join the room and store the received information.
-        self.rooms.join(
+        let result = self.rooms.join(
             &response.room_name, response.owner, response.operators,
-            &response.users).unwrap_or_else(
-                |err| error!("RoomJoinResponse: {}", err)
+            &response.users
         );
+        if let Err(err) = result {
+            error!("RoomJoinResponse: {}", err);
+            return;
+        }
 
         // Then update the user structs based on the info we just got.
         for (name, user) in response.users.drain(..) {
@@ -358,30 +361,8 @@ impl Client {
     }
 
     fn handle_room_leave_response(&mut self, response: RoomLeaveResponse) {
-        {
-            let room = match self.rooms.get_mut(&response.room_name) {
-                Some(room) => room,
-                None => {
-                    error!(
-                        "Cannot leave room: unknown room {:?}",
-                        response.room_name,
-                    );
-                    return;
-                }
-            };
-
-            match room.membership {
-                room::Membership::Leaving => info!(
-                    "Leaving room {:?}", response.room_name
-                ),
-
-                membership => warn!(
-                    "Leaving room {:?} with wrong membership: {:?}",
-                    response.room_name, membership
-                ),
-            }
-
-            room.membership = room::Membership::NonMember;
+        if let Err(err) = self.rooms.leave(&response.room_name) {
+            error!("RoomLeaveResponse: {}", err);
         }
 
         self.control_send(control::Response::RoomLeaveResponse(
@@ -401,10 +382,14 @@ impl Client {
     }
 
     fn handle_room_message_response(&mut self, response: RoomMessageResponse) {
-        self.rooms.add_message(&response.room_name, room::Message {
+        let result = self.rooms.add_message(&response.room_name, room::Message {
             user_name: response.user_name.clone(),
             message:   response.message.clone(),
         });
+        if let Err(err) = result {
+            error!("RoomMessageResponse: {}", err);
+            return;
+        }
 
         let control_response = control::RoomMessageResponse {
             room_name: response.room_name,
@@ -418,20 +403,23 @@ impl Client {
     fn handle_user_joined_room_response(
         &mut self, response: UserJoinedRoomResponse)
     {
-        if let Some(room) = self.rooms.get_mut(&response.room_name) {
-            room.members.insert(response.user_name.clone());
-            self.users.insert(response.user_name, response.user);
-        } else {
-            error!(
-                "UserJoinedRoomResponse: unknown room \"{}\"",
-                response.room_name
-            );
+        let result = self.rooms.insert_member(
+            &response.room_name, response.user_name.clone()
+        );
+        match result {
+            Ok(()) => self.users.insert(response.user_name, response.user),
+            Err(err) => error!("UserJoinedRoomResponse: {}", err)
         }
     }
 
     fn handle_user_status_response(&mut self, response: UserStatusResponse) {
-        self.users.set_status(&response.user_name, response.status)
-            .unwrap_or_else(|err| error!("UserStatusResponse: {}", err));
+        let result = self.users.set_status(
+            &response.user_name, response.status
+        );
+        if let Err(err) = result {
+            error!("UserStatusResponse: {}", err);
+            return;
+        }
 
         if response.is_privileged {
             self.users.insert_privileged(response.user_name);
