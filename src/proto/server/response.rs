@@ -40,79 +40,59 @@ pub enum ServerResponse {
     UnknownResponse(u32),
 }
 
+macro_rules! try_from_packet {
+    ($struct_name:ident, $packet:ident) => {
+        ServerResponse::$struct_name(
+            try!($struct_name::from_packet($packet))
+        )
+    }
+}
+
 impl FromPacket for ServerResponse {
     fn from_packet(packet: &mut Packet) -> result::Result<Self> {
         let code = try!(packet.read_uint());
         let resp = match code {
             CODE_CONNECT_TO_PEER =>
-                ServerResponse::ConnectToPeerResponse(
-                    try!(ConnectToPeerResponse::from_packet(packet))
-                ),
+                try_from_packet!(ConnectToPeerResponse, packet),
 
             CODE_LOGIN =>
-                ServerResponse::LoginResponse(
-                    try!(LoginResponse::from_packet(packet))
-                ),
+                try_from_packet!(LoginResponse, packet),
 
             CODE_PEER_ADDRESS =>
-                ServerResponse::PeerAddressResponse(
-                    try!(PeerAddressResponse::from_packet(packet))
-                ),
+                try_from_packet!(PeerAddressResponse, packet),
 
             CODE_PRIVILEGED_USERS =>
-                ServerResponse::PrivilegedUsersResponse(
-                    try!(PrivilegedUsersResponse::from_packet(packet))
-                ),
+                try_from_packet!(PrivilegedUsersResponse, packet),
 
             CODE_ROOM_JOIN =>
-                ServerResponse::RoomJoinResponse(
-                    try!(RoomJoinResponse::from_packet(packet))
-                ),
+                try_from_packet!(RoomJoinResponse, packet),
 
             CODE_ROOM_LEAVE =>
-                ServerResponse::RoomLeaveResponse(
-                    try!(RoomLeaveResponse::from_packet(packet))
-                ),
+                try_from_packet!(RoomLeaveResponse, packet),
 
             CODE_ROOM_LIST =>
-                ServerResponse::RoomListResponse(
-                    try!(RoomListResponse::from_packet(packet))
-                ),
+                try_from_packet!(RoomListResponse, packet),
 
             CODE_ROOM_MESSAGE =>
-                ServerResponse::RoomMessageResponse(
-                    try!(RoomMessageResponse::from_packet(packet))
-                ),
-
-            CODE_ROOM_USER_LEFT =>
-                ServerResponse::RoomUserLeftResponse(
-                    try!(RoomUserLeftResponse::from_packet(packet))
-                ),
+                try_from_packet!(RoomMessageResponse, packet),
 
             CODE_ROOM_USER_JOINED =>
-                ServerResponse::RoomUserJoinedResponse(
-                    try!(RoomUserJoinedResponse::from_packet(packet))
-                ),
+                try_from_packet!(RoomUserJoinedResponse, packet),
+
+            CODE_ROOM_USER_LEFT =>
+                try_from_packet!(RoomUserLeftResponse, packet),
 
             CODE_USER_STATUS =>
-                ServerResponse::UserStatusResponse(
-                    try!(UserStatusResponse::from_packet(packet))
-                ),
+                try_from_packet!(UserStatusResponse, packet),
 
             CODE_WISHLIST_INTERVAL =>
-                ServerResponse::WishlistIntervalResponse(
-                    try!(WishlistIntervalResponse::from_packet(packet))
-                    ),
+                try_from_packet!(WishlistIntervalResponse, packet),
 
             CODE_PARENT_MIN_SPEED =>
-                ServerResponse::ParentMinSpeedResponse(
-                    try!(ParentMinSpeedResponse::from_packet(packet))
-                ),
+                try_from_packet!(ParentMinSpeedResponse, packet),
 
             CODE_PARENT_SPEED_RATIO =>
-                ServerResponse::ParentSpeedRatioResponse(
-                    try!(ParentSpeedRatioResponse::from_packet(packet))
-                ),
+                try_from_packet!(ParentSpeedRatioResponse, packet),
 
             code => ServerResponse::UnknownResponse(code),
         };
