@@ -245,11 +245,11 @@ impl Client {
             ServerResponse::RoomMessageResponse(response) =>
                 self.handle_room_message_response(response),
 
+            ServerResponse::RoomUserJoinedResponse(response) =>
+                self.handle_room_user_joined_response(response),
+
             ServerResponse::RoomUserLeftResponse(response) =>
                 self.handle_room_user_left_response(response),
-
-            ServerResponse::UserJoinedRoomResponse(response) =>
-                self.handle_user_joined_room_response(response),
 
             ServerResponse::UserStatusResponse(response) =>
                 self.handle_user_status_response(response),
@@ -363,6 +363,21 @@ impl Client {
             control::Response::RoomMessageResponse(control_response));
     }
 
+    fn handle_room_user_joined_response(
+        &mut self, response: RoomUserJoinedResponse)
+    {
+        let result = self.rooms.insert_member(
+            &response.room_name, response.user_name.clone()
+        );
+        match result {
+            Ok(()) => {
+                self.users.insert(response.user_name, response.user);
+                // TODO send control response
+            },
+            Err(err) => error!("RoomUserJoinedResponse: {}", err)
+        }
+    }
+
     fn handle_room_user_left_response(
         &mut self, response: RoomUserLeftResponse)
     {
@@ -374,21 +389,6 @@ impl Client {
                 // TODO send control response
             },
             Err(err) => error!("RoomUserLeftResponse: {}", err)
-        }
-    }
-
-    fn handle_user_joined_room_response(
-        &mut self, response: UserJoinedRoomResponse)
-    {
-        let result = self.rooms.insert_member(
-            &response.room_name, response.user_name.clone()
-        );
-        match result {
-            Ok(()) => {
-                self.users.insert(response.user_name, response.user);
-                // TODO send control response
-            },
-            Err(err) => error!("UserJoinedRoomResponse: {}", err)
         }
     }
 

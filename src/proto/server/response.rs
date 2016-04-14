@@ -28,8 +28,8 @@ pub enum ServerResponse {
     RoomLeaveResponse(RoomLeaveResponse),
     RoomListResponse(RoomListResponse),
     RoomMessageResponse(RoomMessageResponse),
+    RoomUserJoinedResponse(RoomUserJoinedResponse),
     RoomUserLeftResponse(RoomUserLeftResponse),
-    UserJoinedRoomResponse(UserJoinedRoomResponse),
     UserStatusResponse(UserStatusResponse),
     WishlistIntervalResponse(WishlistIntervalResponse),
 
@@ -89,9 +89,9 @@ impl FromPacket for ServerResponse {
                     try!(RoomUserLeftResponse::from_packet(packet))
                 ),
 
-            CODE_USER_JOINED_ROOM =>
-                ServerResponse::UserJoinedRoomResponse(
-                    try!(UserJoinedRoomResponse::from_packet(packet))
+            CODE_ROOM_USER_JOINED =>
+                ServerResponse::RoomUserJoinedResponse(
+                    try!(RoomUserJoinedResponse::from_packet(packet))
                 ),
 
             CODE_USER_STATUS =>
@@ -513,17 +513,17 @@ impl FromPacket for RoomMessageResponse {
 }
 
 /*==================*
- * USER JOINED ROOM *
+ * ROOM USER JOINED *
  *==================*/
 
 #[derive(Debug)]
-pub struct UserJoinedRoomResponse {
+pub struct RoomUserJoinedResponse {
     pub room_name: String,
     pub user_name: String,
     pub user:      user::User,
 }
 
-impl FromPacket for UserJoinedRoomResponse {
+impl FromPacket for RoomUserJoinedResponse {
     fn from_packet(packet: &mut Packet) -> result::Result<Self> {
         let room_name = try!(packet.read_str());
         let user_name = try!(packet.read_str());
@@ -540,7 +540,7 @@ impl FromPacket for UserJoinedRoomResponse {
 
         let country = try!(packet.read_str());
 
-        Ok(UserJoinedRoomResponse {
+        Ok(RoomUserJoinedResponse {
             room_name: room_name,
             user_name: user_name,
             user: user::User {
