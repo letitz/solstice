@@ -26,35 +26,43 @@ pub enum ServerRequest {
     UserStatusRequest(UserStatusRequest),
 }
 
+macro_rules! try_to_packet {
+    ($code: ident, $request:ident) => {
+        {
+            let mut packet = Packet::new($code);
+            try!($request.write_to_packet(&mut packet));
+            Ok(packet)
+        }
+    }
+}
+
 impl ServerRequest {
     pub fn to_packet(&self) -> io::Result<Packet> {
-        let (mut packet, request): (Packet, &WriteToPacket) = match *self {
+        match *self {
             ServerRequest::LoginRequest(ref request) =>
-                (Packet::new(CODE_LOGIN), request),
+                try_to_packet!(CODE_LOGIN, request),
 
             ServerRequest::PeerAddressRequest(ref request) =>
-                (Packet::new(CODE_PEER_ADDRESS), request),
+                try_to_packet!(CODE_PEER_ADDRESS, request),
 
             ServerRequest::RoomJoinRequest(ref request) =>
-                (Packet::new(CODE_ROOM_JOIN), request),
+                try_to_packet!(CODE_ROOM_JOIN, request),
 
             ServerRequest::RoomLeaveRequest(ref request) =>
-                (Packet::new(CODE_ROOM_LEAVE), request),
+                try_to_packet!(CODE_ROOM_LEAVE, request),
 
             ServerRequest::RoomListRequest =>
-                return Ok(Packet::new(CODE_ROOM_LIST)),
+                Ok(Packet::new(CODE_ROOM_LIST)),
 
             ServerRequest::RoomMessageRequest(ref request) =>
-                (Packet::new(CODE_ROOM_MESSAGE), request),
+                try_to_packet!(CODE_ROOM_MESSAGE, request),
 
             ServerRequest::SetListenPortRequest(ref request) =>
-                (Packet::new(CODE_SET_LISTEN_PORT), request),
+                try_to_packet!(CODE_SET_LISTEN_PORT, request),
 
             ServerRequest::UserStatusRequest(ref request) =>
-                (Packet::new(CODE_USER_STATUS), request),
-        };
-        try!(request.write_to_packet(&mut packet));
-        Ok(packet)
+                try_to_packet!(CODE_USER_STATUS, request),
+        }
     }
 }
 
