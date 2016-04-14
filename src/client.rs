@@ -288,6 +288,9 @@ impl Client {
             ServerResponse::UserJoinedRoomResponse(response) =>
                 self.handle_user_joined_room_response(response),
 
+            ServerResponse::UserStatusResponse(response) =>
+                self.handle_user_status_response(response),
+
             ServerResponse::UnknownResponse(code) =>
                 warn!("Unknown response: code {}", code),
 
@@ -421,6 +424,17 @@ impl Client {
                 "UserJoinedRoomResponse: unknown room \"{}\"",
                 response.room_name
             );
+        }
+    }
+
+    fn handle_user_status_response(&mut self, response: UserStatusResponse) {
+        self.users.set_status(&response.user_name, response.status)
+            .unwrap_or_else(|err| error!("UserStatusResponse: {}", err));
+
+        if response.is_privileged {
+            self.users.insert_privileged(response.user_name);
+        } else {
+            self.users.remove_privileged(&response.user_name);
         }
     }
 }

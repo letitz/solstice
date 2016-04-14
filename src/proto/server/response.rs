@@ -29,6 +29,7 @@ pub enum ServerResponse {
     RoomListResponse(RoomListResponse),
     RoomMessageResponse(RoomMessageResponse),
     UserJoinedRoomResponse(UserJoinedRoomResponse),
+    UserStatusResponse(UserStatusResponse),
     WishlistIntervalResponse(WishlistIntervalResponse),
 
     // Unknown purpose
@@ -85,6 +86,11 @@ impl FromPacket for ServerResponse {
             CODE_USER_JOINED_ROOM =>
                 ServerResponse::UserJoinedRoomResponse(
                     try!(UserJoinedRoomResponse::from_packet(packet))
+                ),
+
+            CODE_USER_STATUS =>
+                ServerResponse::UserStatusResponse(
+                    try!(UserStatusResponse::from_packet(packet))
                 ),
 
             CODE_WISHLIST_INTERVAL =>
@@ -541,6 +547,31 @@ impl FromPacket for UserJoinedRoomResponse {
                 num_free_slots: num_free_slots,
                 country:        country,
             }
+        })
+    }
+}
+
+/*=============*
+ * USER STATUS *
+ *=============*/
+
+#[derive(Debug)]
+pub struct UserStatusResponse {
+    pub user_name: String,
+    pub status: user::Status,
+    pub is_privileged: bool,
+}
+
+impl FromPacket for UserStatusResponse {
+    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+        let user_name     = try!(packet.read_str());
+        let status_u32    = try!(packet.read_uint());
+        let status        = try!(user::Status::from_u32(status_u32));
+        let is_privileged = try!(packet.read_bool());
+        Ok(UserStatusResponse {
+            user_name:     user_name,
+            status:        status,
+            is_privileged: is_privileged,
         })
     }
 }

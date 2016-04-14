@@ -1,6 +1,7 @@
 pub const CODE_LOGIN:              u32 = 1;
 pub const CODE_SET_LISTEN_PORT:    u32 = 2;
 pub const CODE_PEER_ADDRESS:       u32 = 3;
+pub const CODE_USER_STATUS:        u32 = 7;
 pub const CODE_ROOM_MESSAGE:       u32 = 13;
 pub const CODE_ROOM_JOIN:          u32 = 14;
 pub const CODE_ROOM_LEAVE:         u32 = 15;

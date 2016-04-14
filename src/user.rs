@@ -1,4 +1,6 @@
 use std::collections;
+use std::error;
+use std::fmt;
 
 use result;
 
@@ -59,6 +61,25 @@ pub struct User {
     pub country: String,
 }
 
+/// The error returned when a user name was not found in the user map.
+#[derive(Debug)]
+pub struct UserNotFoundError {
+    /// The name of the user that wasn't found.
+    user_name: String,
+}
+
+impl fmt::Display for UserNotFoundError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "user \"{}\" not found", self.user_name)
+    }
+}
+
+impl error::Error for UserNotFoundError {
+    fn description(&self) -> &str {
+        "user not found"
+    }
+}
+
 /// Contains the mapping from user names to user data and provides a clean
 /// interface to interact with it.
 #[derive(Debug)]
@@ -80,32 +101,51 @@ impl UserMap {
 
     /// Looks up the given user name in the map, returning an immutable
     /// reference to the associated data if found.
-    pub fn get(&self, name: &str) -> Option<&User> {
-        self.map.get(name)
+    pub fn get(&self, user_name: &str) -> Option<&User> {
+        self.map.get(user_name)
     }
 
     /// Inserts the given user info for the given user name in the mapping.
     /// If there is already data under that name, it is replaced.
-    pub fn insert(&mut self, name: String, user: User) {
-        self.map.insert(name, user);
+    pub fn insert(&mut self, user_name: String, user: User) {
+        self.map.insert(user_name, user);
+    }
+
+    /// Sets the given user's status to the given value, if such a user exists.
+    pub fn set_status(&mut self, user_name: &str, status: Status)
+        -> Result<(), UserNotFoundError>
+    {
+        if let Some(user) = self.map.get_mut(user_name) {
+            user.status = status;
+            Ok(())
+        } else {
+            Err(UserNotFoundError {
+                user_name: user_name.to_string(),
+            })
+        }
     }
 
     /// Sets the set of privileged users to the given list.
     pub fn set_all_privileged(&mut self, mut users: Vec<String>)
     {
         self.privileged.clear();
-        for name in users.drain(..) {
-            self.privileged.insert(name);
+        for user_name in users.drain(..) {
+            self.privileged.insert(user_name);
         }
     }
 
     /// Marks the given user as privileged.
-    pub fn add_privileged(&mut self, name: String) {
-        self.privileged.insert(name);
+    pub fn insert_privileged(&mut self, user_name: String) {
+        self.privileged.insert(user_name);
+    }
+
+    /// Marks the given user as not privileged.
+    pub fn remove_privileged(&mut self, user_name: &str) {
+        self.privileged.remove(user_name);
     }
 
     /// Checks if the given user is privileged.
-    pub fn is_privileged(&self, name: &str) -> bool {
-        self.privileged.contains(name)
+    pub fn is_privileged(&self, user_name: &str) -> bool {
+        self.privileged.contains(user_name)
     }
 }

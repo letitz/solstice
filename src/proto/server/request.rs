@@ -23,6 +23,7 @@ pub enum ServerRequest {
     RoomListRequest,
     RoomMessageRequest(RoomMessageRequest),
     SetListenPortRequest(SetListenPortRequest),
+    UserStatusRequest(UserStatusRequest),
 }
 
 impl ServerRequest {
@@ -48,6 +49,9 @@ impl ServerRequest {
 
             ServerRequest::SetListenPortRequest(ref request) =>
                 (Packet::new(CODE_SET_LISTEN_PORT), request),
+
+            ServerRequest::UserStatusRequest(ref request) =>
+                (Packet::new(CODE_USER_STATUS), request),
         };
         try!(request.write_to_packet(&mut packet));
         Ok(packet)
@@ -201,3 +205,18 @@ impl WriteToPacket for SetListenPortRequest {
     }
 }
 
+/*=============*
+ * USER STATUS *
+ *=============*/
+
+#[derive(Debug)]
+pub struct UserStatusRequest {
+    pub user_name: String,
+}
+
+impl WriteToPacket for UserStatusRequest {
+    fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
+        try!(packet.write_str(&self.user_name));
+        Ok(())
+    }
+}
