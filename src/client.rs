@@ -172,73 +172,33 @@ impl Client {
     }
 
     fn handle_room_join_request(&mut self, room_name: String) {
-        // First check that we are not already a member.
-        // Enclosed in a block otherwise the mutable borrow of self.rooms
-        // prevents from calling self.server_send.
-        {
-            let room = match self.rooms.get_mut(&room_name) {
-                Some(room) => room,
-                None => {
-                    error!("Cannot join inexistent room \"{}\"", room_name);
-                    return;
-                }
-            };
-            match room.membership {
-                room::Membership::NonMember => {
-                    // As expected.
-                    room.membership = room::Membership::Joining;
-                },
+        match self.rooms.start_joining(&room_name) {
+            Ok(()) => {
+                info!("Requesting to join room {:?}", room_name);
+                self.server_send(
+                    ServerRequest::RoomJoinRequest(RoomJoinRequest {
+                        room_name: room_name
+                    })
+                );
+            },
 
-                room::Membership::Member => {
-                    warn!(
-                        "Controller requested to re-join room \"{}\"",
-                        room_name
-                    );
-                    // TODO Send control response
-                },
-
-                membership => {
-                    error!(
-                        "Cannot join room \"{}\": current membership: {:?}",
-                        room_name, membership
-                    );
-                }
-            }
+            Err(err) => error!("RoomJoinRequest: {}", err)
         }
-
-        self.server_send(ServerRequest::RoomJoinRequest(RoomJoinRequest {
-            room_name: room_name
-        }));
     }
 
     fn handle_room_leave_request(&mut self, room_name: String) {
-        {
-            let room = match self.rooms.get_mut(&room_name) {
-                Some(room) => room,
-                None => {
-                    error!("Cannot leave unknown room {:?}", room_name);
-                    return;
-                }
-            };
+        match self.rooms.start_leaving(&room_name) {
+            Ok(()) => {
+                info!("Requesting to leave room {:?}", room_name);
+                self.server_send(
+                    ServerRequest::RoomLeaveRequest(RoomLeaveRequest {
+                        room_name: room_name
+                    })
+                );
+            },
 
-            match room.membership {
-                room::Membership::Member => {
-                    room.membership = room::Membership::Leaving;
-                },
-
-                membership => {
-                    error!(
-                        "Cannot leave room {:?}: current membership: {:?}",
-                        room_name, membership
-                    );
-                    return;
-                }
-            }
+            Err(err) => error!("RoomLeaveRequest: {}", err)
         }
-
-        self.server_send(ServerRequest::RoomLeaveRequest(RoomLeaveRequest {
-            room_name: room_name
-        }));
     }
 
     fn handle_room_list_request(&mut self) {

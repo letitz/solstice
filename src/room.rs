@@ -80,21 +80,34 @@ impl Room {
     }
 }
 
-/// The error returned when a room name was not found in the room map.
+/// The error returned by RoomMap functions.
 #[derive(Debug)]
-pub struct RoomNotFoundError {
-    room_name: String,
+pub enum Error {
+    RoomNotFound(String),
+    MembershipChangeInvalid(Membership, Membership),
 }
 
-impl fmt::Display for RoomNotFoundError {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "room \"{}\" not found", self.room_name)
+        match *self {
+            Error::RoomNotFound(ref room_name) =>
+                write!(f, "room {:?} not found", room_name),
+
+            Error::MembershipChangeInvalid(old_membership, new_membership) =>
+                write!(
+                    f, "cannot change membership from {:?} to {:?}",
+                    old_membership, new_membership
+                ),
+        }
     }
 }
 
-impl error::Error for RoomNotFoundError {
+impl error::Error for Error {
     fn description(&self) -> &str {
-        "room not found"
+        match *self {
+            Error::RoomNotFound(_) => "room not found",
+            Error::MembershipChangeInvalid(_, _) => "cannot change membership"
+        }
     }
 }
 
@@ -189,6 +202,31 @@ impl RoomMap {
         rooms
     }
 
+    /// Records that we are now trying to join the given room.
+    /// If the room is not found, or if its membership is not `NonMember`,
+    /// returns an error.
+    pub fn start_joining(&mut self, room_name: &str)
+        -> Result<(), Error>
+    {
+        let room = match self.map.get_mut(room_name) {
+            Some(room) => room,
+            None => return Err(Error::RoomNotFound(room_name.to_string()))
+        };
+
+        match room.membership {
+            Membership::NonMember => {
+                room.membership = Membership::Joining;
+                Ok(())
+            },
+
+            membership => {
+                Err(Error::MembershipChangeInvalid(
+                        membership, Membership::Joining)
+                )
+            }
+        }
+    }
+
     /// Records that we are now a member of the given room and updates the room
     /// information.
     pub fn join(
@@ -196,22 +234,20 @@ impl RoomMap {
         owner: Option<String>,
         mut operators: Vec<String>,
         members: &Vec<(String, user::User)>)
-        -> Result<(), RoomNotFoundError>
+        -> Result<(), Error>
     {
         // First look up the room struct.
         let room = match self.map.get_mut(room_name) {
             Some(room) => room,
-            None => return Err(
-                RoomNotFoundError{ room_name: room_name.to_string() }
-            ),
+            None => return Err(Error::RoomNotFound(room_name.to_string()))
         };
 
         // Log what's happening.
         if let Membership::Joining = room.membership {
-            info!("Joined room \"{}\"", room_name);
+            info!("Joined room {:?}", room_name);
         } else {
             warn!(
-                "Joined room \"{}\" but membership was already {:?}",
+                "Joined room {:?} but membership was already {:?}",
                 room_name, room.membership
             );
         }
@@ -234,21 +270,43 @@ impl RoomMap {
         Ok(())
     }
 
-    /// Records that we are now no longer a member of the given room.
-    pub fn leave(&mut self, room_name: &str) -> Result<(), RoomNotFoundError> {
+    /// Records that we are now trying to leave the given room.
+    /// If the room is not found, or if its membership status is not `Member`,
+    /// returns an error.
+    pub fn start_leaving(&mut self, room_name: &str)
+        -> Result<(), Error>
+    {
         let room = match self.map.get_mut(room_name) {
             Some(room) => room,
-            None => return Err(RoomNotFoundError {
-                room_name: room_name.to_string()
-            }),
+            None => return Err(Error::RoomNotFound(room_name.to_string()))
         };
 
         match room.membership {
-            Membership::Leaving => info!(
-                "Leaving room {:?}", room_name
-            ),
+            Membership::Member => {
+                room.membership = Membership::Leaving;
+                Ok(())
+            },
+
+            membership => {
+                Err(Error::MembershipChangeInvalid(
+                        membership, Membership::Leaving)
+                )
+            }
+        }
+    }
+
+    /// Records that we have now left the given room.
+    pub fn leave(&mut self, room_name: &str) -> Result<(), Error> {
+        let room = match self.map.get_mut(room_name) {
+            Some(room) => room,
+            None => return Err(Error::RoomNotFound(room_name.to_string()))
+        };
+
+        match room.membership {
+            Membership::Leaving => info!("Left room {:?}", room_name),
+
             membership => warn!(
-                "Leaving room {:?} with wrong membership: {:?}",
+                "Left room {:?} with wrong membership: {:?}",
                 room_name, membership
             ),
         }
@@ -259,27 +317,27 @@ impl RoomMap {
 
     /// Saves the given message as the last one in the given room.
     pub fn add_message(&mut self, room_name: &str, message: Message)
-        -> Result<(), RoomNotFoundError>
+        -> Result<(), Error>
     {
         match self.map.get_mut(room_name) {
             Some(room) => {
                 room.messages.push(message);
                 Ok(())
             },
-            None => Err(RoomNotFoundError{ room_name: room_name.to_string() }),
+            None => Err(Error::RoomNotFound(room_name.to_string())),
         }
     }
 
     /// Inserts the given user in the given room's set of members.
     pub fn insert_member(&mut self, room_name: &str, user_name: String)
-        -> Result<(), RoomNotFoundError>
+        -> Result<(), Error>
     {
         match self.map.get_mut(room_name) {
             Some(room) => {
                 room.members.insert(user_name);
                 Ok(())
             },
-            None => Err(RoomNotFoundError{ room_name: room_name.to_string() }),
+            None => Err(Error::RoomNotFound(room_name.to_string())),
         }
     }
 }
