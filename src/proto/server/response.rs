@@ -28,6 +28,7 @@ pub enum ServerResponse {
     RoomLeaveResponse(RoomLeaveResponse),
     RoomListResponse(RoomListResponse),
     RoomMessageResponse(RoomMessageResponse),
+    RoomTickersResponse(RoomTickersResponse),
     RoomUserJoinedResponse(RoomUserJoinedResponse),
     RoomUserLeftResponse(RoomUserLeftResponse),
     UserStatusResponse(UserStatusResponse),
@@ -75,6 +76,9 @@ impl FromPacket for ServerResponse {
 
             CODE_ROOM_MESSAGE =>
                 try_from_packet!(RoomMessageResponse, packet),
+
+            CODE_ROOM_TICKERS =>
+                try_from_packet!(RoomTickersResponse, packet),
 
             CODE_ROOM_USER_JOINED =>
                 try_from_packet!(RoomUserJoinedResponse, packet),
@@ -488,6 +492,35 @@ impl FromPacket for RoomMessageResponse {
             room_name: room_name,
             user_name: user_name,
             message:   message,
+        })
+    }
+}
+
+/*==============*
+ * ROOM MESSAGE *
+ *==============*/
+
+#[derive(Debug)]
+pub struct RoomTickersResponse {
+    pub room_name: String,
+    pub tickers:   Vec<(String, String)>
+}
+
+impl FromPacket for RoomTickersResponse {
+    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+        let room_name = try!(packet.read_str());
+
+        let num_tickers = try!(packet.read_uint()) as usize;
+        let mut tickers = Vec::new();
+        for _ in 0..num_tickers {
+            let user_name = try!(packet.read_str());
+            let message   = try!(packet.read_str());
+            tickers.push((user_name, message))
+        }
+
+        Ok(RoomTickersResponse {
+            room_name: room_name,
+            tickers:   tickers,
         })
     }
 }

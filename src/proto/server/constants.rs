@@ -13,3 +13,4 @@ pub const CODE_PRIVILEGED_USERS:   u32 = 69;
 pub const CODE_PARENT_MIN_SPEED:   u32 = 83;
 pub const CODE_PARENT_SPEED_RATIO: u32 = 84;
 pub const CODE_WISHLIST_INTERVAL:  u32 = 104;
+pub const CODE_ROOM_TICKERS:       u32 = 113;
