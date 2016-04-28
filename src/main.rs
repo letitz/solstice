@@ -12,6 +12,7 @@ mod user;
 extern crate byteorder;
 extern crate core;
 extern crate crypto;
+extern crate encoding;
 #[macro_use] extern crate log;
 extern crate env_logger;
 extern crate mio;

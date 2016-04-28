@@ -3,6 +3,8 @@ use std::iter::repeat;
 use std::io::{Read, Write};
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
+use encoding::{Encoding, DecoderTrap, EncoderTrap};
+use encoding::all::ISO_8859_1;
 use mio::{
     Evented, EventLoop, EventSet, Handler, PollOpt, Token, TryRead, TryWrite
 };
@@ -42,8 +44,15 @@ impl Packet {
     // Writing convenience
 
     pub fn write_str(&mut self, string: &str) -> io::Result<usize> {
-        try!(self.write_uint(string.len() as u32));
-        let n = try!(self.write(string.as_bytes()));
+        let bytes = match ISO_8859_1.encode(string, EncoderTrap::Strict) {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                let copy = string.to_string();
+                return Err(io::Error::new(io::ErrorKind::Other, copy))
+            }
+        };
+        try!(self.write_uint(bytes.len() as u32));
+        let n = try!(self.write(&bytes));
         Ok(n + U32_SIZE)
     }
 
@@ -68,8 +77,7 @@ impl Packet {
         let len = try!(self.read_uint()) as usize;
         let mut buffer = vec![0; len];
         try!(self.read(&mut buffer));
-        let result = String::from_utf8(buffer);
-        match result {
+        match ISO_8859_1.decode(&buffer, DecoderTrap::Strict) {
             Ok(string) => Ok(string),
             Err(e) => Err(io::Error::new(io::ErrorKind::Other, e.to_string())),
         }
