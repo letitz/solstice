@@ -188,7 +188,7 @@ pub struct SetListenPortRequest {
 
 impl<'a> WriteToPacket for &'a SetListenPortRequest {
     fn write_to_packet(self, packet: &mut Packet) -> io::Result<()> {
-        try!(packet.write_port(self.port));
+        try!(packet.write_value(self.port));
         Ok(())
     }
 }

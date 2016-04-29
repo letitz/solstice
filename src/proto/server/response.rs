@@ -106,32 +106,30 @@ impl ReadFromPacket for ServerResponse {
 
 #[derive(Debug)]
 pub struct ConnectToPeerResponse {
-    pub username: String,
+    pub username:        String,
     pub connection_type: String,
-    pub ip: net::Ipv4Addr,
-    pub port: u16,
-    pub token: u32,
-    pub is_privileged: bool,
+    pub ip:              net::Ipv4Addr,
+    pub port:            u16,
+    pub token:           u32,
+    pub is_privileged:   bool,
 }
 
 impl ReadFromPacket for ConnectToPeerResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let username = try!(packet.read_value());
+        let username        = try!(packet.read_value());
         let connection_type = try!(packet.read_value());
-
-        let ip = try!(packet.read_value());
-        let port = try!(packet.read_port());
-
-        let token = try!(packet.read_value());
-        let is_privileged = try!(packet.read_value());
+        let ip              = try!(packet.read_value());
+        let port            = try!(packet.read_value());
+        let token           = try!(packet.read_value());
+        let is_privileged   = try!(packet.read_value());
 
         Ok(ConnectToPeerResponse {
-            username: username,
+            username:        username,
             connection_type: connection_type,
-            ip: ip,
-            port: port,
-            token: token,
-            is_privileged: is_privileged,
+            ip:              ip,
+            port:            port,
+            token:           token,
+            is_privileged:   is_privileged,
         })
     }
 }
@@ -228,7 +226,7 @@ impl ReadFromPacket for PeerAddressResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
         let username = try!(packet.read_value());
         let ip = try!(packet.read_value());
-        let port = try!(packet.read_port());
+        let port = try!(packet.read_value());
 
         Ok(PeerAddressResponse {
             username: username,
