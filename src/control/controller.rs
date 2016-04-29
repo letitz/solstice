@@ -155,7 +155,9 @@ impl Controller {
                     let response = match response_result {
                         Ok(response) => response,
                         Err(e) => {
-                            error!("Error receving from client channel: {}", e);
+                            error!(
+                                "Error receiving from client channel: {}", e
+                            );
                             break;
                         }
                     };
