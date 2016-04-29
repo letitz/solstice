@@ -1,8 +1,9 @@
 use std::collections;
 use std::error;
 use std::fmt;
+use std::io;
 
-use result;
+use proto;
 
 const STATUS_OFFLINE: u32 = 1;
 const STATUS_AWAY:    u32 = 2;
@@ -19,22 +20,31 @@ pub enum Status {
     Online,
 }
 
-impl Status {
-    pub fn from_u32(n: u32) -> result::Result<Status> {
+impl proto::ReadFromPacket for Status {
+    fn read_from_packet(packet: &mut proto::Packet)
+        -> Result<Self, proto::PacketReadError>
+    {
+        let n: u32 = try!(packet.read_value());
         match n {
             STATUS_OFFLINE => Ok(Status::Offline),
             STATUS_AWAY    => Ok(Status::Away),
             STATUS_ONLINE  => Ok(Status::Online),
-            _              => Err(result::Error::InvalidEnumError(n as usize))
+            _              => {
+                Err(proto::PacketReadError::InvalidUserStatusError(n))
+            }
         }
     }
+}
 
-    pub fn to_u32(&self) -> u32 {
-        match *self {
+impl<'a> proto::WriteToPacket for &'a Status {
+    fn write_to_packet(self, packet: &mut proto::Packet) -> io::Result<()> {
+        let n = match *self {
             Status::Offline => STATUS_OFFLINE,
             Status::Away    => STATUS_AWAY,
             Status::Online  => STATUS_ONLINE,
-        }
+        };
+        try!(packet.write_value(n));
+        Ok(())
     }
 }
 

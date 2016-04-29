@@ -96,16 +96,16 @@ impl LoginRequest {
     }
 }
 
-impl WriteToPacket for LoginRequest {
-    fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
+impl<'a> WriteToPacket for &'a LoginRequest {
+    fn write_to_packet(self, packet: &mut Packet) -> io::Result<()> {
         let userpass = String::new() + &self.username + &self.password;
         let userpass_md5 = md5_str(&userpass);
 
-        try!(packet.write_str(&self.username));
-        try!(packet.write_str(&self.password));
-        try!(packet.write_uint(self.major));
-        try!(packet.write_str(&userpass_md5));
-        try!(packet.write_uint(self.minor));
+        try!(packet.write_value(&self.username));
+        try!(packet.write_value(&self.password));
+        try!(packet.write_value(self.major));
+        try!(packet.write_value(&userpass_md5));
+        try!(packet.write_value(self.minor));
 
         Ok(())
     }
@@ -117,20 +117,12 @@ impl WriteToPacket for LoginRequest {
 
 #[derive(Debug)]
 pub struct PeerAddressRequest {
-    username: String,
+    pub username: String,
 }
 
-impl PeerAddressRequest {
-    fn new(username: &str) -> Self {
-        PeerAddressRequest {
-            username: username.to_string(),
-        }
-    }
-}
-
-impl WriteToPacket for PeerAddressRequest {
-    fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
-        try!(packet.write_str(&self.username));
+impl<'a> WriteToPacket for &'a PeerAddressRequest {
+    fn write_to_packet(self, packet: &mut Packet) -> io::Result<()> {
+        try!(packet.write_value(&self.username));
         Ok(())
     }
 }
@@ -144,9 +136,9 @@ pub struct RoomJoinRequest {
     pub room_name: String
 }
 
-impl WriteToPacket for RoomJoinRequest {
-    fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
-        try!(packet.write_str(&self.room_name));
+impl<'a> WriteToPacket for &'a RoomJoinRequest {
+    fn write_to_packet(self, packet: &mut Packet) -> io::Result<()> {
+        try!(packet.write_value(&self.room_name));
         Ok(())
     }
 }
@@ -160,9 +152,9 @@ pub struct RoomLeaveRequest {
     pub room_name: String
 }
 
-impl WriteToPacket for RoomLeaveRequest {
-    fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
-        try!(packet.write_str(&self.room_name));
+impl<'a> WriteToPacket for &'a RoomLeaveRequest {
+    fn write_to_packet(self, packet: &mut Packet) -> io::Result<()> {
+        try!(packet.write_value(&self.room_name));
         Ok(())
     }
 }
@@ -177,10 +169,10 @@ pub struct RoomMessageRequest {
     pub message:   String,
 }
 
-impl WriteToPacket for RoomMessageRequest {
-    fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
-        try!(packet.write_str(&self.room_name));
-        try!(packet.write_str(&self.message));
+impl<'a> WriteToPacket for &'a RoomMessageRequest {
+    fn write_to_packet(self, packet: &mut Packet) -> io::Result<()> {
+        try!(packet.write_value(&self.room_name));
+        try!(packet.write_value(&self.message));
         Ok(())
     }
 }
@@ -191,20 +183,12 @@ impl WriteToPacket for RoomMessageRequest {
 
 #[derive(Debug)]
 pub struct SetListenPortRequest {
-    port: u16,
+    pub port: u16,
 }
 
-impl SetListenPortRequest {
-    fn new(port: u16) -> Self {
-        SetListenPortRequest {
-            port: port,
-        }
-    }
-}
-
-impl WriteToPacket for SetListenPortRequest {
-    fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
-        try!(packet.write_uint(self.port as u32));
+impl<'a> WriteToPacket for &'a SetListenPortRequest {
+    fn write_to_packet(self, packet: &mut Packet) -> io::Result<()> {
+        try!(packet.write_port(self.port));
         Ok(())
     }
 }
@@ -218,9 +202,9 @@ pub struct UserStatusRequest {
     pub user_name: String,
 }
 
-impl WriteToPacket for UserStatusRequest {
-    fn write_to_packet(&self, packet: &mut Packet) -> io::Result<()> {
-        try!(packet.write_str(&self.user_name));
+impl<'a> WriteToPacket for &'a UserStatusRequest {
+    fn write_to_packet(self, packet: &mut Packet) -> io::Result<()> {
+        try!(packet.write_value(&self.user_name));
         Ok(())
     }
 }

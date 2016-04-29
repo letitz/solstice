@@ -1,4 +1,8 @@
-use std::{io, mem, net};
+use std::error;
+use std::fmt;
+use std::io;
+use std::mem;
+use std::net;
 use std::iter::repeat;
 use std::io::{Read, Write};
 
@@ -9,29 +13,11 @@ use mio::{
     Evented, EventLoop, EventSet, Handler, PollOpt, Token, TryRead, TryWrite
 };
 
-use result;
-
 const MAX_PACKET_SIZE: usize = 1 << 20; // 1 MiB
 const U32_SIZE: usize = 4;
 const MAX_MESSAGE_SIZE: usize = MAX_PACKET_SIZE - U32_SIZE;
 
 const MAX_PORT: u32 = (1 << 16) - 1;
-
-/*==================*
- * READ FROM PACKET *
- *==================*/
-
-pub trait ReadFromPacket: Sized {
-    fn read_from_packet(&mut Packet) -> result::Result<Self>;
-}
-
-/*=================*
- * WRITE TO PACKET *
- *=================*/
-
-pub trait WriteToPacket: Sized {
-    fn write_to_packet(&self, &mut Packet) -> io::Result<()>;
-}
 
 /*========*
  * PACKET *
@@ -41,6 +27,27 @@ pub trait WriteToPacket: Sized {
 pub struct Packet {
     cursor: usize,
     bytes: Vec<u8>,
+}
+
+impl io::Read for Packet {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let mut slice = &self.bytes[self.cursor..];
+        let result = slice.read(buf);
+        if let Ok(num_bytes_read) = result {
+            self.cursor += num_bytes_read
+        }
+        result
+    }
+}
+
+impl io::Write for Packet {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.bytes.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.bytes.flush()
+    }
 }
 
 impl Packet {
@@ -65,97 +72,35 @@ impl Packet {
 
     // Writing convenience
 
-    pub fn write_str(&mut self, string: &str) -> io::Result<usize> {
-        let bytes = match ISO_8859_1.encode(string, EncoderTrap::Strict) {
-            Ok(bytes) => bytes,
-            Err(_) => {
-                let copy = string.to_string();
-                return Err(io::Error::new(io::ErrorKind::Other, copy))
-            }
-        };
-        try!(self.write_uint(bytes.len() as u32));
-        let n = try!(self.write(&bytes));
-        Ok(n + U32_SIZE)
+    pub fn write_port(&mut self, port: u16) -> io::Result<()> {
+        self.write_value(port as u32)
     }
 
-    pub fn write_uint(&mut self, n: u32) -> io::Result<usize> {
-        match self.write_u32::<LittleEndian>(n) {
-            Ok(()) => Ok(U32_SIZE),
-            Err(e) => Err(io::Error::from(e))
+    /// This function is necessary because not all u16 values are encoded in
+    /// 4 bytes.
+    pub fn read_port(&mut self) -> Result<u16, PacketReadError> {
+        let port: u32 = try!(self.read_value());
+        if port > MAX_PORT {
+            return Err(PacketReadError::InvalidPortError(port))
         }
+        Ok(port as u16)
     }
 
-    pub fn write_bool(&mut self, b: bool) -> io::Result<usize> {
-        self.write(&[b as u8])
-    }
-
-    // Reading convenience
-
-    pub fn read_uint(&mut self) -> io::Result<u32> {
-        self.read_u32::<LittleEndian>().map_err(io::Error::from)
-    }
-
-    pub fn read_str(&mut self) -> io::Result<String> {
-        let len = try!(self.read_uint()) as usize;
-        let mut buffer = vec![0; len];
-        try!(self.read(&mut buffer));
-        match ISO_8859_1.decode(&buffer, DecoderTrap::Strict) {
-            Ok(string) => Ok(string),
-            Err(e) => Err(io::Error::new(io::ErrorKind::Other, e.to_string())),
-        }
-    }
-
-    pub fn read_bool(&mut self) -> io::Result<bool> {
-        let mut buffer = vec![0; 1];
-        try!(self.read(&mut buffer));
-        match buffer[0] {
-            0 => Ok(false),
-            1 => Ok(true),
-            n => Err(io::Error::new(io::ErrorKind::InvalidInput,
-                                    format!("{} is not a boolean", n)))
-
-        }
-    }
-
-    pub fn read_array<T, E, F>(&mut self, vector: &mut Vec<T>, read_item: F)
-        -> Result<usize, E>
-        where F: Fn(&mut Self) -> Result<T, E>,
-              E: From<io::Error>
+    /// Provides the main way to read data out of a binary packet.
+    pub fn read_value<T: ReadFromPacket>(&mut self)
+        -> Result<T, PacketReadError>
     {
-        self.read_array_with(|packet, _| {
-            let item = try!(read_item(packet));
-            vector.push(item);
-            Ok(())
-        })
+        T::read_from_packet(self)
     }
 
-    pub fn read_array_with<E, F>(&mut self, mut read_item: F)
-        -> Result<usize, E>
-        where F: FnMut(&mut Self, usize) -> Result<(), E>,
-              E: From<io::Error>
+    /// Provides the main way to write data into a binary packet.
+    pub fn write_value<T: WriteToPacket>(&mut self, val: T)
+        -> io::Result<()>
     {
-        let num_items = try!(self.read_uint()) as usize;
-        for i in 0..num_items {
-            try!(read_item(self, i));
-        }
-        Ok(num_items)
+        val.write_to_packet(self)
     }
 
-    pub fn read_ipv4_addr(&mut self) -> io::Result<net::Ipv4Addr> {
-        let ip_u32 = try!(self.read_uint());
-        Ok(net::Ipv4Addr::from(ip_u32))
-    }
-
-    pub fn read_port(&mut self) -> io::Result<u16> {
-        let port_u32 = try!(self.read_uint());
-        if port_u32 > MAX_PORT {
-            return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Invalid port number: {}", port_u32)));
-        }
-        Ok(port_u32 as u16)
-    }
-
+    /// Returns the number of unread bytes remaining in the packet.
     pub fn bytes_remaining(&self) -> usize {
         self.bytes.len() - self.cursor
     }
@@ -171,33 +116,192 @@ impl Packet {
     }
 }
 
-impl io::Write for Packet {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.bytes.write(buf)
-    }
+/*===================*
+ * PACKET READ ERROR *
+ *===================*/
 
-    fn flush(&mut self) -> io::Result<()> {
-        self.bytes.flush()
-    }
+#[derive(Debug)]
+pub enum PacketReadError {
+    InvalidBoolError(u8),
+    InvalidPortError(u32),
+    InvalidStringError(Vec<u8>),
+    InvalidUserStatusError(u32),
+    IOError(io::Error),
 }
 
-impl io::Read for Packet {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let mut slice = &self.bytes[self.cursor..];
-        let result = slice.read(buf);
-        if let Ok(num_bytes_read) = result {
-            self.cursor += num_bytes_read
+impl fmt::Display for PacketReadError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            PacketReadError::InvalidBoolError(n) =>
+                write!(fmt, "InvalidBoolError: {}", n),
+            PacketReadError::InvalidPortError(n) =>
+                write!(fmt, "InvalidPortError: {}", n),
+            PacketReadError::InvalidStringError(ref bytes) =>
+                write!(fmt, "InvalidStringError: {:?}", bytes),
+            PacketReadError::InvalidUserStatusError(n) =>
+                write!(fmt, "InvalidUserStatusError: {}", n),
+            PacketReadError::IOError(ref err) =>
+                write!(fmt, "IOError: {}", err),
         }
-        result
     }
 }
 
+impl error::Error for PacketReadError {
+    fn description(&self) -> &str {
+        match *self {
+            PacketReadError::InvalidBoolError(_) =>
+                "InvalidBoolError",
+            PacketReadError::InvalidPortError(_) =>
+                "InvalidPortError",
+            PacketReadError::InvalidStringError(_) =>
+                "InvalidStringError",
+            PacketReadError::InvalidUserStatusError(_) =>
+                "InvalidUserStatusError",
+            PacketReadError::IOError(_) =>
+                "IOError",
+        }
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            PacketReadError::InvalidBoolError(_)       => None,
+            PacketReadError::InvalidPortError(_)       => None,
+            PacketReadError::InvalidStringError(_)     => None,
+            PacketReadError::InvalidUserStatusError(_) => None,
+            PacketReadError::IOError(ref err)          => Some(err),
+        }
+    }
+}
+
+impl From<io::Error> for PacketReadError {
+    fn from(err: io::Error) -> Self {
+        PacketReadError::IOError(err)
+    }
+}
+
+/*==================*
+ * READ FROM PACKET *
+ *==================*/
+
+pub trait ReadFromPacket: Sized {
+    fn read_from_packet(&mut Packet) -> Result<Self, PacketReadError>;
+}
+
+impl ReadFromPacket for u32 {
+    fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
+        packet.read_u32::<LittleEndian>().map_err(PacketReadError::from)
+    }
+}
+
+impl ReadFromPacket for usize {
+    fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
+        let n: u32 = try!(packet.read_value());
+        Ok(n as usize)
+    }
+}
+
+impl ReadFromPacket for bool {
+    fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
+        let mut buffer = vec![0];
+        try!(packet.read(&mut buffer));
+        match buffer[0] {
+            0 => Ok(false),
+            1 => Ok(true),
+            n => Err(PacketReadError::InvalidBoolError(n))
+        }
+    }
+}
+
+impl ReadFromPacket for net::Ipv4Addr {
+    fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
+        let ip: u32 = try!(packet.read_value());
+        Ok(net::Ipv4Addr::from(ip))
+    }
+}
+
+impl ReadFromPacket for String {
+    fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
+        let len = try!(packet.read_value());
+        let mut buffer = vec![0; len];
+        try!(packet.read(&mut buffer));
+        match ISO_8859_1.decode(&buffer, DecoderTrap::Strict) {
+            Ok(string) => Ok(string),
+            Err(_) => Err(PacketReadError::InvalidStringError(buffer))
+        }
+    }
+}
+
+impl<T: ReadFromPacket> ReadFromPacket for Vec<T> {
+    fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
+        let len: usize = try!(packet.read_value());
+        let mut vec = Vec::new();
+        for _ in 0..len {
+            vec.push(try!(packet.read_value()));
+        }
+        Ok(vec)
+    }
+}
+
+/*=================*
+ * WRITE TO PACKET *
+ *=================*/
+
+pub trait WriteToPacket: Sized {
+    fn write_to_packet(self, &mut Packet) -> io::Result<()>;
+}
+
+impl WriteToPacket for u32 {
+    fn write_to_packet(self, packet: &mut Packet) -> io::Result<()> {
+        packet.write_u32::<LittleEndian>(self)
+    }
+}
+
+impl WriteToPacket for bool {
+    fn write_to_packet(self, packet: &mut Packet) -> io::Result<()> {
+        try!(packet.write(&[self as u8]));
+        Ok(())
+    }
+}
+
+impl<'a> WriteToPacket for &'a str {
+    fn write_to_packet(self, packet: &mut Packet) -> io::Result<()> {
+        let bytes = match ISO_8859_1.encode(self, EncoderTrap::Strict) {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                let copy = self.to_string();
+                return Err(io::Error::new(io::ErrorKind::Other, copy))
+            }
+        };
+        try!(packet.write_value(bytes.len() as u32));
+        try!(packet.write(&bytes));
+        Ok(())
+    }
+}
+
+impl<'a> WriteToPacket for &'a String {
+    fn write_to_packet(self, packet: &mut Packet) -> io::Result<()> {
+        packet.write_value::<&'a str>(self)
+    }
+}
+
+/*===============*
+ * PACKET STREAM *
+ *===============*/
+
+/// This enum defines the possible states a PacketStream state machine can be
+/// in.
 #[derive(Debug, Clone, Copy)]
 enum State {
+    /// The PacketStream is waiting to read enough bytes to determine the
+    /// length of the following packet.
     ReadingLength,
+    /// The PacketStream is waiting to read enough bytes to form the entire
+    /// packet.
     ReadingPacket,
 }
 
+/// This struct wraps around an mio byte stream and provides the ability to
+/// read 32-bit-length-prefixed packets of bytes from it.
 #[derive(Debug)]
 pub struct PacketStream<T: Read + Write + Evented> {
     stream: T,

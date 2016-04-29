@@ -13,10 +13,10 @@ use proto;
 
 #[derive(Debug)]
 pub enum Error {
-    InvalidEnumError(usize),
     IOError(io::Error),
     JSONEncoderError(json::EncoderError),
     JSONDecoderError(json::DecoderError),
+    PacketReadError(proto::PacketReadError),
     SendControlRequestError(mpsc::SendError<control::Request>),
     SendProtoResponseError(mpsc::SendError<proto::Response>),
     Utf8Error(str::Utf8Error),
@@ -26,16 +26,14 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::InvalidEnumError(n) =>
-                write!(
-                    fmt, "InvalidEnumError: {} is not a valid enum value", n
-                ),
             Error::IOError(ref err) =>
                 write!(fmt, "IOError: {}", err),
             Error::JSONEncoderError(ref err) =>
                 write!(fmt, "JSONEncoderError: {}", err),
             Error::JSONDecoderError(ref err) =>
                 write!(fmt, "JSONDecoderError: {}", err),
+            Error::PacketReadError(ref err) =>
+                write!(fmt, "PacketReadError: {}", err),
             Error::SendControlRequestError(ref err) =>
                 write!(fmt, "SendControlRequestError: {}", err),
             Error::SendProtoResponseError(ref err) =>
@@ -51,10 +49,10 @@ impl fmt::Display for Error {
 impl error::Error for Error {
     fn description(&self) -> &str {
         match *self {
-            Error::InvalidEnumError(_)        => "InvalidEnumError",
             Error::IOError(_)                 => "IOError",
             Error::JSONEncoderError(_)        => "JSONEncoderError",
             Error::JSONDecoderError(_)        => "JSONDecoderError",
+            Error::PacketReadError(_)         => "PacketReadError",
             Error::SendControlRequestError(_) => "SendControlRequestError",
             Error::SendProtoResponseError(_)  => "SendProtoResponseError",
             Error::Utf8Error(_)               => "Utf8Error",
@@ -64,10 +62,10 @@ impl error::Error for Error {
 
     fn cause(&self) -> Option<&error::Error> {
         match *self {
-            Error::InvalidEnumError(_)              => None,
             Error::IOError(ref err)                 => Some(err),
             Error::JSONEncoderError(ref err)        => Some(err),
             Error::JSONDecoderError(ref err)        => Some(err),
+            Error::PacketReadError(ref err)         => Some(err),
             Error::SendControlRequestError(ref err) => Some(err),
             Error::SendProtoResponseError(ref err)  => Some(err),
             Error::Utf8Error(ref err)               => Some(err),
@@ -91,6 +89,12 @@ impl From<json::EncoderError> for Error {
 impl From<json::DecoderError> for Error {
     fn from(err: json::DecoderError) -> Self {
         Error::JSONDecoderError(err)
+    }
+}
+
+impl From<proto::PacketReadError> for Error {
+    fn from(err: proto::PacketReadError) -> Self {
+        Error::PacketReadError(err)
     }
 }
 
