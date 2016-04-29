@@ -6,7 +6,7 @@ use std::sync::mpsc::Sender;
 use mio::{EventLoop, EventSet, Handler, PollOpt, Token};
 use mio::tcp::TcpStream;
 
-use proto::{Packet, PacketStream, Request, Response};
+use proto::{Packet, PacketStream, ReadFromPacket, Request, Response};
 use proto::server::*;
 use result;
 
@@ -112,7 +112,9 @@ impl ConnectionHandler {
         };
 
         debug!("Read packet with size {}", packet.bytes_remaining());
-        let server_response = try!(ServerResponse::from_packet(&mut packet));
+        let server_response = try!(
+            ServerResponse::read_from_packet(&mut packet)
+        );
         debug!("Received server response: {:?}", server_response);
 
         try!(self.client_tx.send(Response::ServerResponse(server_response)));

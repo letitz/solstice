@@ -9,11 +9,33 @@ use mio::{
     Evented, EventLoop, EventSet, Handler, PollOpt, Token, TryRead, TryWrite
 };
 
+use result;
+
 const MAX_PACKET_SIZE: usize = 1 << 20; // 1 MiB
 const U32_SIZE: usize = 4;
 const MAX_MESSAGE_SIZE: usize = MAX_PACKET_SIZE - U32_SIZE;
 
 const MAX_PORT: u32 = (1 << 16) - 1;
+
+/*==================*
+ * READ FROM PACKET *
+ *==================*/
+
+pub trait ReadFromPacket: Sized {
+    fn read_from_packet(&mut Packet) -> result::Result<Self>;
+}
+
+/*=================*
+ * WRITE TO PACKET *
+ *=================*/
+
+pub trait WriteToPacket: Sized {
+    fn write_to_packet(&self, &mut Packet) -> io::Result<()>;
+}
+
+/*========*
+ * PACKET *
+ *========*/
 
 #[derive(Debug)]
 pub struct Packet {

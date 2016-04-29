@@ -1,7 +1,7 @@
 mod packet;
 pub mod server;
 
-pub use self::packet::{PacketStream, Packet};
+pub use self::packet::{PacketStream, Packet, ReadFromPacket, WriteToPacket};
 
 use self::server::{ServerRequest, ServerResponse};
 

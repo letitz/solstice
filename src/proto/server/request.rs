@@ -4,11 +4,7 @@ use crypto::md5::Md5;
 use crypto::digest::Digest;
 
 use super::constants::*;
-use super::super::packet::Packet;
-
-trait WriteToPacket {
-    fn write_to_packet(&self, &mut Packet) -> io::Result<()>;
-}
+use super::super::packet::{Packet, WriteToPacket};
 
 /*================*
  * SERVER REQUEST *

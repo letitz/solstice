@@ -1,18 +1,10 @@
 use std::net;
 
 use super::constants::*;
-use super::super::packet::Packet;
+use super::super::packet::{Packet, ReadFromPacket};
 
 use result;
 use user;
-
-/*=============*
- * FROM PACKET *
- *=============*/
-
-pub trait FromPacket: Sized {
-    fn from_packet(&mut Packet) -> result::Result<Self>;
-}
 
 /*=================*
  * SERVER RESPONSE *
@@ -41,62 +33,62 @@ pub enum ServerResponse {
     UnknownResponse(u32),
 }
 
-macro_rules! try_from_packet {
+macro_rules! try_read_from_packet {
     ($struct_name:ident, $packet:ident) => {
         ServerResponse::$struct_name(
-            try!($struct_name::from_packet($packet))
+            try!($struct_name::read_from_packet($packet))
         )
     }
 }
 
-impl FromPacket for ServerResponse {
-    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+impl ReadFromPacket for ServerResponse {
+    fn read_from_packet(packet: &mut Packet) -> result::Result<Self> {
         let code = try!(packet.read_uint());
         let resp = match code {
             CODE_CONNECT_TO_PEER =>
-                try_from_packet!(ConnectToPeerResponse, packet),
+                try_read_from_packet!(ConnectToPeerResponse, packet),
 
             CODE_LOGIN =>
-                try_from_packet!(LoginResponse, packet),
+                try_read_from_packet!(LoginResponse, packet),
 
             CODE_PEER_ADDRESS =>
-                try_from_packet!(PeerAddressResponse, packet),
+                try_read_from_packet!(PeerAddressResponse, packet),
 
             CODE_PRIVILEGED_USERS =>
-                try_from_packet!(PrivilegedUsersResponse, packet),
+                try_read_from_packet!(PrivilegedUsersResponse, packet),
 
             CODE_ROOM_JOIN =>
-                try_from_packet!(RoomJoinResponse, packet),
+                try_read_from_packet!(RoomJoinResponse, packet),
 
             CODE_ROOM_LEAVE =>
-                try_from_packet!(RoomLeaveResponse, packet),
+                try_read_from_packet!(RoomLeaveResponse, packet),
 
             CODE_ROOM_LIST =>
-                try_from_packet!(RoomListResponse, packet),
+                try_read_from_packet!(RoomListResponse, packet),
 
             CODE_ROOM_MESSAGE =>
-                try_from_packet!(RoomMessageResponse, packet),
+                try_read_from_packet!(RoomMessageResponse, packet),
 
             CODE_ROOM_TICKERS =>
-                try_from_packet!(RoomTickersResponse, packet),
+                try_read_from_packet!(RoomTickersResponse, packet),
 
             CODE_ROOM_USER_JOINED =>
-                try_from_packet!(RoomUserJoinedResponse, packet),
+                try_read_from_packet!(RoomUserJoinedResponse, packet),
 
             CODE_ROOM_USER_LEFT =>
-                try_from_packet!(RoomUserLeftResponse, packet),
+                try_read_from_packet!(RoomUserLeftResponse, packet),
 
             CODE_USER_STATUS =>
-                try_from_packet!(UserStatusResponse, packet),
+                try_read_from_packet!(UserStatusResponse, packet),
 
             CODE_WISHLIST_INTERVAL =>
-                try_from_packet!(WishlistIntervalResponse, packet),
+                try_read_from_packet!(WishlistIntervalResponse, packet),
 
             CODE_PARENT_MIN_SPEED =>
-                try_from_packet!(ParentMinSpeedResponse, packet),
+                try_read_from_packet!(ParentMinSpeedResponse, packet),
 
             CODE_PARENT_SPEED_RATIO =>
-                try_from_packet!(ParentSpeedRatioResponse, packet),
+                try_read_from_packet!(ParentSpeedRatioResponse, packet),
 
             code => ServerResponse::UnknownResponse(code),
         };
@@ -123,8 +115,8 @@ pub struct ConnectToPeerResponse {
     pub is_privileged: bool,
 }
 
-impl FromPacket for ConnectToPeerResponse {
-    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+impl ReadFromPacket for ConnectToPeerResponse {
+    fn read_from_packet(packet: &mut Packet) -> result::Result<Self> {
         let username = try!(packet.read_str());
         let connection_type = try!(packet.read_str());
 
@@ -161,8 +153,8 @@ pub enum LoginResponse {
     },
 }
 
-impl FromPacket for LoginResponse {
-    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+impl ReadFromPacket for LoginResponse {
+    fn read_from_packet(packet: &mut Packet) -> result::Result<Self> {
         let ok = try!(packet.read_bool());
         if ok {
             let motd = try!(packet.read_str());
@@ -195,8 +187,8 @@ pub struct ParentMinSpeedResponse {
     pub value: u32,
 }
 
-impl FromPacket for ParentMinSpeedResponse {
-    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+impl ReadFromPacket for ParentMinSpeedResponse {
+    fn read_from_packet(packet: &mut Packet) -> result::Result<Self> {
         let value = try!(packet.read_uint());
         Ok(ParentMinSpeedResponse {
             value: value,
@@ -213,8 +205,8 @@ pub struct ParentSpeedRatioResponse {
     pub value: u32,
 }
 
-impl FromPacket for ParentSpeedRatioResponse {
-    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+impl ReadFromPacket for ParentSpeedRatioResponse {
+    fn read_from_packet(packet: &mut Packet) -> result::Result<Self> {
         let value = try!(packet.read_uint());
         Ok(ParentSpeedRatioResponse {
             value: value,
@@ -233,8 +225,8 @@ pub struct PeerAddressResponse {
     port: u16,
 }
 
-impl FromPacket for PeerAddressResponse {
-    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+impl ReadFromPacket for PeerAddressResponse {
+    fn read_from_packet(packet: &mut Packet) -> result::Result<Self> {
         let username = try!(packet.read_str());
         let ip = try!(packet.read_ipv4_addr());
         let port = try!(packet.read_port());
@@ -256,8 +248,8 @@ pub struct PrivilegedUsersResponse {
     pub users: Vec<String>,
 }
 
-impl FromPacket for PrivilegedUsersResponse {
-    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+impl ReadFromPacket for PrivilegedUsersResponse {
+    fn read_from_packet(packet: &mut Packet) -> result::Result<Self> {
         let mut response = PrivilegedUsersResponse {
             users: Vec::new(),
         };
@@ -278,8 +270,8 @@ pub struct RoomJoinResponse {
     pub operators: Vec<String>,
 }
 
-impl FromPacket for RoomJoinResponse {
-    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+impl ReadFromPacket for RoomJoinResponse {
+    fn read_from_packet(packet: &mut Packet) -> result::Result<Self> {
         let mut response = RoomJoinResponse {
             room_name: try!(packet.read_str()),
             users: Vec::new(),
@@ -386,8 +378,8 @@ pub struct RoomLeaveResponse {
     pub room_name: String,
 }
 
-impl FromPacket for RoomLeaveResponse {
-    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+impl ReadFromPacket for RoomLeaveResponse {
+    fn read_from_packet(packet: &mut Packet) -> result::Result<Self> {
         Ok(RoomLeaveResponse {
             room_name: try!(packet.read_str()),
         })
@@ -406,8 +398,8 @@ pub struct RoomListResponse {
     pub operated_private_room_names: Vec<String>,
 }
 
-impl FromPacket for RoomListResponse {
-    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+impl ReadFromPacket for RoomListResponse {
+    fn read_from_packet(packet: &mut Packet) -> result::Result<Self> {
         let mut response = RoomListResponse {
             rooms: Vec::new(),
             owned_private_rooms: Vec::new(),
@@ -483,8 +475,8 @@ pub struct RoomMessageResponse {
     pub message:   String,
 }
 
-impl FromPacket for RoomMessageResponse {
-    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+impl ReadFromPacket for RoomMessageResponse {
+    fn read_from_packet(packet: &mut Packet) -> result::Result<Self> {
         let room_name = try!(packet.read_str());
         let user_name = try!(packet.read_str());
         let message   = try!(packet.read_str());
@@ -506,8 +498,8 @@ pub struct RoomTickersResponse {
     pub tickers:   Vec<(String, String)>
 }
 
-impl FromPacket for RoomTickersResponse {
-    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+impl ReadFromPacket for RoomTickersResponse {
+    fn read_from_packet(packet: &mut Packet) -> result::Result<Self> {
         let room_name = try!(packet.read_str());
 
         let num_tickers = try!(packet.read_uint()) as usize;
@@ -536,8 +528,8 @@ pub struct RoomUserJoinedResponse {
     pub user:      user::User,
 }
 
-impl FromPacket for RoomUserJoinedResponse {
-    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+impl ReadFromPacket for RoomUserJoinedResponse {
+    fn read_from_packet(packet: &mut Packet) -> result::Result<Self> {
         let room_name = try!(packet.read_str());
         let user_name = try!(packet.read_str());
 
@@ -580,8 +572,8 @@ pub struct RoomUserLeftResponse {
     pub user_name: String,
 }
 
-impl FromPacket for RoomUserLeftResponse {
-    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+impl ReadFromPacket for RoomUserLeftResponse {
+    fn read_from_packet(packet: &mut Packet) -> result::Result<Self> {
         let room_name = try!(packet.read_str());
         let user_name = try!(packet.read_str());
         Ok(RoomUserLeftResponse {
@@ -602,8 +594,8 @@ pub struct UserStatusResponse {
     pub is_privileged: bool,
 }
 
-impl FromPacket for UserStatusResponse {
-    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+impl ReadFromPacket for UserStatusResponse {
+    fn read_from_packet(packet: &mut Packet) -> result::Result<Self> {
         let user_name     = try!(packet.read_str());
         let status_u32    = try!(packet.read_uint());
         let status        = try!(user::Status::from_u32(status_u32));
@@ -625,8 +617,8 @@ pub struct WishlistIntervalResponse {
     pub seconds: u32,
 }
 
-impl FromPacket for WishlistIntervalResponse {
-    fn from_packet(packet: &mut Packet) -> result::Result<Self> {
+impl ReadFromPacket for WishlistIntervalResponse {
+    fn read_from_packet(packet: &mut Packet) -> result::Result<Self> {
         let seconds = try!(packet.read_uint());
         Ok(WishlistIntervalResponse {
             seconds: seconds,
