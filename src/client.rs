@@ -36,6 +36,9 @@ pub struct Client {
 }
 
 impl Client {
+    /// Returns a new client that will communicate with the protocol agent
+    /// through `proto_tx` and `proto_rx`, and with the controller agent
+    /// through `control_rx`.
     pub fn new(
         proto_tx: mio::Sender<Request>,
         proto_rx: mpsc::Receiver<Response>,
@@ -56,6 +59,7 @@ impl Client {
         }
     }
 
+    /// Runs the client, potentially forever.
     pub fn run(&mut self) {
         info!("Logging in...");
         let server_request = ServerRequest::LoginRequest(LoginRequest::new(
@@ -64,7 +68,7 @@ impl Client {
                 config::VER_MAJOR,
                 config::VER_MINOR,
                 ).unwrap());
-        self.server_send(server_request);
+        self.send_to_server(server_request);
 
         loop {
             match self.recv() {
@@ -95,15 +99,28 @@ impl Client {
     }
 
     /// Send a request to the server.
-    fn server_send(&self, request: ServerRequest) {
+    fn send_to_server(&self, request: ServerRequest) {
         self.proto_tx.send(Request::ServerRequest(request)).unwrap();
     }
 
     /// Send a response to the controller client.
-    fn control_send(&mut self, response: control::Response) {
-        // Silently drop control packets when no-one is listening.
-        if let Some(ref mut control_tx) = self.control_tx {
-            control_tx.send(response).unwrap();
+    fn send_to_controller(&mut self, response: control::Response) {
+        let result = match self.control_tx {
+            None => {
+                // Silently drop control requests when controller is
+                // disconnected.
+                return
+            },
+            Some(ref mut control_tx) => control_tx.send(response)
+        };
+        // If we failed to send, we assume it means that the other end of the
+        // channel has been dropped, i.e. the controller has disconnected.
+        // It may be that mio has died on us, in which case we will never see
+        // a controller again. If that happens, there would have probably been
+        // a panic anyway, so we might never hit this corner case.
+        if let Err(_) = result {
+            info!("Controller has disconnected.");
+            self.control_tx = None;
         }
     }
 
@@ -179,14 +196,16 @@ impl Client {
                     reason: reason.clone(),
                 },
         };
-        self.control_send(control::Response::LoginStatusResponse(response));
+        self.send_to_controller(
+            control::Response::LoginStatusResponse(response)
+        );
     }
 
     fn handle_room_join_request(&mut self, room_name: String) {
         match self.rooms.start_joining(&room_name) {
             Ok(()) => {
                 info!("Requesting to join room {:?}", room_name);
-                self.server_send(
+                self.send_to_server(
                     ServerRequest::RoomJoinRequest(RoomJoinRequest {
                         room_name: room_name
                     })
@@ -201,7 +220,7 @@ impl Client {
         match self.rooms.start_leaving(&room_name) {
             Ok(()) => {
                 info!("Requesting to leave room {:?}", room_name);
-                self.server_send(
+                self.send_to_server(
                     ServerRequest::RoomLeaveRequest(RoomLeaveRequest {
                         room_name: room_name
                     })
@@ -217,19 +236,21 @@ impl Client {
         let response = control::RoomListResponse {
             rooms: self.rooms.get_room_list(),
         };
-        self.control_send(control::Response::RoomListResponse(response));
+        self.send_to_controller(control::Response::RoomListResponse(response));
         // Then ask the server for an updated version, which will be forwarded
         // to the controller client once received.
-        self.server_send(ServerRequest::RoomListRequest);
+        self.send_to_server(ServerRequest::RoomListRequest);
     }
 
     fn handle_room_message_request(
         &mut self, request: control::RoomMessageRequest)
     {
-        self.server_send(ServerRequest::RoomMessageRequest(RoomMessageRequest {
-            room_name: request.room_name,
-            message:   request.message,
-        }));
+        self.send_to_server(ServerRequest::RoomMessageRequest(
+            RoomMessageRequest {
+                room_name: request.room_name,
+                message:   request.message,
+            }
+        ));
     }
 
     /*==========================*
@@ -329,7 +350,7 @@ impl Client {
         let control_response = control::RoomJoinResponse {
             room_name: response.room_name
         };
-        self.control_send(control::Response::RoomJoinResponse(
+        self.send_to_controller(control::Response::RoomJoinResponse(
                 control_response
         ));
     }
@@ -339,7 +360,7 @@ impl Client {
             error!("RoomLeaveResponse: {}", err);
         }
 
-        self.control_send(control::Response::RoomLeaveResponse(
+        self.send_to_controller(control::Response::RoomLeaveResponse(
                 response.room_name
         ));
     }
@@ -351,7 +372,7 @@ impl Client {
         let control_response = control::RoomListResponse {
             rooms: self.rooms.get_room_list(),
         };
-        self.control_send(
+        self.send_to_controller(
             control::Response::RoomListResponse(control_response));
     }
 
@@ -370,7 +391,7 @@ impl Client {
             user_name: response.user_name,
             message:   response.message,
         };
-        self.control_send(
+        self.send_to_controller(
             control::Response::RoomMessageResponse(control_response));
     }
 
