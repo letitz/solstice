@@ -6,7 +6,6 @@ use std::str;
 use std::sync::mpsc;
 
 use rustc_serialize::json;
-use websocket;
 
 use control;
 use proto;
@@ -20,7 +19,6 @@ pub enum Error {
     SendControlRequestError(mpsc::SendError<control::Request>),
     SendProtoResponseError(mpsc::SendError<proto::Response>),
     Utf8Error(str::Utf8Error),
-    WebSocketError(websocket::result::WebSocketError),
 }
 
 impl fmt::Display for Error {
@@ -40,8 +38,6 @@ impl fmt::Display for Error {
                 write!(fmt, "SendProtoResponseError: {}", err),
             Error::Utf8Error(ref err) =>
                 write!(fmt, "Utf8Error: {}", err),
-            Error::WebSocketError(ref err) =>
-                write!(fmt, "WebSocketError: {}", err),
         }
     }
 }
@@ -56,7 +52,6 @@ impl error::Error for Error {
             Error::SendControlRequestError(_) => "SendControlRequestError",
             Error::SendProtoResponseError(_)  => "SendProtoResponseError",
             Error::Utf8Error(_)               => "Utf8Error",
-            Error::WebSocketError(_)          => "WebSocketError",
         }
     }
 
@@ -69,7 +64,6 @@ impl error::Error for Error {
             Error::SendControlRequestError(ref err) => Some(err),
             Error::SendProtoResponseError(ref err)  => Some(err),
             Error::Utf8Error(ref err)               => Some(err),
-            Error::WebSocketError(ref err)          => Some(err),
         }
     }
 }
@@ -113,12 +107,6 @@ impl From<mpsc::SendError<proto::Response>> for Error {
 impl From<str::Utf8Error> for Error {
     fn from(err: str::Utf8Error) -> Self {
         Error::Utf8Error(err)
-    }
-}
-
-impl From<websocket::result::WebSocketError> for Error {
-    fn from(err: websocket::result::WebSocketError) -> Self {
-        Error::WebSocketError(err)
     }
 }
 

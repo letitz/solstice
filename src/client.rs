@@ -12,7 +12,7 @@ use user;
 #[derive(Debug)]
 enum IncomingMessage {
     ServerResponse(ServerResponse),
-    ControlRequest(control::Request),
+    ControlNotification(control::Notification),
 }
 
 #[derive(Debug, Clone)]
@@ -26,9 +26,8 @@ pub struct Client {
     proto_tx: mio::Sender<Request>,
     proto_rx: mpsc::Receiver<Response>,
 
-    control_tx: mpsc::Sender<control::Response>,
-    control_rx: mpsc::Receiver<control::Request>,
-    controller_connected: bool,
+    control_tx: Option<control::Sender>,
+    control_rx: mpsc::Receiver<control::Notification>,
 
     login_status: LoginStatus,
 
@@ -40,17 +39,15 @@ impl Client {
     pub fn new(
         proto_tx: mio::Sender<Request>,
         proto_rx: mpsc::Receiver<Response>,
-        control_tx: mpsc::Sender<control::Response>,
-        control_rx: mpsc::Receiver<control::Request>)
+        control_rx: mpsc::Receiver<control::Notification>)
         -> Self
     {
         Client {
             proto_tx: proto_tx,
             proto_rx: proto_rx,
 
-            control_tx: control_tx,
+            control_tx: None,
             control_rx: control_rx,
-            controller_connected: false,
 
             login_status: LoginStatus::Pending,
 
@@ -74,8 +71,8 @@ impl Client {
                 IncomingMessage::ServerResponse(response) =>
                     self.handle_server_response(response),
 
-                IncomingMessage::ControlRequest(request) =>
-                    self.handle_control_request(request),
+                IncomingMessage::ControlNotification(notif) =>
+                    self.handle_control_notification(notif),
             }
         }
     }
@@ -83,7 +80,7 @@ impl Client {
     // Necessary to break out in different function because self cannot be
     // borrowed in the select arms due to *macro things*.
     fn recv(&mut self) -> IncomingMessage {
-        let proto_rx = &self.proto_rx;
+        let proto_rx   = &self.proto_rx;
         let control_rx = &self.control_rx;
         select! {
             result = proto_rx.recv() =>
@@ -93,7 +90,7 @@ impl Client {
                 },
 
             result = control_rx.recv() =>
-                IncomingMessage::ControlRequest(result.unwrap())
+                IncomingMessage::ControlNotification(result.unwrap())
         }
     }
 
@@ -103,11 +100,35 @@ impl Client {
     }
 
     /// Send a response to the controller client.
-    fn control_send(&self, response: control::Response) {
-        if !self.controller_connected {
-            return; // Silently drop control packets when no-one is listening.
+    fn control_send(&mut self, response: control::Response) {
+        // Silently drop control packets when no-one is listening.
+        if let Some(ref mut control_tx) = self.control_tx {
+            control_tx.send(response).unwrap();
         }
-        self.control_tx.send(response).unwrap();
+    }
+
+    /*===============================*
+     * CONTROL NOTIFICATION HANDLING *
+     *===============================*/
+
+    fn handle_control_notification(&mut self, notif: control::Notification) {
+        match notif {
+            control::Notification::Connected(tx) => {
+                self.control_tx = Some(tx);
+            },
+
+            control::Notification::Disconnected => {
+                self.control_tx = None;
+            },
+
+            control::Notification::Error(e) => {
+                debug!("Control loop error: {}", e);
+                self.control_tx = None;
+            },
+
+            control::Notification::Request(req) =>
+                self.handle_control_request(req)
+        }
     }
 
     /*==========================*
@@ -116,16 +137,6 @@ impl Client {
 
     fn handle_control_request(&mut self, request: control::Request) {
         match request {
-            control::Request::ConnectNotification => {
-                info!("Controller client connected");
-                self.controller_connected = true;
-            },
-
-            control::Request::DisconnectNotification => {
-                info!("Controller client disconnected");
-                self.controller_connected = false;
-            },
-
             control::Request::LoginStatusRequest =>
                 self.handle_login_status_request(),
 

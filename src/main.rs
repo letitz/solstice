@@ -17,7 +17,7 @@ extern crate encoding;
 extern crate env_logger;
 extern crate mio;
 extern crate rustc_serialize;
-extern crate websocket;
+extern crate ws;
 
 use std::sync::mpsc::channel;
 use std::thread;
@@ -25,7 +25,6 @@ use std::thread;
 use mio::EventLoop;
 
 use client::Client;
-use control::Controller;
 use handler::ConnectionHandler;
 
 fn main() {
@@ -47,7 +46,6 @@ fn main() {
 
     let (handler_to_client_tx, handler_to_client_rx) = channel();
     let (control_to_client_tx, control_to_client_rx) = channel();
-    let (client_to_control_tx, client_to_control_rx) = channel();
     let client_to_handler_tx = event_loop.channel();
 
     let mut handler = {
@@ -65,13 +63,10 @@ fn main() {
     };
 
     let mut client = Client::new(
-        client_to_handler_tx, handler_to_client_rx,
-        client_to_control_tx, control_to_client_rx);
+        client_to_handler_tx, handler_to_client_rx, control_to_client_rx
+    );
 
-    let mut controller =
-        Controller::new(control_to_client_tx, client_to_control_rx);
-
-    thread::spawn(move || controller.run());
+    thread::spawn(move || control::listen(control_to_client_tx));
     thread::spawn(move || event_loop.run(&mut handler).unwrap());
     client.run();
 }
