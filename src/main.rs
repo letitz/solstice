@@ -3,7 +3,6 @@
 mod client;
 mod config;
 mod control;
-mod result;
 mod handler;
 mod proto;
 mod room;

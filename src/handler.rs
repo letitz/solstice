@@ -6,9 +6,8 @@ use std::sync::mpsc::Sender;
 use mio::{EventLoop, EventSet, Handler, PollOpt, Token};
 use mio::tcp::TcpStream;
 
-use proto::{Packet, PacketStream, ReadFromPacket, Request, Response};
+use proto::{Packet, PacketStream, Request, Response};
 use proto::server::*;
-use result;
 
 struct TokenCounter {
     counter: usize,
@@ -81,57 +80,52 @@ impl ConnectionHandler {
 
     fn read_server(&mut self) {
         loop {
-            match self.read_server_once() {
-                Ok(true) => (),
-                Ok(false) => break,
-                Err(e) => {
-                    error!("Error reading server: {}", e);
-                    break;
+            let mut packet = match self.server_stream.try_read() {
+                Ok(Some(packet)) => packet,
+                Ok(None)         => break,
+                Err(err)         => {
+                    error!("Error reading server: {}", err);
+                    break
                 }
+            };
+
+            debug!("Read packet with size {}", packet.bytes_remaining());
+
+            let response = match packet.read_value() {
+                Ok(resp) => {
+                    debug!("Received server response: {:?}", resp);
+                    Response::ServerResponse(resp)
+                },
+                Err(err) => {
+                    error!("Error parsing server packet: {}", err);
+                    break
+                }
+            };
+
+            if let Err(err) = self.client_tx.send(response) {
+                error!("Error sending server response to client: {}", err);
+                break
             }
         }
     }
 
     fn write_server(&mut self) {
         loop {
-            match self.write_server_once() {
-                Ok(true) => (),
-                Ok(false) => break,
+            let mut packet = match self.server_queue.pop_front() {
+                Some(packet) => packet,
+                None => break
+            };
+
+            match self.server_stream.try_write(&mut packet) {
+                Ok(Some(())) => (), // continue looping
+                Ok(None)     => {
+                    self.server_queue.push_front(packet);
+                    break
+                },
                 Err(e) => {
-                    error!("Error writing server: {}", e);
-                    break;
+                    error!("Error writing server stream: {}", e);
+                    break
                 }
-            }
-        }
-    }
-
-    fn read_server_once(&mut self) -> result::Result<bool> {
-        let mut packet = match try!(self.server_stream.try_read()) {
-            Some(packet) => packet,
-            None => return Ok(false),
-        };
-
-        debug!("Read packet with size {}", packet.bytes_remaining());
-        let server_response = try!(
-            ServerResponse::read_from_packet(&mut packet)
-        );
-        debug!("Received server response: {:?}", server_response);
-
-        try!(self.client_tx.send(Response::ServerResponse(server_response)));
-        Ok(true)
-    }
-
-    fn write_server_once(&mut self) -> io::Result<bool> {
-        let mut packet = match self.server_queue.pop_front() {
-            Some(packet) => packet,
-            None => return Ok(false),
-        };
-
-        match try!(self.server_stream.try_write(&mut packet)) {
-            Some(()) => Ok(true),
-            None => {
-                self.server_queue.push_front(packet);
-                Ok(false)
             }
         }
     }
@@ -143,15 +137,19 @@ impl ConnectionHandler {
         Ok(())
     }
 
+    /// Re-register the server socket with the event loop.
     fn reregister_server(&mut self, event_loop: &mut EventLoop<Self>) {
         let event_set = if self.server_queue.len() > 0 {
             EventSet::readable() | EventSet::writable()
         } else {
             EventSet::readable()
         };
+
         let poll_opt = PollOpt::edge() | PollOpt::oneshot();
+
         self.server_stream.reregister(
-            event_loop, self.server_token, event_set, poll_opt).unwrap();
+            event_loop, self.server_token, event_set, poll_opt
+        ).unwrap();
     }
 }
 
