@@ -1,5 +1,8 @@
+mod handler;
 mod packet;
 pub mod server;
+
+pub use self::handler::ConnectionHandler;
 
 pub use self::packet::{
     Packet,

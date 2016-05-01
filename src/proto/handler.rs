@@ -6,8 +6,8 @@ use std::sync::mpsc::Sender;
 use mio::{EventLoop, EventSet, Handler, PollOpt, Token};
 use mio::tcp::TcpStream;
 
-use proto::{Packet, PacketStream, Request, Response};
-use proto::server::*;
+use super::{Packet, PacketStream, Request, Response};
+use super::server::*;
 
 struct TokenCounter {
     counter: usize,

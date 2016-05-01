@@ -3,7 +3,6 @@
 mod client;
 mod config;
 mod control;
-mod handler;
 mod proto;
 mod room;
 mod user;
@@ -24,7 +23,7 @@ use std::thread;
 use mio::EventLoop;
 
 use client::Client;
-use handler::ConnectionHandler;
+use proto::ConnectionHandler;
 
 fn main() {
     match env_logger::init() {
