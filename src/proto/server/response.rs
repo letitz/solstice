@@ -42,8 +42,7 @@ macro_rules! try_read_from_packet {
 
 impl ReadFromPacket for ServerResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let code = try!(packet.read_value());
-        let resp = match code {
+        let resp = match packet.code() {
             CODE_CONNECT_TO_PEER =>
                 try_read_from_packet!(ConnectToPeerResponse, packet),
 
@@ -94,7 +93,7 @@ impl ReadFromPacket for ServerResponse {
         let bytes_remaining = packet.bytes_remaining();
         if bytes_remaining > 0 {
             warn!("Packet with code {} contains {} extra bytes",
-                   code, bytes_remaining)
+                   packet.code(), bytes_remaining)
         }
         Ok(resp)
     }

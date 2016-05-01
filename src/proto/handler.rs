@@ -7,8 +7,45 @@ use mio;
 
 use config;
 
-use super::{Packet, PacketStream, Request, Response};
+use super::{PacketStream, Request, Response};
 use super::server::*;
+
+/// A struct used for writing bytes to a TryWrite sink.
+struct OutBuf {
+    cursor: usize,
+    bytes: Vec<u8>
+}
+
+impl From<Vec<u8>> for OutBuf {
+    fn from(bytes: Vec<u8>) -> Self {
+        OutBuf {
+            cursor: 0,
+            bytes: bytes
+        }
+    }
+}
+
+impl OutBuf {
+    #[inline]
+    fn remaining(&self) -> usize {
+        self.bytes.len() - self.cursor
+    }
+
+    #[inline]
+    fn has_remaining(&self) -> bool {
+        self.remaining() > 0
+    }
+
+    fn try_write_to<T>(&mut self, mut writer: T) -> io::Result<Option<usize>>
+        where T: mio::TryWrite
+    {
+        let result = writer.try_write(&self.bytes[self.cursor..]);
+        if let Ok(Some(bytes_written)) = result {
+            self.cursor += bytes_written;
+        }
+        result
+    }
+}
 
 /// This struct provides a simple way to generate different tokens.
 struct TokenCounter {
@@ -35,7 +72,7 @@ struct Handler {
 
     server_token: mio::Token,
     server_stream: PacketStream<mio::tcp::TcpStream>,
-    server_queue: VecDeque<Packet>,
+    server_queue: VecDeque<OutBuf>,
 
     client_tx: mpsc::Sender<Response>,
 }
@@ -118,15 +155,20 @@ impl Handler {
 
     fn write_server(&mut self) {
         loop {
-            let mut packet = match self.server_queue.pop_front() {
-                Some(packet) => packet,
+            let mut outbuf = match self.server_queue.pop_front() {
+                Some(outbuf) => outbuf,
                 None => break
             };
 
-            match self.server_stream.try_write(&mut packet) {
-                Ok(Some(())) => (), // continue looping
+            match outbuf.try_write_to(&mut self.server_stream) {
+                Ok(Some(_)) => {
+                    if outbuf.has_remaining() {
+                        self.server_queue.push_front(outbuf)
+                    }
+                    // Continue looping
+                },
                 Ok(None)     => {
-                    self.server_queue.push_front(packet);
+                    self.server_queue.push_front(outbuf);
                     break
                 },
                 Err(e) => {
@@ -140,7 +182,7 @@ impl Handler {
     fn notify_server(&mut self, request: ServerRequest) -> io::Result<()> {
         debug!("Sending server request: {:?}", request);
         let packet = try!(request.to_packet());
-        self.server_queue.push_back(packet);
+        self.server_queue.push_back(OutBuf::from(packet.into_bytes()));
         Ok(())
     }
 

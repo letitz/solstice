@@ -4,7 +4,7 @@ use crypto::md5::Md5;
 use crypto::digest::Digest;
 
 use super::constants::*;
-use super::super::packet::{Packet, WriteToPacket};
+use super::super::packet::{MutPacket, WriteToPacket};
 
 /*================*
  * SERVER REQUEST *
@@ -25,7 +25,7 @@ pub enum ServerRequest {
 macro_rules! try_to_packet {
     ($code: ident, $request:ident) => {
         {
-            let mut packet = Packet::new($code);
+            let mut packet = MutPacket::new($code);
             try!($request.write_to_packet(&mut packet));
             Ok(packet)
         }
@@ -33,7 +33,7 @@ macro_rules! try_to_packet {
 }
 
 impl ServerRequest {
-    pub fn to_packet(&self) -> io::Result<Packet> {
+    pub fn to_packet(&self) -> io::Result<MutPacket> {
         match *self {
             ServerRequest::LoginRequest(ref request) =>
                 try_to_packet!(CODE_LOGIN, request),
@@ -48,7 +48,7 @@ impl ServerRequest {
                 try_to_packet!(CODE_ROOM_LEAVE, request),
 
             ServerRequest::RoomListRequest =>
-                Ok(Packet::new(CODE_ROOM_LIST)),
+                Ok(MutPacket::new(CODE_ROOM_LIST)),
 
             ServerRequest::RoomMessageRequest(ref request) =>
                 try_to_packet!(CODE_ROOM_MESSAGE, request),
@@ -97,7 +97,7 @@ impl LoginRequest {
 }
 
 impl<'a> WriteToPacket for &'a LoginRequest {
-    fn write_to_packet(self, packet: &mut Packet) -> io::Result<()> {
+    fn write_to_packet(self, packet: &mut MutPacket) -> io::Result<()> {
         let userpass = String::new() + &self.username + &self.password;
         let userpass_md5 = md5_str(&userpass);
 
@@ -121,7 +121,7 @@ pub struct PeerAddressRequest {
 }
 
 impl<'a> WriteToPacket for &'a PeerAddressRequest {
-    fn write_to_packet(self, packet: &mut Packet) -> io::Result<()> {
+    fn write_to_packet(self, packet: &mut MutPacket) -> io::Result<()> {
         try!(packet.write_value(&self.username));
         Ok(())
     }
@@ -137,7 +137,7 @@ pub struct RoomJoinRequest {
 }
 
 impl<'a> WriteToPacket for &'a RoomJoinRequest {
-    fn write_to_packet(self, packet: &mut Packet) -> io::Result<()> {
+    fn write_to_packet(self, packet: &mut MutPacket) -> io::Result<()> {
         try!(packet.write_value(&self.room_name));
         Ok(())
     }
@@ -153,7 +153,7 @@ pub struct RoomLeaveRequest {
 }
 
 impl<'a> WriteToPacket for &'a RoomLeaveRequest {
-    fn write_to_packet(self, packet: &mut Packet) -> io::Result<()> {
+    fn write_to_packet(self, packet: &mut MutPacket) -> io::Result<()> {
         try!(packet.write_value(&self.room_name));
         Ok(())
     }
@@ -170,7 +170,7 @@ pub struct RoomMessageRequest {
 }
 
 impl<'a> WriteToPacket for &'a RoomMessageRequest {
-    fn write_to_packet(self, packet: &mut Packet) -> io::Result<()> {
+    fn write_to_packet(self, packet: &mut MutPacket) -> io::Result<()> {
         try!(packet.write_value(&self.room_name));
         try!(packet.write_value(&self.message));
         Ok(())
@@ -187,7 +187,7 @@ pub struct SetListenPortRequest {
 }
 
 impl<'a> WriteToPacket for &'a SetListenPortRequest {
-    fn write_to_packet(self, packet: &mut Packet) -> io::Result<()> {
+    fn write_to_packet(self, packet: &mut MutPacket) -> io::Result<()> {
         try!(packet.write_value(self.port));
         Ok(())
     }
@@ -203,7 +203,7 @@ pub struct UserStatusRequest {
 }
 
 impl<'a> WriteToPacket for &'a UserStatusRequest {
-    fn write_to_packet(self, packet: &mut Packet) -> io::Result<()> {
+    fn write_to_packet(self, packet: &mut MutPacket) -> io::Result<()> {
         try!(packet.write_value(&self.user_name));
         Ok(())
     }
