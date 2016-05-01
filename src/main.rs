@@ -17,54 +17,36 @@ extern crate mio;
 extern crate rustc_serialize;
 extern crate ws;
 
-use std::sync::mpsc::channel;
+use std::sync::mpsc;
 use std::thread;
-
-use mio::EventLoop;
-
-use client::Client;
-use proto::ConnectionHandler;
 
 fn main() {
     match env_logger::init() {
         Ok(()) => (),
         Err(err) => {
-            error!("Failed to initialize logger: {}", err);
+            error!("Error initializing logger: {}", err);
             return;
         }
     };
 
-    let mut event_loop = match EventLoop::new() {
-        Ok(event_loop) => event_loop,
+    let (proto_to_client_tx, proto_to_client_rx) = mpsc::channel();
+
+    let mut proto_agent = match proto::Agent::new(proto_to_client_tx) {
+        Ok(agent) => agent,
         Err(err) => {
-            error!("Failed to create EventLoop: {}", err);
+            error!("Error initializing protocol agent: {}", err);
             return;
         }
     };
 
-    let (handler_to_client_tx, handler_to_client_rx) = channel();
-    let (control_to_client_tx, control_to_client_rx) = channel();
-    let client_to_handler_tx = event_loop.channel();
+    let client_to_proto_tx = proto_agent.channel();
+    let (control_to_client_tx, control_to_client_rx) = mpsc::channel();
 
-    let mut handler = {
-        let handler_result = ConnectionHandler::new(
-            config::SERVER_HOST, config::SERVER_PORT,
-            handler_to_client_tx, &mut event_loop);
-
-        match handler_result {
-            Ok(handler) => handler,
-            Err(err) => {
-                error!("Failed to create ConnectionHandler: {}", err);
-                return;
-            }
-        }
-    };
-
-    let mut client = Client::new(
-        client_to_handler_tx, handler_to_client_rx, control_to_client_rx
+    let mut client = client::Client::new(
+        client_to_proto_tx, proto_to_client_rx, control_to_client_rx
     );
 
     thread::spawn(move || control::listen(control_to_client_tx));
-    thread::spawn(move || event_loop.run(&mut handler).unwrap());
+    thread::spawn(move || proto_agent.run().unwrap());
     client.run();
 }
