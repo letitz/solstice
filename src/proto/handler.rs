@@ -7,7 +7,7 @@ use mio;
 
 use config;
 
-use super::{PacketStream, Request, Response};
+use super::{Intent, Stream, SendPacket, Request, Response};
 use super::server::*;
 
 /// A struct used for writing bytes to a TryWrite sink.
@@ -65,13 +65,24 @@ impl TokenCounter {
     }
 }
 
+pub struct ServerResponseSender(mpsc::Sender<Response>);
+
+impl SendPacket for ServerResponseSender {
+    type Value = ServerResponse;
+    type Error = mpsc::SendError<Response>;
+
+    fn send_packet(&mut self, value: Self::Value) -> Result<(), Self::Error> {
+        self.0.send(Response::ServerResponse(value))
+    }
+}
+
 /// This struct handles all the soulseek connections, to the server and to
 /// peers.
 struct Handler {
     token_counter: TokenCounter,
 
     server_token: mio::Token,
-    server_stream: PacketStream<mio::tcp::TcpStream>,
+    server_stream: Stream<mio::tcp::TcpStream, ServerResponseSender>,
     server_queue: VecDeque<OutBuf>,
 
     client_tx: mpsc::Sender<Response>,
@@ -81,8 +92,9 @@ impl Handler {
     fn new(client_tx: mpsc::Sender<Response>) -> io::Result<Self> {
         let host = config::SERVER_HOST;
         let port = config::SERVER_PORT;
-        let server_stream = PacketStream::new(
-            try!(Self::connect(host, port))
+        let server_stream = Stream::new(
+            try!(Self::connect(host, port)),
+            ServerResponseSender(client_tx.clone())
         );
         info!("Connected to server at {}:{}", host, port);
 
@@ -102,8 +114,8 @@ impl Handler {
 
     fn register(&self, event_loop: &mut mio::EventLoop<Self>) -> io::Result<()>
     {
-        self.server_stream.register(
-            event_loop,
+        event_loop.register(
+            self.server_stream.evented(),
             self.server_token,
             mio::EventSet::readable(),
             mio::PollOpt::edge() | mio::PollOpt::oneshot()
@@ -120,37 +132,6 @@ impl Handler {
             io::ErrorKind::Other,
             format!("Cannot connect to {}:{}", hostname, port)
         ))
-    }
-
-    fn read_server(&mut self) {
-        loop {
-            let mut packet = match self.server_stream.try_read() {
-                Ok(Some(packet)) => packet,
-                Ok(None)         => break,
-                Err(err)         => {
-                    error!("Error reading server: {}", err);
-                    break
-                }
-            };
-
-            debug!("Read packet with size {}", packet.bytes_remaining());
-
-            let response = match packet.read_value() {
-                Ok(resp) => {
-                    debug!("Received server response: {:?}", resp);
-                    Response::ServerResponse(resp)
-                },
-                Err(err) => {
-                    error!("Error parsing server packet: {}", err);
-                    break
-                }
-            };
-
-            if let Err(err) = self.client_tx.send(response) {
-                error!("Error sending server response to client: {}", err);
-                break
-            }
-        }
     }
 
     fn write_server(&mut self) {
@@ -194,8 +175,8 @@ impl Handler {
             mio::EventSet::readable()
         };
 
-        self.server_stream.reregister(
-            event_loop,
+        event_loop.reregister(
+            self.server_stream.evented(),
             self.server_token,
             event_set,
             mio::PollOpt::edge() | mio::PollOpt::oneshot()
@@ -214,10 +195,12 @@ impl mio::Handler for Handler {
             if event_set.is_writable() {
                 self.write_server();
             }
-            if event_set.is_readable() {
-                self.read_server();
+            match self.server_stream.on_readable() {
+                Intent::Done => { /* don't re-register server */ },
+                Intent::Continue(_) => {
+                    self.reregister_server(event_loop);
+                }
             }
-            self.reregister_server(event_loop);
         } else {
             unreachable!("Unknown token!");
         }
