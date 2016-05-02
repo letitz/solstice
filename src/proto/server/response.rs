@@ -33,9 +33,9 @@ pub enum ServerResponse {
 }
 
 macro_rules! try_read_from_packet {
-    ($struct_name:ident, $packet:ident) => {
-        ServerResponse::$struct_name(
-            try!($struct_name::read_from_packet($packet))
+    ($variant:ident, $packet:ident) => {
+        ServerResponse::$variant(
+            try!($packet.read_value())
         )
     }
 }

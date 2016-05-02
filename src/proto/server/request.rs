@@ -26,7 +26,7 @@ macro_rules! try_to_packet {
     ($code: ident, $request:ident) => {
         {
             let mut packet = MutPacket::new($code);
-            try!($request.write_to_packet(&mut packet));
+            try!(packet.write_value($request));
             Ok(packet)
         }
     }
