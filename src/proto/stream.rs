@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::error;
 use std::io;
 use std::iter;
@@ -10,15 +11,17 @@ use mio::TryRead;
 use super::constants::*;
 use super::packet::{Packet, ReadFromPacket};
 
-/// This enum defines the possible actions the stream wants to take after
-/// processing an event.
-#[derive(Debug, Clone, Copy)]
-pub enum Intent {
-    /// The stream is done, the event loop handler can drop it.
-    Done,
-    /// The stream wants to wait for the next event matching the given
-    /// `EventSet`.
-    Continue(mio::EventSet),
+/*========*
+ * PARSER *
+ *========*/
+
+/// This trait is implemented by packet sinks to which a parser can forward
+/// the packets it reads.
+pub trait SendPacket {
+    type Value: ReadFromPacket;
+    type Error: error::Error;
+
+    fn send_packet(&mut self, Self::Value) -> Result<(), Self::Error>;
 }
 
 /// This enum defines the possible states of a packet parser state machine.
@@ -30,15 +33,6 @@ enum State {
     /// The parser is waiting to read enough bytes to form the entire
     /// packet.
     ReadingPacket,
-}
-
-/// This trait is implemented by packet sinks to which a parser can forward
-/// the packets it reads.
-pub trait SendPacket {
-    type Value: ReadFromPacket;
-    type Error: error::Error;
-
-    fn send_packet(&mut self, Self::Value) -> Result<(), Self::Error>;
 }
 
 #[derive(Debug)]
@@ -141,18 +135,75 @@ impl<T: SendPacket> Parser<T> {
             }
         }
     }
-
 }
 
-/// This struct wraps around an mio byte stream and reads soulseek packets
-/// from it, forwarding them once parsed.
+/*========*
+ * OUTBUF *
+ *========*/
+
+/// A struct used for writing bytes to a TryWrite sink.
+#[derive(Debug)]
+struct OutBuf {
+    cursor: usize,
+    bytes: Vec<u8>
+}
+
+impl From<Vec<u8>> for OutBuf {
+    fn from(bytes: Vec<u8>) -> Self {
+        OutBuf {
+            cursor: 0,
+            bytes: bytes
+        }
+    }
+}
+
+impl OutBuf {
+    #[inline]
+    fn remaining(&self) -> usize {
+        self.bytes.len() - self.cursor
+    }
+
+    #[inline]
+    fn has_remaining(&self) -> bool {
+        self.remaining() > 0
+    }
+
+    fn try_write_to<T>(&mut self, mut writer: T) -> io::Result<Option<usize>>
+        where T: mio::TryWrite
+    {
+        let result = writer.try_write(&self.bytes[self.cursor..]);
+        if let Ok(Some(bytes_written)) = result {
+            self.cursor += bytes_written;
+        }
+        result
+    }
+}
+
+/*========*
+ * STREAM *
+ *========*/
+
+/// This enum defines the possible actions the stream wants to take after
+/// processing an event.
+#[derive(Debug, Clone, Copy)]
+pub enum Intent {
+    /// The stream is done, the event loop handler can drop it.
+    Done,
+    /// The stream wants to wait for the next event matching the given
+    /// `EventSet`.
+    Continue(mio::EventSet),
+}
+
+/// This struct wraps around an mio byte stream and handles packet reads and
+/// writes.
 #[derive(Debug)]
 pub struct Stream<T, U>
     where T: io::Read + io::Write + mio::Evented,
           U: SendPacket
 {
     stream: T,
-    parser: Parser<U>
+    parser: Parser<U>,
+    queue:  VecDeque<OutBuf>,
 }
 
 impl<T, U> Stream<T, U>
@@ -165,6 +216,7 @@ impl<T, U> Stream<T, U>
         Stream {
             stream: stream,
             parser: Parser::new(packet_tx),
+            queue:  VecDeque::new(),
         }
     }
 
@@ -174,15 +226,62 @@ impl<T, U> Stream<T, U>
         &self.stream
     }
 
-    /// The stream is readable.
-    pub fn on_readable(&mut self) -> Intent {
-        match self.parser.read_from(&mut self.stream) {
-            Ok(()) => Intent::Continue(mio::EventSet::readable()),
-            Err(e) => {
-                error!("Stream input error: {}", e);
-                Intent::Done
+    fn on_writable(&mut self) -> io::Result<()> {
+        loop {
+            let mut outbuf = match self.queue.pop_front() {
+                Some(outbuf) => outbuf,
+                None => break
+            };
+
+            let option = try!(outbuf.try_write_to(&mut self.stream));
+            match option {
+                Some(_) => {
+                    if outbuf.has_remaining() {
+                        self.queue.push_front(outbuf)
+                    }
+                    // Continue looping
+                },
+                None => {
+                    self.queue.push_front(outbuf);
+                    break
+                }
             }
         }
+        Ok(())
+    }
+
+    /// The stream is ready to read, write, or both.
+    pub fn on_ready(&mut self, event_set: mio::EventSet) -> Intent {
+        if event_set.is_readable() {
+            let result = self.parser.read_from(&mut self.stream);
+            if let Err(e) = result {
+                error!("Stream input error: {}", e);
+                return Intent::Done
+            }
+        }
+        if event_set.is_writable() {
+            let result = self.on_writable();
+            if let Err(e) = result {
+                error!("Stream output error: {}", e);
+                return Intent::Done
+            }
+        }
+
+        // We're always interested in reading more.
+        // If there is still stuff to write in the queue, we're interested in
+        // the socket becoming writable too.
+        let event_set = if self.queue.len() > 0 {
+            mio::EventSet::readable() | mio::EventSet::writable()
+        } else {
+            mio::EventSet::readable()
+        };
+        Intent::Continue(event_set)
+    }
+
+    /// The stream has been notified.
+    pub fn on_notify(&mut self, mut bytes: Vec<u8>) -> Intent {
+        self.queue.push_back(OutBuf::from(bytes));
+        Intent::Continue(mio::EventSet::readable() | mio::EventSet::writable())
     }
 }
 

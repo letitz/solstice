@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use std::io;
 use std::net::ToSocketAddrs;
 use std::sync::mpsc;
@@ -10,42 +9,9 @@ use config;
 use super::{Intent, Stream, SendPacket, Request, Response};
 use super::server::*;
 
-/// A struct used for writing bytes to a TryWrite sink.
-struct OutBuf {
-    cursor: usize,
-    bytes: Vec<u8>
-}
-
-impl From<Vec<u8>> for OutBuf {
-    fn from(bytes: Vec<u8>) -> Self {
-        OutBuf {
-            cursor: 0,
-            bytes: bytes
-        }
-    }
-}
-
-impl OutBuf {
-    #[inline]
-    fn remaining(&self) -> usize {
-        self.bytes.len() - self.cursor
-    }
-
-    #[inline]
-    fn has_remaining(&self) -> bool {
-        self.remaining() > 0
-    }
-
-    fn try_write_to<T>(&mut self, mut writer: T) -> io::Result<Option<usize>>
-        where T: mio::TryWrite
-    {
-        let result = writer.try_write(&self.bytes[self.cursor..]);
-        if let Ok(Some(bytes_written)) = result {
-            self.cursor += bytes_written;
-        }
-        result
-    }
-}
+/*===============*
+ * TOKEN COUNTER *
+ *===============*/
 
 /// This struct provides a simple way to generate different tokens.
 struct TokenCounter {
@@ -65,6 +31,10 @@ impl TokenCounter {
     }
 }
 
+/*========================*
+ * SERVER RESPONSE SENDER *
+ *========================*/
+
 pub struct ServerResponseSender(mpsc::Sender<Response>);
 
 impl SendPacket for ServerResponseSender {
@@ -76,6 +46,10 @@ impl SendPacket for ServerResponseSender {
     }
 }
 
+/*=========*
+ * HANDLER *
+ *=========*/
+
 /// This struct handles all the soulseek connections, to the server and to
 /// peers.
 struct Handler {
@@ -83,7 +57,6 @@ struct Handler {
 
     server_token: mio::Token,
     server_stream: Stream<mio::tcp::TcpStream, ServerResponseSender>,
-    server_queue: VecDeque<OutBuf>,
 
     client_tx: mpsc::Sender<Response>,
 }
@@ -106,7 +79,6 @@ impl Handler {
 
             server_token: server_token,
             server_stream: server_stream,
-            server_queue: VecDeque::new(),
 
             client_tx: client_tx,
         })
@@ -134,53 +106,23 @@ impl Handler {
         ))
     }
 
-    fn write_server(&mut self) {
-        loop {
-            let mut outbuf = match self.server_queue.pop_front() {
-                Some(outbuf) => outbuf,
-                None => break
-            };
-
-            match outbuf.try_write_to(&mut self.server_stream) {
-                Ok(Some(_)) => {
-                    if outbuf.has_remaining() {
-                        self.server_queue.push_front(outbuf)
-                    }
-                    // Continue looping
-                },
-                Ok(None)     => {
-                    self.server_queue.push_front(outbuf);
-                    break
-                },
-                Err(e) => {
-                    error!("Error writing server stream: {}", e);
-                    break
-                }
+    fn process_server_intent(
+        &mut self, intent: Intent, event_loop: &mut mio::EventLoop<Self>)
+    {
+        match intent {
+            Intent::Done => {
+                error!("Server connection closed");
+                // TODO notify client and shut down
+            },
+            Intent::Continue(event_set) => {
+                event_loop.reregister(
+                    self.server_stream.evented(),
+                    self.server_token,
+                    event_set,
+                    mio::PollOpt::edge() | mio::PollOpt::oneshot()
+                ).unwrap();
             }
         }
-    }
-
-    fn notify_server(&mut self, request: ServerRequest) -> io::Result<()> {
-        debug!("Sending server request: {:?}", request);
-        let packet = try!(request.to_packet());
-        self.server_queue.push_back(OutBuf::from(packet.into_bytes()));
-        Ok(())
-    }
-
-    /// Re-register the server socket with the event loop.
-    fn reregister_server(&mut self, event_loop: &mut mio::EventLoop<Self>) {
-        let event_set = if self.server_queue.len() > 0 {
-            mio::EventSet::readable() | mio::EventSet::writable()
-        } else {
-            mio::EventSet::readable()
-        };
-
-        event_loop.reregister(
-            self.server_stream.evented(),
-            self.server_token,
-            event_set,
-            mio::PollOpt::edge() | mio::PollOpt::oneshot()
-        ).unwrap();
     }
 }
 
@@ -192,15 +134,8 @@ impl mio::Handler for Handler {
              token: mio::Token, event_set: mio::EventSet)
     {
         if token == self.server_token {
-            if event_set.is_writable() {
-                self.write_server();
-            }
-            match self.server_stream.on_readable() {
-                Intent::Done => { /* don't re-register server */ },
-                Intent::Continue(_) => {
-                    self.reregister_server(event_loop);
-                }
-            }
+            let intent = self.server_stream.on_ready(event_set);
+            self.process_server_intent(intent, event_loop);
         } else {
             unreachable!("Unknown token!");
         }
@@ -211,11 +146,15 @@ impl mio::Handler for Handler {
     {
         match request {
             Request::ServerRequest(server_request) => {
-                match self.notify_server(server_request) {
-                    Ok(()) => (),
-                    Err(e) => error!("Error processing server request: {}", e),
-                }
-                self.reregister_server(event_loop);
+                let packet = match server_request.to_packet() {
+                    Ok(packet) => packet,
+                    Err(e) => {
+                        error!("Error writing server request to packet: {}", e);
+                        return
+                    }
+                };
+                let intent = self.server_stream.on_notify(packet.into_bytes());
+                self.process_server_intent(intent, event_loop);
             }
         }
     }
