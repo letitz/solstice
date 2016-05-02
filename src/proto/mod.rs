@@ -1,17 +1,19 @@
+mod constants;
 mod handler;
 mod packet;
 pub mod server;
+mod stream;
 
 pub use self::handler::*;
 
 pub use self::packet::*;
 
-use self::server::{ServerRequest, ServerResponse};
+pub use self::stream::*;
 
 pub enum Request {
-    ServerRequest(ServerRequest),
+    ServerRequest(server::ServerRequest),
 }
 
 pub enum Response {
-    ServerResponse(ServerResponse),
+    ServerResponse(server::ServerResponse),
 }
