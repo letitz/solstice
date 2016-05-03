@@ -22,43 +22,49 @@ pub enum ServerRequest {
     UserStatusRequest(UserStatusRequest),
 }
 
-macro_rules! try_to_packet {
-    ($code: ident, $request:ident) => {
-        {
-            let mut packet = MutPacket::new($code);
-            try!(packet.write_value($request));
-            Ok(packet)
-        }
-    }
-}
-
-impl ServerRequest {
-    pub fn to_packet(&self) -> io::Result<MutPacket> {
+impl<'a> WriteToPacket for &'a ServerRequest {
+    fn write_to_packet(self, packet: &mut MutPacket) -> io::Result<()> {
         match *self {
-            ServerRequest::LoginRequest(ref request) =>
-                try_to_packet!(CODE_LOGIN, request),
+            ServerRequest::LoginRequest(ref request) => {
+                try!(packet.write_value(CODE_LOGIN));
+                try!(packet.write_value(request));
+            },
 
-            ServerRequest::PeerAddressRequest(ref request) =>
-                try_to_packet!(CODE_PEER_ADDRESS, request),
+            ServerRequest::PeerAddressRequest(ref request) => {
+                try!(packet.write_value(CODE_PEER_ADDRESS));
+                try!(packet.write_value(request));
+            },
 
-            ServerRequest::RoomJoinRequest(ref request) =>
-                try_to_packet!(CODE_ROOM_JOIN, request),
+            ServerRequest::RoomJoinRequest(ref request) => {
+                try!(packet.write_value(CODE_ROOM_JOIN));
+                try!(packet.write_value(request));
+            },
 
-            ServerRequest::RoomLeaveRequest(ref request) =>
-                try_to_packet!(CODE_ROOM_LEAVE, request),
+            ServerRequest::RoomLeaveRequest(ref request) => {
+                try!(packet.write_value(CODE_ROOM_LEAVE));
+                try!(packet.write_value(request));
+            },
 
-            ServerRequest::RoomListRequest =>
-                Ok(MutPacket::new(CODE_ROOM_LIST)),
+            ServerRequest::RoomListRequest => {
+                try!(packet.write_value(CODE_ROOM_LIST));
+            },
 
-            ServerRequest::RoomMessageRequest(ref request) =>
-                try_to_packet!(CODE_ROOM_MESSAGE, request),
+            ServerRequest::RoomMessageRequest(ref request) => {
+                try!(packet.write_value(CODE_ROOM_MESSAGE));
+                try!(packet.write_value(request));
+            },
 
-            ServerRequest::SetListenPortRequest(ref request) =>
-                try_to_packet!(CODE_SET_LISTEN_PORT, request),
+            ServerRequest::SetListenPortRequest(ref request) => {
+                try!(packet.write_value(CODE_SET_LISTEN_PORT));
+                try!(packet.write_value(request));
+            },
 
-            ServerRequest::UserStatusRequest(ref request) =>
-                try_to_packet!(CODE_USER_STATUS, request),
+            ServerRequest::UserStatusRequest(ref request) => {
+                try!(packet.write_value(CODE_USER_STATUS));
+                try!(packet.write_value(request));
+            }
         }
+        Ok(())
     }
 }
 

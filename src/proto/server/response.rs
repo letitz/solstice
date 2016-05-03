@@ -32,68 +32,91 @@ pub enum ServerResponse {
     UnknownResponse(u32),
 }
 
-macro_rules! try_read_from_packet {
-    ($variant:ident, $packet:ident) => {
-        ServerResponse::$variant(
-            try!($packet.read_value())
-        )
-    }
-}
-
 impl ReadFromPacket for ServerResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let resp = match packet.code() {
+        let code: u32 = try!(packet.read_value());
+        let resp = match code {
             CODE_CONNECT_TO_PEER =>
-                try_read_from_packet!(ConnectToPeerResponse, packet),
+                ServerResponse::ConnectToPeerResponse(
+                    try!(packet.read_value())
+                ),
 
             CODE_LOGIN =>
-                try_read_from_packet!(LoginResponse, packet),
+                ServerResponse::LoginResponse(
+                    try!(packet.read_value())
+                ),
 
             CODE_PEER_ADDRESS =>
-                try_read_from_packet!(PeerAddressResponse, packet),
+                ServerResponse::PeerAddressResponse(
+                    try!(packet.read_value())
+                ),
 
             CODE_PRIVILEGED_USERS =>
-                try_read_from_packet!(PrivilegedUsersResponse, packet),
+                ServerResponse::PrivilegedUsersResponse(
+                    try!(packet.read_value())
+                ),
 
             CODE_ROOM_JOIN =>
-                try_read_from_packet!(RoomJoinResponse, packet),
+                ServerResponse::RoomJoinResponse(
+                    try!(packet.read_value())
+                ),
 
             CODE_ROOM_LEAVE =>
-                try_read_from_packet!(RoomLeaveResponse, packet),
+                ServerResponse::RoomLeaveResponse(
+                    try!(packet.read_value())
+                ),
 
             CODE_ROOM_LIST =>
-                try_read_from_packet!(RoomListResponse, packet),
+                ServerResponse::RoomListResponse(
+                    try!(packet.read_value())
+                ),
 
             CODE_ROOM_MESSAGE =>
-                try_read_from_packet!(RoomMessageResponse, packet),
+                ServerResponse::RoomMessageResponse(
+                    try!(packet.read_value())
+                ),
 
             CODE_ROOM_TICKERS =>
-                try_read_from_packet!(RoomTickersResponse, packet),
+                ServerResponse::RoomTickersResponse(
+                    try!(packet.read_value())
+                ),
 
             CODE_ROOM_USER_JOINED =>
-                try_read_from_packet!(RoomUserJoinedResponse, packet),
+                ServerResponse::RoomUserJoinedResponse(
+                    try!(packet.read_value())
+                ),
 
             CODE_ROOM_USER_LEFT =>
-                try_read_from_packet!(RoomUserLeftResponse, packet),
+                ServerResponse::RoomUserLeftResponse(
+                    try!(packet.read_value())
+                ),
 
             CODE_USER_STATUS =>
-                try_read_from_packet!(UserStatusResponse, packet),
+                ServerResponse::UserStatusResponse(
+                    try!(packet.read_value())
+                ),
 
             CODE_WISHLIST_INTERVAL =>
-                try_read_from_packet!(WishlistIntervalResponse, packet),
+                ServerResponse::WishlistIntervalResponse(
+                    try!(packet.read_value())
+                ),
 
             CODE_PARENT_MIN_SPEED =>
-                try_read_from_packet!(ParentMinSpeedResponse, packet),
+                ServerResponse::ParentMinSpeedResponse(
+                    try!(packet.read_value())
+                ),
 
             CODE_PARENT_SPEED_RATIO =>
-                try_read_from_packet!(ParentSpeedRatioResponse, packet),
+                ServerResponse::ParentSpeedRatioResponse(
+                    try!(packet.read_value())
+                ),
 
             code => ServerResponse::UnknownResponse(code),
         };
         let bytes_remaining = packet.bytes_remaining();
         if bytes_remaining > 0 {
             warn!("Packet with code {} contains {} extra bytes",
-                   packet.code(), bytes_remaining)
+                   code, bytes_remaining)
         }
         Ok(resp)
     }

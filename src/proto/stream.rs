@@ -9,7 +9,7 @@ use mio;
 use mio::TryRead;
 
 use super::constants::*;
-use super::packet::{Packet, ReadFromPacket};
+use super::packet::{MutPacket, Packet, ReadFromPacket, WriteToPacket};
 
 /*========*
  * PARSER *
@@ -279,22 +279,16 @@ impl<T, U> Stream<T, U>
     }
 
     /// The stream has been notified.
-    pub fn on_notify(&mut self, mut bytes: Vec<u8>) -> Intent {
-        self.queue.push_back(OutBuf::from(bytes));
+    pub fn on_notify<V>(&mut self, payload: V) -> Intent
+        where V: WriteToPacket
+    {
+        let mut packet = MutPacket::new();
+        let result = packet.write_value(payload);
+        if let Err(e) = result {
+            error!("Error writing payload to packet: {}", e);
+            return Intent::Done
+        }
+        self.queue.push_back(OutBuf::from(packet.into_bytes()));
         Intent::Continue(mio::EventSet::readable() | mio::EventSet::writable())
     }
 }
-
-impl<T, U> io::Write for Stream<T, U>
-    where T: io::Read + io::Write + mio::Evented,
-          U: SendPacket
-{
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        self.stream.write(bytes)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.stream.flush()
-    }
-}
-

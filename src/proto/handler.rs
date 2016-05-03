@@ -141,19 +141,12 @@ impl mio::Handler for Handler {
         }
     }
 
-    fn notify(
-        &mut self, event_loop: &mut mio::EventLoop<Self>, request: Request)
+    fn notify(&mut self, event_loop: &mut mio::EventLoop<Self>,
+              request: Request)
     {
         match request {
             Request::ServerRequest(server_request) => {
-                let packet = match server_request.to_packet() {
-                    Ok(packet) => packet,
-                    Err(e) => {
-                        error!("Error writing server request to packet: {}", e);
-                        return
-                    }
-                };
-                let intent = self.server_stream.on_notify(packet.into_bytes());
+                let intent = self.server_stream.on_notify(&server_request);
                 self.process_server_intent(intent, event_loop);
             }
         }

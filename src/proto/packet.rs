@@ -16,8 +16,6 @@ use super::constants::*;
 
 #[derive(Debug)]
 pub struct Packet {
-    /// The packet code.
-    code: u32,
     /// The current read position in the byte buffer.
     cursor: usize,
     /// The underlying bytes.
@@ -40,23 +38,15 @@ impl Packet {
     /// packet.
     pub fn from_bytes(bytes: Vec<u8>) -> Self {
         // Check that the packet is long enough to contain at least a code.
-        assert!(bytes.len() >= 2*U32_SIZE);
+        assert!(bytes.len() >= U32_SIZE);
         // Read the purported length of the packet.
         let size = LittleEndian::read_u32(&bytes[0..U32_SIZE]) as usize;
         // Check that the packet has the right length.
         assert!(size + U32_SIZE == bytes.len());
-        // Read the packet code.
-        let code = LittleEndian::read_u32(&bytes[U32_SIZE..2*U32_SIZE]);
         Packet {
-            code:   code,
-            cursor: 2*U32_SIZE,
+            cursor: U32_SIZE,
             bytes:  bytes,
         }
-    }
-
-    /// Returns the packet code.
-    pub fn code(&self) -> u32 {
-        self.code
     }
 
     /// Provides the main way to read data out of a binary packet.
@@ -83,13 +73,10 @@ pub struct MutPacket {
 
 impl MutPacket {
     /// Returns an empty packet with the given packet code.
-    pub fn new(code: u32) -> Self {
+    pub fn new() -> Self {
         // Leave space for the eventual size of the packet.
-        let mut bytes = vec![0; U32_SIZE];
-        // Write the code.
-        bytes.write_u32::<LittleEndian>(code).unwrap();
         MutPacket {
-            bytes: bytes,
+            bytes: vec![0; U32_SIZE]
         }
     }
 
