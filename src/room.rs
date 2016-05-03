@@ -128,15 +128,21 @@ impl RoomMap {
     }
 
     /// Looks up the given room name in the map, returning an immutable
-    /// reference to the associated data if found.
-    pub fn get(&self, name: &str) -> Option<&Room> {
-        self.map.get(name)
+    /// reference to the associated data if found, or an error if not found.
+    fn get_strict(&self, room_name: &str) -> Result<&Room, Error> {
+        match self.map.get(room_name) {
+            Some(room) => Ok(room),
+            None => Err(Error::RoomNotFound(room_name.to_string()))
+        }
     }
 
     /// Looks up the given room name in the map, returning a mutable
-    /// reference to the associated data if found.
-    pub fn get_mut(&mut self, name: &str) -> Option<&mut Room> {
-        self.map.get_mut(name)
+    /// reference to the associated data if found, or an error if not found.
+    fn get_mut_strict(&mut self, room_name: &str) -> Result<&mut Room, Error> {
+        match self.map.get_mut(room_name) {
+            Some(room) => Ok(room),
+            None => Err(Error::RoomNotFound(room_name.to_string()))
+        }
     }
 
     /// Updates one room in the map based on the information received in
@@ -208,10 +214,7 @@ impl RoomMap {
     pub fn start_joining(&mut self, room_name: &str)
         -> Result<(), Error>
     {
-        let room = match self.map.get_mut(room_name) {
-            Some(room) => room,
-            None => return Err(Error::RoomNotFound(room_name.to_string()))
-        };
+        let room = try!(self.get_mut_strict(room_name));
 
         match room.membership {
             Membership::NonMember => {
@@ -237,10 +240,7 @@ impl RoomMap {
         -> Result<(), Error>
     {
         // First look up the room struct.
-        let room = match self.map.get_mut(room_name) {
-            Some(room) => room,
-            None => return Err(Error::RoomNotFound(room_name.to_string()))
-        };
+        let room = try!(self.get_mut_strict(room_name));
 
         // Log what's happening.
         if let Membership::Joining = room.membership {
@@ -276,10 +276,7 @@ impl RoomMap {
     pub fn start_leaving(&mut self, room_name: &str)
         -> Result<(), Error>
     {
-        let room = match self.map.get_mut(room_name) {
-            Some(room) => room,
-            None => return Err(Error::RoomNotFound(room_name.to_string()))
-        };
+        let room = try!(self.get_mut_strict(room_name));
 
         match room.membership {
             Membership::Member => {
@@ -297,10 +294,7 @@ impl RoomMap {
 
     /// Records that we have now left the given room.
     pub fn leave(&mut self, room_name: &str) -> Result<(), Error> {
-        let room = match self.map.get_mut(room_name) {
-            Some(room) => room,
-            None => return Err(Error::RoomNotFound(room_name.to_string()))
-        };
+        let room = try!(self.get_mut_strict(room_name));
 
         match room.membership {
             Membership::Leaving => info!("Left room {:?}", room_name),
@@ -319,13 +313,9 @@ impl RoomMap {
     pub fn add_message(&mut self, room_name: &str, message: Message)
         -> Result<(), Error>
     {
-        match self.map.get_mut(room_name) {
-            Some(room) => {
-                room.messages.push(message);
-                Ok(())
-            },
-            None => Err(Error::RoomNotFound(room_name.to_string())),
-        }
+        let room = try!(self.get_mut_strict(room_name));
+        room.messages.push(message);
+        Ok(())
     }
 
     /// Inserts the given user in the given room's set of members.
@@ -333,13 +323,9 @@ impl RoomMap {
     pub fn insert_member(&mut self, room_name: &str, user_name: String)
         -> Result<(), Error>
     {
-        match self.map.get_mut(room_name) {
-            Some(room) => {
-                room.members.insert(user_name);
-                Ok(())
-            },
-            None => Err(Error::RoomNotFound(room_name.to_string())),
-        }
+        let room = try!(self.get_mut_strict(room_name));
+        room.members.insert(user_name);
+        Ok(())
     }
 
     /// Removes the given user from the given room's set of members.
@@ -347,13 +333,9 @@ impl RoomMap {
     pub fn remove_member(&mut self, room_name: &str, user_name: &str)
         -> Result<(), Error>
     {
-        match self.map.get_mut(room_name) {
-            Some(room) => {
-                room.members.remove(user_name);
-                Ok(())
-            },
-            None => Err(Error::RoomNotFound(room_name.to_string()))
-        }
+        let room = try!(self.get_mut_strict(room_name));
+        room.members.remove(user_name);
+        Ok(())
     }
 }
 
