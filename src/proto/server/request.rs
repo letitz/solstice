@@ -22,45 +22,45 @@ pub enum ServerRequest {
     UserStatusRequest(UserStatusRequest),
 }
 
-impl<'a> WriteToPacket for &'a ServerRequest {
-    fn write_to_packet(self, packet: &mut MutPacket) -> io::Result<()> {
+impl WriteToPacket for ServerRequest {
+    fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
         match *self {
             ServerRequest::LoginRequest(ref request) => {
-                try!(packet.write_value(CODE_LOGIN));
+                try!(packet.write_value(&CODE_LOGIN));
                 try!(packet.write_value(request));
             },
 
             ServerRequest::PeerAddressRequest(ref request) => {
-                try!(packet.write_value(CODE_PEER_ADDRESS));
+                try!(packet.write_value(&CODE_PEER_ADDRESS));
                 try!(packet.write_value(request));
             },
 
             ServerRequest::RoomJoinRequest(ref request) => {
-                try!(packet.write_value(CODE_ROOM_JOIN));
+                try!(packet.write_value(&CODE_ROOM_JOIN));
                 try!(packet.write_value(request));
             },
 
             ServerRequest::RoomLeaveRequest(ref request) => {
-                try!(packet.write_value(CODE_ROOM_LEAVE));
+                try!(packet.write_value(&CODE_ROOM_LEAVE));
                 try!(packet.write_value(request));
             },
 
             ServerRequest::RoomListRequest => {
-                try!(packet.write_value(CODE_ROOM_LIST));
+                try!(packet.write_value(&CODE_ROOM_LIST));
             },
 
             ServerRequest::RoomMessageRequest(ref request) => {
-                try!(packet.write_value(CODE_ROOM_MESSAGE));
+                try!(packet.write_value(&CODE_ROOM_MESSAGE));
                 try!(packet.write_value(request));
             },
 
             ServerRequest::SetListenPortRequest(ref request) => {
-                try!(packet.write_value(CODE_SET_LISTEN_PORT));
+                try!(packet.write_value(&CODE_SET_LISTEN_PORT));
                 try!(packet.write_value(request));
             },
 
             ServerRequest::UserStatusRequest(ref request) => {
-                try!(packet.write_value(CODE_USER_STATUS));
+                try!(packet.write_value(&CODE_USER_STATUS));
                 try!(packet.write_value(request));
             }
         }
@@ -102,16 +102,16 @@ impl LoginRequest {
     }
 }
 
-impl<'a> WriteToPacket for &'a LoginRequest {
-    fn write_to_packet(self, packet: &mut MutPacket) -> io::Result<()> {
+impl WriteToPacket for LoginRequest {
+    fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
         let userpass = String::new() + &self.username + &self.password;
         let userpass_md5 = md5_str(&userpass);
 
         try!(packet.write_value(&self.username));
         try!(packet.write_value(&self.password));
-        try!(packet.write_value(self.major));
+        try!(packet.write_value(&self.major));
         try!(packet.write_value(&userpass_md5));
-        try!(packet.write_value(self.minor));
+        try!(packet.write_value(&self.minor));
 
         Ok(())
     }
@@ -126,8 +126,8 @@ pub struct PeerAddressRequest {
     pub username: String,
 }
 
-impl<'a> WriteToPacket for &'a PeerAddressRequest {
-    fn write_to_packet(self, packet: &mut MutPacket) -> io::Result<()> {
+impl WriteToPacket for PeerAddressRequest {
+    fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
         try!(packet.write_value(&self.username));
         Ok(())
     }
@@ -142,8 +142,8 @@ pub struct RoomJoinRequest {
     pub room_name: String
 }
 
-impl<'a> WriteToPacket for &'a RoomJoinRequest {
-    fn write_to_packet(self, packet: &mut MutPacket) -> io::Result<()> {
+impl WriteToPacket for RoomJoinRequest {
+    fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
         try!(packet.write_value(&self.room_name));
         Ok(())
     }
@@ -158,8 +158,8 @@ pub struct RoomLeaveRequest {
     pub room_name: String
 }
 
-impl<'a> WriteToPacket for &'a RoomLeaveRequest {
-    fn write_to_packet(self, packet: &mut MutPacket) -> io::Result<()> {
+impl WriteToPacket for RoomLeaveRequest {
+    fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
         try!(packet.write_value(&self.room_name));
         Ok(())
     }
@@ -175,8 +175,8 @@ pub struct RoomMessageRequest {
     pub message:   String,
 }
 
-impl<'a> WriteToPacket for &'a RoomMessageRequest {
-    fn write_to_packet(self, packet: &mut MutPacket) -> io::Result<()> {
+impl WriteToPacket for RoomMessageRequest {
+    fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
         try!(packet.write_value(&self.room_name));
         try!(packet.write_value(&self.message));
         Ok(())
@@ -192,9 +192,9 @@ pub struct SetListenPortRequest {
     pub port: u16,
 }
 
-impl<'a> WriteToPacket for &'a SetListenPortRequest {
-    fn write_to_packet(self, packet: &mut MutPacket) -> io::Result<()> {
-        try!(packet.write_value(self.port));
+impl WriteToPacket for SetListenPortRequest {
+    fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
+        try!(packet.write_value(&self.port));
         Ok(())
     }
 }
@@ -208,8 +208,8 @@ pub struct UserStatusRequest {
     pub user_name: String,
 }
 
-impl<'a> WriteToPacket for &'a UserStatusRequest {
-    fn write_to_packet(self, packet: &mut MutPacket) -> io::Result<()> {
+impl WriteToPacket for UserStatusRequest {
+    fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
         try!(packet.write_value(&self.user_name));
         Ok(())
     }

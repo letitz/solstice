@@ -277,7 +277,7 @@ impl<T, U> Stream<T, U>
     }
 
     /// The stream has been notified.
-    pub fn on_notify<V>(&mut self, payload: V) -> Intent
+    pub fn on_notify<V>(&mut self, payload: &V) -> Intent
         where V: WriteToPacket
     {
         let mut packet = MutPacket::new();

@@ -36,14 +36,14 @@ impl proto::ReadFromPacket for Status {
     }
 }
 
-impl<'a> proto::WriteToPacket for &'a Status {
-    fn write_to_packet(self, packet: &mut proto::MutPacket) -> io::Result<()> {
+impl proto::WriteToPacket for Status {
+    fn write_to_packet(&self, packet: &mut proto::MutPacket) -> io::Result<()> {
         let n = match *self {
             Status::Offline => STATUS_OFFLINE,
             Status::Away    => STATUS_AWAY,
             Status::Online  => STATUS_ONLINE,
         };
-        try!(packet.write_value(n));
+        try!(packet.write_value(&n));
         Ok(())
     }
 }
