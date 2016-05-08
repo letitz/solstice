@@ -62,6 +62,8 @@ pub struct Room {
     pub members: collections::HashSet<String>,
     /// The messages sent to this chat room, in chronological order.
     pub messages: Vec<Message>,
+    /// The tickers displayed in this room.
+    pub tickers: Vec<(String, String)>
 }
 
 impl Room {
@@ -76,6 +78,7 @@ impl Room {
             operators:  collections::HashSet::new(),
             members:    collections::HashSet::new(),
             messages:   Vec::new(),
+            tickers:    Vec::new(),
         }
     }
 }
@@ -335,6 +338,19 @@ impl RoomMap {
     {
         let room = try!(self.get_mut_strict(room_name));
         room.members.remove(user_name);
+        Ok(())
+    }
+
+    /*---------*
+     * Tickers *
+     *---------*/
+
+    pub fn set_tickers(
+        &mut self, room_name: &str, tickers: Vec<(String, String)>)
+        -> Result<(), Error>
+    {
+        let room = try!(self.get_mut_strict(room_name));
+        room.tickers = tickers;
         Ok(())
     }
 }

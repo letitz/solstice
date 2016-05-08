@@ -277,6 +277,9 @@ impl Client {
             ServerResponse::RoomMessageResponse(response) =>
                 self.handle_room_message_response(response),
 
+            ServerResponse::RoomTickersResponse(response) =>
+                self.handle_room_tickers_response(response),
+
             ServerResponse::RoomUserJoinedResponse(response) =>
                 self.handle_room_user_joined_response(response),
 
@@ -393,6 +396,15 @@ impl Client {
         };
         self.send_to_controller(
             control::Response::RoomMessageResponse(control_response));
+    }
+
+    fn handle_room_tickers_response(&mut self, response: RoomTickersResponse) {
+        let result = self.rooms.set_tickers(
+            &response.room_name, response.tickers
+        );
+        if let Err(e) = result {
+            error!("RoomTickersResponse: {}", e);
+        }
     }
 
     fn handle_room_user_joined_response(
