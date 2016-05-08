@@ -286,6 +286,9 @@ impl Client {
             ServerResponse::RoomUserLeftResponse(response) =>
                 self.handle_room_user_left_response(response),
 
+            ServerResponse::UserInfoResponse(response) =>
+                self.handle_user_info_response(response),
+
             ServerResponse::UserStatusResponse(response) =>
                 self.handle_user_status_response(response),
 
@@ -434,6 +437,28 @@ impl Client {
             },
             Err(err) => error!("RoomUserLeftResponse: {}", err)
         }
+    }
+
+    fn handle_user_info_response(&mut self, response: UserInfoResponse) {
+        let c_response = match self.users.get_mut_strict(&response.user_name) {
+            Ok(user) => {
+                user.average_speed = response.average_speed;
+                user.num_downloads = response.num_downloads;
+                user.num_files     = response.num_files;
+                user.num_folders   = response.num_folders;
+                control::UserInfoResponse {
+                    user_name: response.user_name,
+                    user_info: user.clone(),
+                }
+            },
+            Err(err) => {
+                error!("UserInfoResponse: {}", err);
+                return
+            }
+        };
+        self.send_to_controller(
+            control::Response::UserInfoResponse(c_response)
+        );
     }
 
     fn handle_user_status_response(&mut self, response: UserStatusResponse) {

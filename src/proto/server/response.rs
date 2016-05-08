@@ -22,6 +22,7 @@ pub enum ServerResponse {
     RoomTickersResponse(RoomTickersResponse),
     RoomUserJoinedResponse(RoomUserJoinedResponse),
     RoomUserLeftResponse(RoomUserLeftResponse),
+    UserInfoResponse(UserInfoResponse),
     UserStatusResponse(UserStatusResponse),
     WishlistIntervalResponse(WishlistIntervalResponse),
 
@@ -88,6 +89,11 @@ impl ReadFromPacket for ServerResponse {
 
             CODE_ROOM_USER_LEFT =>
                 ServerResponse::RoomUserLeftResponse(
+                    try!(packet.read_value())
+                ),
+
+            CODE_USER_INFO =>
+                ServerResponse::UserInfoResponse(
                     try!(packet.read_value())
                 ),
 
@@ -568,6 +574,36 @@ impl ReadFromPacket for RoomUserLeftResponse {
         Ok(RoomUserLeftResponse {
             room_name: room_name,
             user_name: user_name,
+        })
+    }
+}
+
+/*===========*
+ * USER INFO *
+ *===========*/
+
+#[derive(Debug)]
+pub struct UserInfoResponse {
+    pub user_name:     String,
+    pub average_speed: usize,
+    pub num_downloads: usize,
+    pub num_files:     usize,
+    pub num_folders:   usize,
+}
+
+impl ReadFromPacket for UserInfoResponse {
+    fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
+        let user_name     = try!(packet.read_value());
+        let average_speed = try!(packet.read_value());
+        let num_downloads = try!(packet.read_value());
+        let num_files     = try!(packet.read_value());
+        let num_folders   = try!(packet.read_value());
+        Ok(UserInfoResponse {
+            user_name:     user_name,
+            average_speed: average_speed,
+            num_downloads: num_downloads,
+            num_files:     num_files,
+            num_folders:   num_folders,
         })
     }
 }

@@ -10,7 +10,7 @@ const STATUS_AWAY:    u32 = 2;
 const STATUS_ONLINE:  u32 = 3;
 
 /// This enumeration is the list of possible user statuses.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, RustcDecodable, RustcEncodable)]
 pub enum Status {
     /// The user if offline.
     Offline,
@@ -51,7 +51,7 @@ impl proto::WriteToPacket for Status {
 /// This structure contains the last known information about a fellow user.
 /// It does not store the name, as that is stored implicitly as the key in the
 /// user hash table.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, RustcDecodable, RustcEncodable)]
 pub struct User {
     /// The last known status of the user.
     pub status: Status,
@@ -113,6 +113,19 @@ impl UserMap {
     /// reference to the associated data if found.
     pub fn get(&self, user_name: &str) -> Option<&User> {
         self.map.get(user_name)
+    }
+
+    /// Looks up the given user name in the map, returning a mutable reference
+    /// to the associated data if found, or an error if not found.
+    pub fn get_mut_strict(&mut self, user_name: &str)
+        -> Result<&mut User, UserNotFoundError>
+    {
+        match self.map.get_mut(user_name) {
+            Some(user) => Ok(user),
+            None => Err(UserNotFoundError {
+                user_name: user_name.to_string()
+            })
+        }
     }
 
     /// Inserts the given user info for the given user name in the mapping.

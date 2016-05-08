@@ -1,4 +1,5 @@
 use room;
+use user;
 
 /// This enumeration is the list of possible control responses from the client
 /// to the controller.
@@ -9,6 +10,7 @@ pub enum Response {
     RoomLeaveResponse(String),
     RoomListResponse(RoomListResponse),
     RoomMessageResponse(RoomMessageResponse),
+    UserInfoResponse(UserInfoResponse),
 }
 
 #[derive(Debug, RustcEncodable, RustcDecodable)]
@@ -62,4 +64,11 @@ pub struct RoomMessageResponse {
     pub user_name: String,
     /// The message itself.
     pub message: String,
+}
+
+/// This struct contains the last known information about a given user.
+#[derive(Debug, RustcDecodable, RustcEncodable)]
+pub struct UserInfoResponse {
+    pub user_name: String,
+    pub user_info: user::User,
 }
