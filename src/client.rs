@@ -375,11 +375,11 @@ impl Client {
         // Update the room map in memory.
         self.rooms.set_room_list(response);
         // Send the updated version to the controller.
-        let control_response = control::RoomListResponse {
-            rooms: self.rooms.get_room_list(),
-        };
-        self.send_to_controller(
-            control::Response::RoomListResponse(control_response));
+        self.send_to_controller(control::Response::RoomListResponse(
+            control::RoomListResponse {
+                rooms: self.rooms.get_room_list()
+            }
+        ));
     }
 
     fn handle_room_message_response(&mut self, response: RoomMessageResponse) {
@@ -392,13 +392,13 @@ impl Client {
             return;
         }
 
-        let control_response = control::RoomMessageResponse {
-            room_name: response.room_name,
-            user_name: response.user_name,
-            message:   response.message,
-        };
-        self.send_to_controller(
-            control::Response::RoomMessageResponse(control_response));
+        self.send_to_controller(control::Response::RoomMessageResponse(
+            control::RoomMessageResponse {
+                room_name: response.room_name,
+                user_name: response.user_name,
+                message:   response.message,
+            }
+        ));
     }
 
     fn handle_room_tickers_response(&mut self, response: RoomTickersResponse) {
