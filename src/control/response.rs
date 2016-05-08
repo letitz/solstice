@@ -10,6 +10,8 @@ pub enum Response {
     RoomLeaveResponse(String),
     RoomListResponse(RoomListResponse),
     RoomMessageResponse(RoomMessageResponse),
+    RoomUserJoinedResponse(RoomUserJoinedResponse),
+    RoomUserLeftResponse(RoomUserLeftResponse),
     UserInfoResponse(UserInfoResponse),
 }
 
@@ -64,6 +66,20 @@ pub struct RoomMessageResponse {
     pub user_name: String,
     /// The message itself.
     pub message: String,
+}
+
+/// This struct describes the fact that the given user joined the given room.
+#[derive(Debug, RustcDecodable, RustcEncodable)]
+pub struct RoomUserJoinedResponse {
+    pub room_name: String,
+    pub user_name: String,
+}
+
+/// This struct describes the fact that the given user left the given room.
+#[derive(Debug, RustcDecodable, RustcEncodable)]
+pub struct RoomUserLeftResponse {
+    pub room_name: String,
+    pub user_name: String,
 }
 
 /// This struct contains the last known information about a given user.

@@ -416,13 +416,16 @@ impl Client {
         let result = self.rooms.insert_member(
             &response.room_name, response.user_name.clone()
         );
-        match result {
-            Ok(()) => {
-                self.users.insert(response.user_name, response.user);
-                // TODO send control response
-            },
-            Err(err) => error!("RoomUserJoinedResponse: {}", err)
+        if let Err(err) = result {
+            error!("RoomUserJoinedResponse: {}", err);
+            return
         }
+        self.send_to_controller(control::Response::RoomUserJoinedResponse(
+            control::RoomUserJoinedResponse {
+                room_name: response.room_name,
+                user_name: response.user_name,
+            }
+        ));
     }
 
     fn handle_room_user_left_response(
@@ -431,12 +434,16 @@ impl Client {
         let result = self.rooms.remove_member(
             &response.room_name, &response.user_name
         );
-        match result {
-            Ok(()) => {
-                // TODO send control response
-            },
-            Err(err) => error!("RoomUserLeftResponse: {}", err)
+        if let Err(err) = result {
+            error!("RoomUserLeftResponse: {}", err);
+            return
         }
+        self.send_to_controller(control::Response::RoomUserLeftResponse(
+            control::RoomUserLeftResponse {
+                room_name: response.room_name,
+                user_name: response.user_name,
+            }
+        ));
     }
 
     fn handle_user_info_response(&mut self, response: UserInfoResponse) {
