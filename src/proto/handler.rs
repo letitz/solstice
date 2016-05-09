@@ -6,8 +6,20 @@ use mio;
 
 use config;
 
-use super::{Intent, Stream, SendPacket, Request, Response};
+use super::{Intent, Stream, SendPacket};
 use super::server::*;
+
+/*====================*
+ * REQUEST - RESPONSE *
+ *====================*/
+
+pub enum Request {
+    ServerRequest(ServerRequest)
+}
+
+pub enum Response {
+    ServerResponse(ServerResponse)
+}
 
 /*===============*
  * TOKEN COUNTER *
