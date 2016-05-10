@@ -292,8 +292,8 @@ impl Client {
             proto::Response::ServerResponse(server_response) =>
                 self.handle_server_response(server_response),
 
-            proto::Response::ConnectToPeerSuccess(ip, port, peer_id) =>
-                self.handle_connect_to_peer_success(ip, port, peer_id),
+            proto::Response::PeerConnectionOpen(ip, port, peer_id) =>
+                self.handle_peer_connection_open(ip, port, peer_id),
 
             proto::Response::PeerConnectionClosed(peer_id) =>
                 self.handle_peer_connection_closed(peer_id),
@@ -311,7 +311,7 @@ impl Client {
         }
     }
 
-    fn handle_connect_to_peer_success(
+    fn handle_peer_connection_open(
         &mut self, ip: net::Ipv4Addr, port: u16, peer_id: usize)
     {
         info!("Connected to peer {}:{} with id {}", ip, port, peer_id);
@@ -436,7 +436,7 @@ impl Client {
             (response.ip, response.port),
             ConnectingPeer::Firewalled(response.token)
         );
-        self.proto_tx.send(proto::Request::ConnectToPeer(
+        self.proto_tx.send(proto::Request::PeerConnect(
             response.ip, response.port
         )).unwrap();
     }

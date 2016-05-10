@@ -25,16 +25,16 @@ type PeerStream   = Stream<mio::tcp::TcpStream, PeerResponseSender>;
 
 #[derive(Debug)]
 pub enum Request {
-    ConnectToPeer(net::Ipv4Addr, u16),
+    PeerConnect(net::Ipv4Addr, u16),
     PeerMessage(usize, peer::Message),
     ServerRequest(ServerRequest)
 }
 
 #[derive(Debug)]
 pub enum Response {
-    ConnectToPeerError(net::Ipv4Addr, u16),
-    ConnectToPeerSuccess(net::Ipv4Addr, u16, usize),
     PeerConnectionClosed(usize),
+    PeerConnectionError(net::Ipv4Addr, u16),
+    PeerConnectionOpen(net::Ipv4Addr, u16, usize),
     PeerMessage(peer::Message),
     ServerResponse(ServerResponse),
 }
@@ -161,7 +161,7 @@ impl Handler {
                     ip, port
                 );
                 self.client_tx.send(
-                    Response::ConnectToPeerError(ip, port)
+                    Response::PeerConnectionError(ip, port)
                 ).unwrap();
                 return
             },
@@ -175,7 +175,7 @@ impl Handler {
                 error!("Cannot connect to peer {}:{}: {}", ip, port, err);
 
                 self.client_tx.send(
-                    Response::ConnectToPeerError(ip, port)
+                    Response::PeerConnectionError(ip, port)
                 ).unwrap();
                 return
             }
@@ -204,7 +204,7 @@ impl Handler {
         // and closing the connection as soon as the client tries to use it,
         // at which point the client will forget about the whole thing.
         self.client_tx.send(
-            Response::ConnectToPeerSuccess(ip, port, peer_id)
+            Response::PeerConnectionOpen(ip, port, peer_id)
         ).unwrap();
     }
 
@@ -258,7 +258,7 @@ impl mio::Handler for Handler {
               request: Request)
     {
         match request {
-            Request::ConnectToPeer(ip, port) =>
+            Request::PeerConnect(ip, port) =>
                 self.connect_to_peer(ip, port, event_loop),
 
             Request::PeerMessage(peer_id, message) => {
