@@ -1,10 +1,14 @@
+use std::collections::hash_map;
+use std::net;
 use std::sync::mpsc;
 
 use mio;
+use slab;
 
 use config;
 use control;
 use proto;
+use proto::peer;
 use proto::server;
 use room;
 use user;
@@ -15,11 +19,23 @@ enum IncomingMessage {
     ControlNotification(control::Notification),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 enum LoginStatus {
     Pending,
     Success(String),
     Failure(String),
+}
+
+#[derive(Clone, Copy, Debug)]
+enum ConnectingPeer {
+    Direct,
+    Firewalled(u32)
+}
+
+#[derive(Debug)]
+struct Peer {
+    ip:   net::Ipv4Addr,
+    port: u16,
 }
 
 pub struct Client {
@@ -33,6 +49,10 @@ pub struct Client {
 
     rooms: room::RoomMap,
     users: user::UserMap,
+
+    connecting_peers: hash_map::HashMap<(net::Ipv4Addr, u16), ConnectingPeer>,
+    peers:            slab::Slab<Peer, usize>,
+    next_peer_token:  u32,
 }
 
 impl Client {
@@ -56,6 +76,10 @@ impl Client {
 
             rooms: room::RoomMap::new(),
             users: user::UserMap::new(),
+
+            connecting_peers: hash_map::HashMap::new(),
+            peers:            slab::Slab::new(config::MAX_PEERS),
+            next_peer_token:  0,
         }
     }
 
@@ -99,6 +123,12 @@ impl Client {
     /// Send a request to the server.
     fn send_to_server(&self, request: server::ServerRequest) {
         self.proto_tx.send(proto::Request::ServerRequest(request)).unwrap();
+    }
+
+    /// Send a message to a peer.
+    fn send_to_peer(&self, peer_id: usize, message: peer::Message) {
+        self.proto_tx.send(proto::Request::PeerMessage(peer_id, message))
+            .unwrap();
     }
 
     /// Send a response to the controller client.
@@ -262,8 +292,86 @@ impl Client {
             proto::Response::ServerResponse(server_response) =>
                 self.handle_server_response(server_response),
 
+            proto::Response::ConnectToPeerSuccess(ip, port, peer_id) =>
+                self.handle_connect_to_peer_success(ip, port, peer_id),
+
+            proto::Response::PeerConnectionClosed(peer_id) =>
+                self.handle_peer_connection_closed(peer_id),
+
             _ => {
                 warn!("Unhandled proto response: {:?}", response);
+            }
+        }
+    }
+
+    fn handle_peer_connection_closed(&mut self, peer_id: usize) {
+        info!("Connection to peer {} has closed", peer_id);
+        if let None = self.peers.remove(peer_id) {
+            error!("Unknown peer {}", peer_id);
+        }
+    }
+
+    fn handle_connect_to_peer_success(
+        &mut self, ip: net::Ipv4Addr, port: u16, peer_id: usize)
+    {
+        info!("Connected to peer {}:{} with id {}", ip, port, peer_id);
+
+        let connecting_peer = match self.connecting_peers.remove(&(ip, port)) {
+            None => {
+                error!("Unknown peer {}:{}", ip, port);
+                return
+            },
+
+            Some(connecting_peer) => connecting_peer,
+        };
+
+        match self.peers.entry(peer_id) {
+            None => {
+                error!(
+                    "Slab entry at {} for {}:{} does not exist",
+                    peer_id, ip, port
+                );
+                return
+            },
+
+            Some(slab::Entry::Occupied(occupied_entry)) => {
+                error!(
+                    "Slab entry at {} for {}:{} is occupied by {:?}",
+                    peer_id, ip, port, occupied_entry.get()
+                );
+                return
+            },
+
+            Some(slab::Entry::Vacant(vacant_entry)) => {
+                vacant_entry.insert(Peer {
+                    ip:   ip,
+                    port: port,
+                });
+            },
+        }
+
+        match connecting_peer {
+            ConnectingPeer::Direct => {
+                let token = self.next_peer_token;
+                self.next_peer_token += 1;
+
+                self.send_to_peer(peer_id, peer::Message::PeerInit(
+                    peer::PeerInit {
+                        user_name:       config::USERNAME.to_string(),
+                        connection_type: "P".to_string(),
+                        token:           token,
+                    }
+                ));
+            },
+
+            ConnectingPeer::Firewalled(token) => {
+                debug!(
+                    "Piercing firewall for peer {} with token {}",
+                    peer_id, token
+                );
+                self.send_to_peer(
+                    peer_id, peer::Message::PierceFirewall(token)
+                );
             }
         }
     }
@@ -320,9 +428,17 @@ impl Client {
     fn handle_connect_to_peer_response(
         &mut self, response: server::ConnectToPeerResponse)
     {
+        info!(
+            "Connecting to peer {}:{} with token {} to pierce firewall",
+            response.ip, response.port, response.token
+        );
+        self.connecting_peers.insert(
+            (response.ip, response.port),
+            ConnectingPeer::Firewalled(response.token)
+        );
         self.proto_tx.send(proto::Request::ConnectToPeer(
             response.ip, response.port
-        ));
+        )).unwrap();
     }
 
     fn handle_login_response(&mut self, login: server::LoginResponse) {

@@ -1,6 +1,7 @@
 mod constants;
 mod handler;
 mod packet;
+pub mod peer;
 pub mod server;
 mod stream;
 
