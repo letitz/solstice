@@ -11,7 +11,7 @@ use user;
 
 #[derive(Debug)]
 enum IncomingMessage {
-    ServerResponse(server::ServerResponse),
+    Proto(proto::Response),
     ControlNotification(control::Notification),
 }
 
@@ -73,8 +73,8 @@ impl Client {
 
         loop {
             match self.recv() {
-                IncomingMessage::ServerResponse(response) =>
-                    self.handle_server_response(response),
+                IncomingMessage::Proto(response) =>
+                    self.handle_proto_response(response),
 
                 IncomingMessage::ControlNotification(notif) =>
                     self.handle_control_notification(notif),
@@ -89,10 +89,7 @@ impl Client {
         let control_rx = &self.control_rx;
         select! {
             result = proto_rx.recv() =>
-                match result.unwrap() {
-                    proto::Response::ServerResponse(server_response) =>
-                        IncomingMessage::ServerResponse(server_response),
-                },
+                IncomingMessage::Proto(result.unwrap()),
 
             result = control_rx.recv() =>
                 IncomingMessage::ControlNotification(result.unwrap())
@@ -256,12 +253,30 @@ impl Client {
         ));
     }
 
+    /*=========================*
+     * PROTO RESPONSE HANDLING *
+     *=========================*/
+
+    fn handle_proto_response(&mut self, response: proto::Response) {
+        match response {
+            proto::Response::ServerResponse(server_response) =>
+                self.handle_server_response(server_response),
+
+            _ => {
+                warn!("Unhandled proto response: {:?}", response);
+            }
+        }
+    }
+
     /*==========================*
      * SERVER RESPONSE HANDLING *
      *==========================*/
 
     fn handle_server_response(&mut self, response: server::ServerResponse) {
         match response {
+            server::ServerResponse::ConnectToPeerResponse(response) =>
+                self.handle_connect_to_peer_response(response),
+
             server::ServerResponse::LoginResponse(response) =>
                 self.handle_login_response(response),
 
@@ -300,6 +315,14 @@ impl Client {
 
             response => warn!("Unhandled response: {:?}", response),
         }
+    }
+
+    fn handle_connect_to_peer_response(
+        &mut self, response: server::ConnectToPeerResponse)
+    {
+        self.proto_tx.send(proto::Request::ConnectToPeer(
+            response.ip, response.port
+        ));
     }
 
     fn handle_login_response(&mut self, login: server::LoginResponse) {

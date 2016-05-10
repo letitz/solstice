@@ -1,46 +1,35 @@
+use std::fmt;
 use std::io;
+use std::net;
 use std::net::ToSocketAddrs;
 use std::sync::mpsc;
 
 use mio;
+use slab;
 
 use config;
 
 use super::{Intent, Stream, SendPacket};
 use super::server::*;
 
+const SERVER_TOKEN:    usize = 0;
+const INIT_PEER_TOKEN: usize = 1;
+
 /*====================*
  * REQUEST - RESPONSE *
  *====================*/
 
+#[derive(Debug)]
 pub enum Request {
+    ConnectToPeer(net::Ipv4Addr, u16),
     ServerRequest(ServerRequest)
 }
 
+#[derive(Debug)]
 pub enum Response {
-    ServerResponse(ServerResponse)
-}
-
-/*===============*
- * TOKEN COUNTER *
- *===============*/
-
-/// This struct provides a simple way to generate different tokens.
-struct TokenCounter {
-    counter: usize,
-}
-
-impl TokenCounter {
-    fn new() -> Self {
-        TokenCounter {
-            counter: 0,
-        }
-    }
-
-    fn next(&mut self) -> mio::Token {
-        self.counter += 1;
-        mio::Token(self.counter - 1)
-    }
+    ConnectToPeerError(net::Ipv4Addr, u16),
+    ConnectToPeerSuccess(net::Ipv4Addr, u16, usize),
+    ServerResponse(ServerResponse),
 }
 
 /*========================*
@@ -58,6 +47,21 @@ impl SendPacket for ServerResponseSender {
     }
 }
 
+/*======================*
+ * PEER RESPONSE SENDER *
+ *======================*/
+
+pub struct PeerResponseSender(mpsc::Sender<Response>, usize);
+
+impl SendPacket for PeerResponseSender {
+    type Value = u32;
+    type Error = mpsc::SendError<Response>;
+
+    fn send_packet(&mut self, value: Self::Value) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
 /*=========*
  * HANDLER *
  *=========*/
@@ -65,10 +69,10 @@ impl SendPacket for ServerResponseSender {
 /// This struct handles all the soulseek connections, to the server and to
 /// peers.
 struct Handler {
-    token_counter: TokenCounter,
-
-    server_token: mio::Token,
     server_stream: Stream<mio::tcp::TcpStream, ServerResponseSender>,
+
+    peer_streams:
+        slab::Slab<Stream<mio::tcp::TcpStream, PeerResponseSender>, usize>,
 
     client_tx: mpsc::Sender<Response>,
 }
@@ -78,19 +82,17 @@ impl Handler {
         let host = config::SERVER_HOST;
         let port = config::SERVER_PORT;
         let server_stream = Stream::new(
-            try!(Self::connect(host, port)),
+            try!(Self::connect((host, port))),
             ServerResponseSender(client_tx.clone())
         );
         info!("Connected to server at {}:{}", host, port);
 
-        let mut token_counter = TokenCounter::new();
-        let server_token = token_counter.next();
-
         Ok(Handler {
-            token_counter: token_counter,
-
-            server_token: server_token,
             server_stream: server_stream,
+
+            peer_streams: slab::Slab::new_starting_at(
+                INIT_PEER_TOKEN, config::MAX_PEERS
+            ),
 
             client_tx: client_tx,
         })
@@ -100,21 +102,23 @@ impl Handler {
     {
         event_loop.register(
             self.server_stream.evented(),
-            self.server_token,
+            mio::Token(SERVER_TOKEN),
             mio::EventSet::readable(),
             mio::PollOpt::edge() | mio::PollOpt::oneshot()
         )
     }
 
-    fn connect(hostname: &str, port: u16) -> io::Result<mio::tcp::TcpStream> {
-        for sock_addr in try!((hostname, port).to_socket_addrs()) {
+    fn connect<T>(addr_spec: T) -> io::Result<mio::tcp::TcpStream>
+        where T: ToSocketAddrs + fmt::Debug
+    {
+        for sock_addr in try!(addr_spec.to_socket_addrs()) {
             if let Ok(stream) = mio::tcp::TcpStream::connect(&sock_addr) {
                 return Ok(stream)
             }
         }
         Err(io::Error::new(
             io::ErrorKind::Other,
-            format!("Cannot connect to {}:{}", hostname, port)
+            format!("Cannot connect to {:?}", addr_spec)
         ))
     }
 
@@ -129,12 +133,54 @@ impl Handler {
             Intent::Continue(event_set) => {
                 event_loop.reregister(
                     self.server_stream.evented(),
-                    self.server_token,
+                    mio::Token(SERVER_TOKEN),
                     event_set,
                     mio::PollOpt::edge() | mio::PollOpt::oneshot()
                 ).unwrap();
             }
         }
+    }
+
+    fn connect_to_peer(&mut self, ip: net::Ipv4Addr, port: u16) {
+        let vacant_entry = match self.peer_streams.vacant_entry() {
+            Some(vacant_entry) => vacant_entry,
+            None => {
+                error!(
+                    "Cannot connect to peer {}:{}: too many connections open",
+                    ip, port
+                );
+                self.client_tx.send(
+                    Response::ConnectToPeerError(ip, port)
+                ).unwrap();
+                return
+            },
+        };
+
+        info!("Connecting to peer {}:{}", ip, port);
+
+        let tcp_stream = match Self::connect((ip, port)) {
+            Ok(tcp_stream) => tcp_stream,
+            Err(err) => {
+                error!("Cannot connect to peer {}:{}: {}", ip, port, err);
+
+                self.client_tx.send(
+                    Response::ConnectToPeerError(ip, port)
+                ).unwrap();
+                return
+            }
+        };
+
+        let token = vacant_entry.index();
+
+        let peer_stream = Stream::new(
+            tcp_stream, PeerResponseSender(self.client_tx.clone(), token)
+        );
+
+        vacant_entry.insert(peer_stream);
+
+        self.client_tx.send(
+            Response::ConnectToPeerSuccess(ip, port, token)
+        ).unwrap();
     }
 }
 
@@ -145,7 +191,7 @@ impl mio::Handler for Handler {
     fn ready(&mut self, event_loop: &mut mio::EventLoop<Self>,
              token: mio::Token, event_set: mio::EventSet)
     {
-        if token == self.server_token {
+        if token.0 == SERVER_TOKEN {
             let intent = self.server_stream.on_ready(event_set);
             self.process_server_intent(intent, event_loop);
         } else {
@@ -157,10 +203,13 @@ impl mio::Handler for Handler {
               request: Request)
     {
         match request {
+            Request::ConnectToPeer(ip, port) =>
+                self.connect_to_peer(ip, port),
+
             Request::ServerRequest(server_request) => {
                 let intent = self.server_stream.on_notify(&server_request);
                 self.process_server_intent(intent, event_loop);
-            }
+            },
         }
     }
 }

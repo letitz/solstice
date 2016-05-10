@@ -15,6 +15,7 @@ extern crate encoding;
 extern crate env_logger;
 extern crate mio;
 extern crate rustc_serialize;
+extern crate slab;
 extern crate ws;
 
 use std::sync::mpsc;

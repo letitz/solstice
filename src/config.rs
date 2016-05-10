@@ -11,3 +11,5 @@ pub const SERVER_PORT : u16 = 2242;
 
 pub const CONTROL_HOST: &'static str = "localhost";
 pub const CONTROL_PORT: u16 = 2244;
+
+pub const MAX_PEERS: usize = 1000;
