@@ -1,6 +1,8 @@
 use std::collections::VecDeque;
 use std::error;
+use std::fmt;
 use std::io;
+use std::net::ToSocketAddrs;
 
 use mio;
 
@@ -59,6 +61,8 @@ pub trait SendPacket {
     type Error: error::Error;
 
     fn send_packet(&mut self, Self::Value) -> Result<(), Self::Error>;
+
+    fn notify_open(&mut self) -> Result<(), Self::Error>;
 }
 
 /// This enum defines the possible actions the stream wants to take after
@@ -72,37 +76,48 @@ pub enum Intent {
     Continue(mio::EventSet),
 }
 
-/// This struct wraps around an mio byte stream and handles packet reads and
+/// This struct wraps around an mio tcp stream and handles packet reads and
 /// writes.
 #[derive(Debug)]
-pub struct Stream<T, U>
-    where T: io::Read + io::Write + mio::Evented,
-          U: SendPacket
+pub struct Stream<T: SendPacket>
 {
     parser: Parser,
     queue:  VecDeque<OutBuf>,
-    sender: U,
-    stream: T,
+    sender: T,
+    stream: mio::tcp::TcpStream,
+
+    is_connected: bool,
 }
 
-impl<T, U> Stream<T, U>
-    where T: io::Read + io::Write + mio::Evented,
-          U: SendPacket
+impl<T: SendPacket> Stream<T>
 {
-    /// Returns a new struct wrapping the provided byte stream, which will
-    /// forward packets to the provided sink.
-    pub fn new(stream: T, sender: U) -> Self {
-        Stream {
-            parser: Parser::new(),
-            queue:  VecDeque::new(),
-            sender: sender,
-            stream: stream,
+    /// Returns a new stream, asynchronously connected to the given address,
+    /// which forwards incoming packets to the given sender.
+    /// If an error occurs when connecting, returns an error.
+    pub fn new<U>(addr_spec: U, sender: T) -> io::Result<Self>
+        where U: ToSocketAddrs + fmt::Debug
+    {
+        for sock_addr in try!(addr_spec.to_socket_addrs()) {
+            if let Ok(stream) = mio::tcp::TcpStream::connect(&sock_addr) {
+                return Ok(Stream {
+                    parser: Parser::new(),
+                    queue:  VecDeque::new(),
+                    sender: sender,
+                    stream: stream,
+
+                    is_connected: false,
+                })
+            }
         }
+        Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("Cannot connect to {:?}", addr_spec)
+        ))
     }
 
     /// Returns a reference to the underlying byte stream, to allow it to be
     /// registered with an event loop.
-    pub fn evented(&self) -> &T {
+    pub fn evented(&self) -> &mio::tcp::TcpStream {
         &self.stream
     }
 
@@ -158,6 +173,9 @@ impl<T, U> Stream<T, U>
 
     /// The stream is ready to read, write, or both.
     pub fn on_ready(&mut self, event_set: mio::EventSet) -> Intent {
+        if event_set.is_hup() || event_set.is_error() {
+            return Intent::Done
+        }
         if event_set.is_readable() {
             let result = self.on_readable();
             if let Err(e) = result {
@@ -173,14 +191,29 @@ impl<T, U> Stream<T, U>
             }
         }
 
+        // We must have read or written something succesfully if we're here,
+        // so the stream must be connected.
+        if !self.is_connected {
+            // If we weren't already connected, notify the sink.
+            if let Err(err) = self.sender.notify_open() {
+                error!("Cannot notify client that stream is open: {}", err);
+                return Intent::Done
+            }
+            // And record the fact that we are now connected.
+            self.is_connected = true;
+        }
+
         // We're always interested in reading more.
+        let mut event_set =
+            mio::EventSet::readable() |
+            mio::EventSet::hup() |
+            mio::EventSet::error();
         // If there is still stuff to write in the queue, we're interested in
         // the socket becoming writable too.
-        let event_set = if self.queue.len() > 0 {
-            mio::EventSet::readable() | mio::EventSet::writable()
-        } else {
-            mio::EventSet::readable()
-        };
+        if self.queue.len() > 0 {
+            event_set = event_set | mio::EventSet::writable();
+        }
+
         Intent::Continue(event_set)
     }
 

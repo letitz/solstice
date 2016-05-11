@@ -1,7 +1,5 @@
-use std::fmt;
 use std::io;
 use std::net;
-use std::net::ToSocketAddrs;
 use std::sync::mpsc;
 
 use mio;
@@ -13,11 +11,14 @@ use super::{Intent, Stream, SendPacket};
 use super::server::*;
 use super::peer;
 
-const SERVER_TOKEN:    usize = 0;
-const INIT_PEER_TOKEN: usize = 1;
+/*===========*
+ * CONSTANTS *
+ *===========*/
 
-type ServerStream = Stream<mio::tcp::TcpStream, ServerResponseSender>;
-type PeerStream   = Stream<mio::tcp::TcpStream, PeerResponseSender>;
+// There are only ever MAX_PEERS peer tokens, from 0 to MAX_PEERS - 1.
+// This way we ensure no overlap and eliminate the need for coordination
+// between client and handler that would otherwise be needed.
+const SERVER_TOKEN: usize = config::MAX_PEERS;
 
 /*====================*
  * REQUEST - RESPONSE *
@@ -25,7 +26,7 @@ type PeerStream   = Stream<mio::tcp::TcpStream, PeerResponseSender>;
 
 #[derive(Debug)]
 pub enum Request {
-    PeerConnect(net::Ipv4Addr, u16),
+    PeerConnect(usize, net::Ipv4Addr, u16),
     PeerMessage(usize, peer::Message),
     ServerRequest(ServerRequest)
 }
@@ -33,9 +34,8 @@ pub enum Request {
 #[derive(Debug)]
 pub enum Response {
     PeerConnectionClosed(usize),
-    PeerConnectionError(net::Ipv4Addr, u16),
-    PeerConnectionOpen(net::Ipv4Addr, u16, usize),
-    PeerMessage(peer::Message),
+    PeerConnectionOpen(usize),
+    PeerMessage(usize, peer::Message),
     ServerResponse(ServerResponse),
 }
 
@@ -52,20 +52,31 @@ impl SendPacket for ServerResponseSender {
     fn send_packet(&mut self, value: Self::Value) -> Result<(), Self::Error> {
         self.0.send(Response::ServerResponse(value))
     }
+
+    fn notify_open(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
 }
 
 /*======================*
  * PEER RESPONSE SENDER *
  *======================*/
 
-pub struct PeerResponseSender(mpsc::Sender<Response>, usize);
+pub struct PeerResponseSender {
+    sender:  mpsc::Sender<Response>,
+    peer_id: usize,
+}
 
 impl SendPacket for PeerResponseSender {
     type Value = peer::Message;
     type Error = mpsc::SendError<Response>;
 
     fn send_packet(&mut self, value: Self::Value) -> Result<(), Self::Error> {
-        self.0.send(Response::PeerMessage(value))
+        self.sender.send(Response::PeerMessage(self.peer_id, value))
+    }
+
+    fn notify_open(&mut self) -> Result<(), Self::Error> {
+        self.sender.send(Response::PeerConnectionOpen(self.peer_id))
     }
 }
 
@@ -76,56 +87,84 @@ impl SendPacket for PeerResponseSender {
 /// This struct handles all the soulseek connections, to the server and to
 /// peers.
 struct Handler {
-    server_stream: ServerStream,
+    server_stream: Stream<ServerResponseSender>,
 
-    peer_streams: slab::Slab<PeerStream, usize>,
+    peer_streams: slab::Slab<Stream<PeerResponseSender>, usize>,
 
     client_tx: mpsc::Sender<Response>,
 }
 
 impl Handler {
-    fn new(client_tx: mpsc::Sender<Response>) -> io::Result<Self> {
+    fn new(
+        client_tx: mpsc::Sender<Response>,
+        event_loop: &mut mio::EventLoop<Self>)
+        -> io::Result<Self>
+    {
         let host = config::SERVER_HOST;
         let port = config::SERVER_PORT;
-        let server_stream = Stream::new(
-            try!(Self::connect((host, port))),
+        let server_stream = try!(Stream::new(
+            (host, port),
             ServerResponseSender(client_tx.clone())
-        );
+        ));
+
         info!("Connected to server at {}:{}", host, port);
+
+        try!(event_loop.register(
+            server_stream.evented(),
+            mio::Token(SERVER_TOKEN),
+            mio::EventSet::all(),
+            mio::PollOpt::edge() | mio::PollOpt::oneshot()
+        ));
 
         Ok(Handler {
             server_stream: server_stream,
 
-            peer_streams: slab::Slab::new_starting_at(
-                INIT_PEER_TOKEN, config::MAX_PEERS
-            ),
+            peer_streams: slab::Slab::new(config::MAX_PEERS),
 
             client_tx: client_tx,
         })
     }
 
-    fn register(&self, event_loop: &mut mio::EventLoop<Self>) -> io::Result<()>
+    fn connect_to_peer(
+        &mut self,
+        peer_id: usize,
+        ip: net::Ipv4Addr,
+        port: u16,
+        event_loop: &mut mio::EventLoop<Self>)
+        -> Result<(), String>
     {
-        event_loop.register(
-            self.server_stream.evented(),
-            mio::Token(SERVER_TOKEN),
-            mio::EventSet::readable(),
-            mio::PollOpt::edge() | mio::PollOpt::oneshot()
-        )
-    }
+        let vacant_entry = match self.peer_streams.entry(peer_id) {
+            None => return Err("id out of range".to_string()),
 
-    fn connect<T>(addr_spec: T) -> io::Result<mio::tcp::TcpStream>
-        where T: ToSocketAddrs + fmt::Debug
-    {
-        for sock_addr in try!(addr_spec.to_socket_addrs()) {
-            if let Ok(stream) = mio::tcp::TcpStream::connect(&sock_addr) {
-                return Ok(stream)
-            }
-        }
-        Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!("Cannot connect to {:?}", addr_spec)
-        ))
+            Some(slab::Entry::Occupied(occupied_entry)) =>
+                return Err("id already taken".to_string()),
+
+            Some(slab::Entry::Vacant(vacant_entry)) => vacant_entry,
+        };
+
+        info!("Opening peer connection {} to {}:{}", peer_id, ip, port);
+
+        let sender = PeerResponseSender {
+            sender:  self.client_tx.clone(),
+            peer_id: peer_id
+        };
+
+        let peer_stream = match Stream::new((ip, port), sender) {
+            Ok(peer_stream) => peer_stream,
+
+            Err(err) => return Err(format!("i/o error: {}", err))
+        };
+
+        event_loop.register(
+            peer_stream.evented(),
+            mio::Token(peer_id),
+            mio::EventSet::all(),
+            mio::PollOpt::edge() | mio::PollOpt::oneshot()
+        ).unwrap();
+
+        vacant_entry.insert(peer_stream);
+
+        Ok(())
     }
 
     fn process_server_intent(
@@ -147,67 +186,6 @@ impl Handler {
         }
     }
 
-    fn connect_to_peer(
-        &mut self,
-        ip: net::Ipv4Addr,
-        port: u16,
-        event_loop: &mut mio::EventLoop<Self>)
-    {
-        let vacant_entry = match self.peer_streams.vacant_entry() {
-            Some(vacant_entry) => vacant_entry,
-            None => {
-                error!(
-                    "Cannot connect to peer {}:{}: too many connections open",
-                    ip, port
-                );
-                self.client_tx.send(
-                    Response::PeerConnectionError(ip, port)
-                ).unwrap();
-                return
-            },
-        };
-
-        info!("Connecting to peer {}:{}", ip, port);
-
-        let mut tcp_stream = match Self::connect((ip, port)) {
-            Ok(tcp_stream) => tcp_stream,
-            Err(err) => {
-                error!("Cannot connect to peer {}:{}: {}", ip, port, err);
-
-                self.client_tx.send(
-                    Response::PeerConnectionError(ip, port)
-                ).unwrap();
-                return
-            }
-        };
-
-        let peer_id = vacant_entry.index();
-
-        event_loop.register(
-            &mut tcp_stream,
-            mio::Token(peer_id),
-            mio::EventSet::readable(),
-            mio::PollOpt::edge() | mio::PollOpt::oneshot()
-        ).unwrap();
-
-        let peer_stream = Stream::new(
-            tcp_stream, PeerResponseSender(self.client_tx.clone(), peer_id)
-        );
-
-        vacant_entry.insert(peer_stream);
-
-        // This is actually false, because the socket might still be connecting
-        // asynchronously.
-        // We will know if the connection worked or not when we get an event
-        // and try to read or write.
-        // There is nothing too wrong about telling the client it worked though,
-        // and closing the connection as soon as the client tries to use it,
-        // at which point the client will forget about the whole thing.
-        self.client_tx.send(
-            Response::PeerConnectionOpen(ip, port, peer_id)
-        ).unwrap();
-    }
-
     fn process_peer_intent(
         &mut self,
         intent: Intent,
@@ -217,8 +195,9 @@ impl Handler {
         match intent {
             Intent::Done => {
                 self.peer_streams.remove(token.0);
-                self.client_tx.send(Response::PeerConnectionClosed(token.0))
-                    .unwrap();
+                self.client_tx.send(
+                    Response::PeerConnectionClosed(token.0)
+                ).unwrap();
             },
 
             Intent::Continue(event_set) => {
@@ -248,7 +227,8 @@ impl mio::Handler for Handler {
         } else {
             let intent = match self.peer_streams.get_mut(token.0) {
                 Some(peer_stream) => peer_stream.on_ready(event_set),
-                None => unreachable!("Unknown token is ready"),
+
+                None => unreachable!("Unknown token {} is ready", token.0),
             };
             self.process_peer_intent(intent, token, event_loop);
         }
@@ -258,8 +238,18 @@ impl mio::Handler for Handler {
               request: Request)
     {
         match request {
-            Request::PeerConnect(ip, port) =>
-                self.connect_to_peer(ip, port, event_loop),
+            Request::PeerConnect(peer_id, ip, port) =>
+                if let Err(err) =
+                    self.connect_to_peer(peer_id, ip, port, event_loop)
+                {
+                    error!(
+                        "Cannot open peer connection {} to {}:{}: {}",
+                        peer_id, ip, port, err
+                    );
+                    self.client_tx.send(
+                        Response::PeerConnectionClosed(peer_id)
+                    ).unwrap();
+                },
 
             Request::PeerMessage(peer_id, message) => {
                 let intent = match self.peer_streams.get_mut(peer_id) {
@@ -296,10 +286,9 @@ impl Agent {
     pub fn new(client_tx: mpsc::Sender<Response>) -> io::Result<Self> {
         // Create the event loop.
         let mut event_loop = try!(mio::EventLoop::new());
-        // Create the handler for the event loop.
-        let handler = try!(Handler::new(client_tx));
-        // Register the handler's sockets with the event loop.
-        try!(handler.register(&mut event_loop));
+        // Create the handler for the event loop and register the handler's
+        // sockets with the event loop.
+        let handler = try!(Handler::new(client_tx, &mut event_loop));
 
         Ok(Agent {
             event_loop: event_loop,

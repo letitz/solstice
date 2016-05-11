@@ -1,4 +1,3 @@
-use std::collections::hash_map;
 use std::net;
 use std::sync::mpsc;
 
@@ -13,6 +12,27 @@ use proto::server;
 use room;
 use user;
 
+/*===============*
+ * TOKEN COUNTER *
+ *===============*/
+
+struct TokenCounter {
+    next_token: u32
+}
+
+impl TokenCounter {
+    fn new() -> Self {
+        TokenCounter  { next_token: 0 }
+    }
+
+    fn next(&mut self) -> u32 {
+        let token = self.next_token;
+        self.next_token += 1;
+        token
+    }
+}
+
+
 #[derive(Debug)]
 enum IncomingMessage {
     Proto(proto::Response),
@@ -26,16 +46,20 @@ enum LoginStatus {
     Failure(String),
 }
 
-#[derive(Clone, Copy, Debug)]
-enum ConnectingPeer {
-    Direct,
-    Firewalled(u32)
+#[derive(Debug)]
+enum PeerState {
+    Opening,
+    OpeningFirewalled,
+    Open
 }
 
 #[derive(Debug)]
 struct Peer {
-    ip:   net::Ipv4Addr,
+    ip: net::Ipv4Addr,
     port: u16,
+    connection_type: String,
+    token: u32,
+    state: PeerState,
 }
 
 pub struct Client {
@@ -50,9 +74,8 @@ pub struct Client {
     rooms: room::RoomMap,
     users: user::UserMap,
 
-    connecting_peers: hash_map::HashMap<(net::Ipv4Addr, u16), ConnectingPeer>,
-    peers:            slab::Slab<Peer, usize>,
-    next_peer_token:  u32,
+    peers:         slab::Slab<Peer, usize>,
+    token_counter: TokenCounter,
 }
 
 impl Client {
@@ -77,9 +100,8 @@ impl Client {
             rooms: room::RoomMap::new(),
             users: user::UserMap::new(),
 
-            connecting_peers: hash_map::HashMap::new(),
-            peers:            slab::Slab::new(config::MAX_PEERS),
-            next_peer_token:  0,
+            peers:         slab::Slab::new(config::MAX_PEERS),
+            token_counter: TokenCounter::new()
         }
     }
 
@@ -292,8 +314,8 @@ impl Client {
             proto::Response::ServerResponse(server_response) =>
                 self.handle_server_response(server_response),
 
-            proto::Response::PeerConnectionOpen(ip, port, peer_id) =>
-                self.handle_peer_connection_open(ip, port, peer_id),
+            proto::Response::PeerConnectionOpen(peer_id) =>
+                self.handle_peer_connection_open(peer_id),
 
             proto::Response::PeerConnectionClosed(peer_id) =>
                 self.handle_peer_connection_closed(peer_id),
@@ -306,74 +328,53 @@ impl Client {
 
     fn handle_peer_connection_closed(&mut self, peer_id: usize) {
         info!("Connection to peer {} has closed", peer_id);
-        if let None = self.peers.remove(peer_id) {
-            error!("Unknown peer {}", peer_id);
+        match self.peers.remove(peer_id) {
+            None => error!("Unknown peer {}", peer_id),
+
+            Some(peer) => {
+                // TODO if the peer was not connected, talk to the server
+            }
         }
     }
 
-    fn handle_peer_connection_open(
-        &mut self, ip: net::Ipv4Addr, port: u16, peer_id: usize)
+    fn handle_peer_connection_open(&mut self, peer_id: usize)
     {
-        info!("Connected to peer {}:{} with id {}", ip, port, peer_id);
-
-        let connecting_peer = match self.connecting_peers.remove(&(ip, port)) {
+        let message = match self.peers.get_mut(peer_id) {
             None => {
-                error!("Unknown peer {}:{}", ip, port);
+                error!("Unknown peer connection {} is open", peer_id);
                 return
             },
 
-            Some(connecting_peer) => connecting_peer,
+            Some(peer @ &mut Peer { state: PeerState::Open, .. }) => {
+                error!(
+                    "Peer connection {} was already open: {:?}",
+                    peer_id, peer
+                );
+                return
+            },
+
+            Some(peer @ &mut Peer { state: PeerState::Opening, .. }) => {
+                info!("Peer connection {} is now open: {:?}", peer_id, peer);
+                // Mark it as open.
+                peer.state = PeerState::Open;
+                // Send a PeerInit.
+                peer::Message::PeerInit(peer::PeerInit {
+                    user_name:       config::USERNAME.to_string(),
+                    connection_type: peer.connection_type.clone(),
+                    token:           peer.token,
+                })
+            },
+
+            Some(peer @ &mut Peer{state: PeerState::OpeningFirewalled, ..}) => {
+                info!("Peer connection {} is now open: {:?}", peer_id, peer);
+                // Mark it as open.
+                peer.state = PeerState::Open;
+                // Send a PierceFirewall.
+                peer::Message::PierceFirewall(peer.token)
+            },
         };
 
-        match self.peers.entry(peer_id) {
-            None => {
-                error!(
-                    "Slab entry at {} for {}:{} does not exist",
-                    peer_id, ip, port
-                );
-                return
-            },
-
-            Some(slab::Entry::Occupied(occupied_entry)) => {
-                error!(
-                    "Slab entry at {} for {}:{} is occupied by {:?}",
-                    peer_id, ip, port, occupied_entry.get()
-                );
-                return
-            },
-
-            Some(slab::Entry::Vacant(vacant_entry)) => {
-                vacant_entry.insert(Peer {
-                    ip:   ip,
-                    port: port,
-                });
-            },
-        }
-
-        match connecting_peer {
-            ConnectingPeer::Direct => {
-                let token = self.next_peer_token;
-                self.next_peer_token += 1;
-
-                self.send_to_peer(peer_id, peer::Message::PeerInit(
-                    peer::PeerInit {
-                        user_name:       config::USERNAME.to_string(),
-                        connection_type: "P".to_string(),
-                        token:           token,
-                    }
-                ));
-            },
-
-            ConnectingPeer::Firewalled(token) => {
-                debug!(
-                    "Piercing firewall for peer {} with token {}",
-                    peer_id, token
-                );
-                self.send_to_peer(
-                    peer_id, peer::Message::PierceFirewall(token)
-                );
-            }
-        }
+        self.send_to_peer(peer_id, message);
     }
 
     /*==========================*
@@ -428,17 +429,32 @@ impl Client {
     fn handle_connect_to_peer_response(
         &mut self, response: server::ConnectToPeerResponse)
     {
-        info!(
-            "Connecting to peer {}:{} with token {} to pierce firewall",
-            response.ip, response.port, response.token
-        );
-        self.connecting_peers.insert(
-            (response.ip, response.port),
-            ConnectingPeer::Firewalled(response.token)
-        );
-        self.proto_tx.send(proto::Request::PeerConnect(
-            response.ip, response.port
-        )).unwrap();
+        let peer = Peer {
+            ip:              response.ip,
+            port:            response.port,
+            connection_type: response.connection_type,
+            token:           response.token,
+            state:           PeerState::OpeningFirewalled
+        };
+
+        match self.peers.insert(peer) {
+            Ok(peer_id) => {
+                info!(
+                    "Opening peer connection {} to {}:{} to pierce firewall",
+                    peer_id, response.ip, response.port
+                );
+                self.proto_tx.send(proto::Request::PeerConnect(
+                    peer_id, response.ip, response.port
+                )).unwrap();
+            },
+
+            Err(peer) => {
+                warn!(
+                    "Cannot open peer connection {:?}: too many already open",
+                    peer
+                );
+            }
+        }
     }
 
     fn handle_login_response(&mut self, login: server::LoginResponse) {
