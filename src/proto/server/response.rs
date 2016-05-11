@@ -134,7 +134,7 @@ impl ReadFromPacket for ServerResponse {
 
 #[derive(Debug)]
 pub struct ConnectToPeerResponse {
-    pub username:        String,
+    pub user_name:       String,
     pub connection_type: String,
     pub ip:              net::Ipv4Addr,
     pub port:            u16,
@@ -144,7 +144,7 @@ pub struct ConnectToPeerResponse {
 
 impl ReadFromPacket for ConnectToPeerResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let username        = try!(packet.read_value());
+        let user_name       = try!(packet.read_value());
         let connection_type = try!(packet.read_value());
         let ip              = try!(packet.read_value());
         let port            = try!(packet.read_value());
@@ -152,7 +152,7 @@ impl ReadFromPacket for ConnectToPeerResponse {
         let is_privileged   = try!(packet.read_value());
 
         Ok(ConnectToPeerResponse {
-            username:        username,
+            user_name:       user_name,
             connection_type: connection_type,
             ip:              ip,
             port:            port,

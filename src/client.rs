@@ -48,13 +48,19 @@ enum LoginStatus {
 
 #[derive(Debug)]
 enum PeerState {
+    /// We are trying to establish a direct connection.
     Opening,
+    /// We are trying to establish a reverse connection.
     OpeningFirewalled,
+    /// We are waiting for a reverse connection to be established to us.
+    WaitingFirewalled,
+    /// The connection is open.
     Open
 }
 
 #[derive(Debug)]
 struct Peer {
+    user_name: String,
     ip: net::Ipv4Addr,
     port: u16,
     connection_type: String,
@@ -327,12 +333,64 @@ impl Client {
     }
 
     fn handle_peer_connection_closed(&mut self, peer_id: usize) {
-        info!("Connection to peer {} has closed", peer_id);
-        match self.peers.remove(peer_id) {
-            None => error!("Unknown peer {}", peer_id),
+        let mut occupied_entry = match self.peers.entry(peer_id) {
+            None | Some(slab::Entry::Vacant(_)) => {
+                error!("Unknown peer connection {} has closed", peer_id);
+                return
+            },
 
-            Some(peer) => {
-                // TODO if the peer was not connected, talk to the server
+            Some(slab::Entry::Occupied(occupied_entry)) => occupied_entry
+        };
+
+        match occupied_entry.get_mut().state {
+            PeerState::Open => {
+                info!("Peer connection {} has closed", peer_id);
+                occupied_entry.remove();
+            },
+
+            PeerState::WaitingFirewalled => {
+                error!(
+                    "Peer connection {} has closed, was waiting: inconsistent",
+                    peer_id
+                );
+                occupied_entry.remove();
+            },
+
+            PeerState::Opening => {
+                info!(
+                    "Peer connection {} has been refused, trying reverse",
+                    peer_id
+                );
+
+                let peer = occupied_entry.get_mut();
+                peer.state = PeerState::WaitingFirewalled;
+
+                self.proto_tx.send(proto::Request::ServerRequest(
+                    server::ServerRequest::ConnectToPeerRequest(
+                        server::ConnectToPeerRequest {
+                            token:           peer.token,
+                            user_name:       peer.user_name.clone(),
+                            connection_type: peer.connection_type.clone(),
+                        }
+                    )
+                )).unwrap();
+            },
+
+            PeerState::OpeningFirewalled => {
+                info!(
+                    "Peer connection {} has been refused, cannot connect",
+                    peer_id
+                );
+
+                let (peer, _) = occupied_entry.remove();
+                self.proto_tx.send(proto::Request::ServerRequest(
+                    server::ServerRequest::CannotConnectRequest(
+                        server::CannotConnectRequest {
+                            token:     peer.token,
+                            user_name: peer.user_name
+                        }
+                    )
+                )).unwrap();
             }
         }
     }
@@ -348,6 +406,14 @@ impl Client {
             Some(peer @ &mut Peer { state: PeerState::Open, .. }) => {
                 error!(
                     "Peer connection {} was already open: {:?}",
+                    peer_id, peer
+                );
+                return
+            },
+
+            Some(peer @ &mut Peer{state: PeerState::WaitingFirewalled, ..}) => {
+                error!(
+                    "Peer connection {} was waiting: {:?}",
                     peer_id, peer
                 );
                 return
@@ -430,6 +496,7 @@ impl Client {
         &mut self, response: server::ConnectToPeerResponse)
     {
         let peer = Peer {
+            user_name:       response.user_name,
             ip:              response.ip,
             port:            response.port,
             connection_type: response.connection_type,

@@ -12,6 +12,8 @@ use super::super::packet::{MutPacket, WriteToPacket};
 
 #[derive(Debug)]
 pub enum ServerRequest {
+    CannotConnectRequest(CannotConnectRequest),
+    ConnectToPeerRequest(ConnectToPeerRequest),
     LoginRequest(LoginRequest),
     PeerAddressRequest(PeerAddressRequest),
     RoomJoinRequest(RoomJoinRequest),
@@ -25,6 +27,16 @@ pub enum ServerRequest {
 impl WriteToPacket for ServerRequest {
     fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
         match *self {
+            ServerRequest::CannotConnectRequest(ref request) => {
+                try!(packet.write_value(&CODE_CANNOT_CONNECT));
+                try!(packet.write_value(request));
+            },
+
+            ServerRequest::ConnectToPeerRequest(ref request) => {
+                try!(packet.write_value(&CODE_CONNECT_TO_PEER));
+                try!(packet.write_value(request));
+            },
+
             ServerRequest::LoginRequest(ref request) => {
                 try!(packet.write_value(&CODE_LOGIN));
                 try!(packet.write_value(request));
@@ -72,6 +84,44 @@ fn md5_str(string: &str) -> String {
     let mut hasher = Md5::new();
     hasher.input_str(string);
     hasher.result_str()
+}
+
+/*================*
+ * CANNOT CONNECT *
+ *================*/
+
+#[derive(Debug)]
+pub struct CannotConnectRequest {
+    pub token:     u32,
+    pub user_name: String,
+}
+
+impl WriteToPacket for CannotConnectRequest {
+    fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
+        try!(packet.write_value(&self.token));
+        try!(packet.write_value(&self.user_name));
+        Ok(())
+    }
+}
+
+/*=================*
+ * CONNECT TO PEER *
+ *=================*/
+
+#[derive(Debug)]
+pub struct ConnectToPeerRequest {
+    pub token:           u32,
+    pub user_name:       String,
+    pub connection_type: String,
+}
+
+impl WriteToPacket for ConnectToPeerRequest {
+    fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
+        try!(packet.write_value(&self.token));
+        try!(packet.write_value(&self.user_name));
+        try!(packet.write_value(&self.connection_type));
+        Ok(())
+    }
 }
 
 /*=======*
