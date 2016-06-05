@@ -12,6 +12,8 @@ pub enum Request {
     RoomListRequest,
     /// The controller wants to send a message to a chat room.
     RoomMessageRequest(RoomMessageRequest),
+    /// The controller wants to know the list of known users.
+    UserListRequest,
 }
 
 /// This structure contains the chat room message request from the controller.

@@ -148,6 +148,16 @@ impl UserMap {
         }
     }
 
+    /// Returns the list of (user name, user data) representing all known users.
+    pub fn get_list(&self) -> Vec<(String, User)>
+    {
+        let mut users = Vec::new();
+        for (user_name, user_data) in self.map.iter() {
+            users.push((user_name.clone(), user_data.clone()));
+        }
+        users
+    }
+
     /// Sets the set of privileged users to the given list.
     pub fn set_all_privileged(&mut self, mut users: Vec<String>)
     {

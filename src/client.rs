@@ -225,6 +225,9 @@ impl Client {
             control::Request::RoomMessageRequest(request) =>
                 self.handle_room_message_request(request),
 
+            control::Request::UserListRequest =>
+                self.handle_user_list_request(),
+
             /*
             _ =>{
                 error!("Unhandled control request: {:?}", request);
@@ -307,6 +310,16 @@ impl Client {
             server::RoomMessageRequest {
                 room_name: request.room_name,
                 message:   request.message,
+            }
+        ));
+    }
+
+    fn handle_user_list_request(&mut self) {
+        // Send the controller client what we have in memory.
+        let user_list = self.users.get_list();
+        self.send_to_controller(control::Response::UserListResponse(
+            control::UserListResponse {
+                user_list: user_list
             }
         ));
     }
@@ -596,7 +609,9 @@ impl Client {
         }
 
         self.send_to_controller(control::Response::RoomLeaveResponse(
-                response.room_name
+            control::RoomLeaveResponse {
+                room_name: response.room_name
+            }
         ));
     }
 

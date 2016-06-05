@@ -7,16 +7,22 @@ use user;
 pub enum Response {
     LoginStatusResponse(LoginStatusResponse),
     RoomJoinResponse(RoomJoinResponse),
-    RoomLeaveResponse(String),
+    RoomLeaveResponse(RoomLeaveResponse),
     RoomListResponse(RoomListResponse),
     RoomMessageResponse(RoomMessageResponse),
     RoomUserJoinedResponse(RoomUserJoinedResponse),
     RoomUserLeftResponse(RoomUserLeftResponse),
     UserInfoResponse(UserInfoResponse),
+    UserListResponse(UserListResponse),
 }
 
 #[derive(Debug, RustcEncodable, RustcDecodable)]
 pub struct RoomJoinResponse {
+    pub room_name: String,
+}
+
+#[derive(Debug, RustcEncodable, RustcDecodable)]
+pub struct RoomLeaveResponse {
     pub room_name: String,
 }
 
@@ -87,4 +93,10 @@ pub struct RoomUserLeftResponse {
 pub struct UserInfoResponse {
     pub user_name: String,
     pub user_info: user::User,
+}
+
+/// This stuct contains the last known information about every user.
+#[derive(Debug, RustcDecodable, RustcEncodable)]
+pub struct UserListResponse {
+    pub user_list: Vec<(String, user::User)>,
 }
