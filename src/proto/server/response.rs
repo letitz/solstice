@@ -12,6 +12,7 @@ use user;
 #[derive(Debug)]
 pub enum ServerResponse {
     ConnectToPeerResponse(ConnectToPeerResponse),
+    FileSearchResponse(FileSearchResponse),
     LoginResponse(LoginResponse),
     PeerAddressResponse(PeerAddressResponse),
     PrivilegedUsersResponse(PrivilegedUsersResponse),
@@ -39,6 +40,11 @@ impl ReadFromPacket for ServerResponse {
         let resp = match code {
             CODE_CONNECT_TO_PEER =>
                 ServerResponse::ConnectToPeerResponse(
+                    try!(packet.read_value())
+                ),
+
+            CODE_FILE_SEARCH =>
+                ServerResponse::FileSearchResponse(
                     try!(packet.read_value())
                 ),
 
@@ -158,6 +164,31 @@ impl ReadFromPacket for ConnectToPeerResponse {
             port:            port,
             token:           token,
             is_privileged:   is_privileged,
+        })
+    }
+}
+
+/*=============*
+ * FILE SEARCH *
+ *=============*/
+
+#[derive(Debug)]
+pub struct FileSearchResponse {
+    pub user_name: String,
+    pub ticket:    u32,
+    pub query:     String,
+}
+
+impl ReadFromPacket for FileSearchResponse {
+    fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
+        let user_name = try!(packet.read_value());
+        let ticket    = try!(packet.read_value());
+        let query     = try!(packet.read_value());
+
+        Ok(FileSearchResponse {
+            user_name: user_name,
+            ticket:    ticket,
+            query:     query,
         })
     }
 }

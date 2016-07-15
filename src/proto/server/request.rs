@@ -14,6 +14,7 @@ use super::super::packet::{MutPacket, WriteToPacket};
 pub enum ServerRequest {
     CannotConnectRequest(CannotConnectRequest),
     ConnectToPeerRequest(ConnectToPeerRequest),
+    FileSearchRequest(FileSearchRequest),
     LoginRequest(LoginRequest),
     PeerAddressRequest(PeerAddressRequest),
     RoomJoinRequest(RoomJoinRequest),
@@ -34,6 +35,11 @@ impl WriteToPacket for ServerRequest {
 
             ServerRequest::ConnectToPeerRequest(ref request) => {
                 try!(packet.write_value(&CODE_CONNECT_TO_PEER));
+                try!(packet.write_value(request));
+            },
+
+            ServerRequest::FileSearchRequest(ref request) => {
+                try!(packet.write_value(&CODE_FILE_SEARCH));
                 try!(packet.write_value(request));
             },
 
@@ -120,6 +126,24 @@ impl WriteToPacket for ConnectToPeerRequest {
         try!(packet.write_value(&self.token));
         try!(packet.write_value(&self.user_name));
         try!(packet.write_value(&self.connection_type));
+        Ok(())
+    }
+}
+
+/*=============*
+ * FILE SEARCH *
+ *=============*/
+
+#[derive(Debug)]
+pub struct FileSearchRequest {
+    pub ticket: u32,
+    pub query:  String,
+}
+
+impl WriteToPacket for FileSearchRequest {
+    fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
+        try!(packet.write_value(&self.ticket));
+        try!(packet.write_value(&self.query));
         Ok(())
     }
 }
