@@ -1,5 +1,7 @@
+use std::fmt;
 use std::io;
 use std::net;
+use std::net::ToSocketAddrs;
 use std::sync::mpsc;
 
 use mio;
@@ -19,6 +21,8 @@ use super::peer;
 // This way we ensure no overlap and eliminate the need for coordination
 // between client and handler that would otherwise be needed.
 const SERVER_TOKEN: usize = config::MAX_PEERS;
+
+const LISTEN_TOKEN: usize = config::MAX_PEERS + 1;
 
 /*====================*
  * REQUEST - RESPONSE *
@@ -91,7 +95,23 @@ struct Handler {
 
     peer_streams: slab::Slab<Stream<PeerResponseSender>, usize>,
 
+    listener: mio::tcp::TcpListener,
+
     client_tx: mpsc::Sender<Response>,
+}
+
+fn listener_bind<U>(addr_spec: U) -> io::Result<mio::tcp::TcpListener>
+    where U: ToSocketAddrs + fmt::Debug
+{
+    for socket_addr in try!(addr_spec.to_socket_addrs()) {
+        if let Ok(listener) = mio::tcp::TcpListener::bind(&socket_addr) {
+            return Ok(listener)
+        }
+    }
+    Err(io::Error::new(
+        io::ErrorKind::Other,
+        format!("Cannot bind to {:?}", addr_spec)
+    ))
 }
 
 impl Handler {
@@ -109,9 +129,24 @@ impl Handler {
 
         info!("Connected to server at {}:{}", host, port);
 
+        let listener = try!(
+            listener_bind((config::LISTEN_HOST, config::LISTEN_PORT))
+        );
+        info!(
+            "Listening for connections on {}:{}",
+            config::LISTEN_HOST, config::LISTEN_PORT
+        );
+
         try!(event_loop.register(
             server_stream.evented(),
             mio::Token(SERVER_TOKEN),
+            mio::EventSet::all(),
+            mio::PollOpt::edge() | mio::PollOpt::oneshot()
+        ));
+
+        try!(event_loop.register(
+            &listener,
+            mio::Token(LISTEN_TOKEN),
             mio::EventSet::all(),
             mio::PollOpt::edge() | mio::PollOpt::oneshot()
         ));
@@ -120,6 +155,8 @@ impl Handler {
             server_stream: server_stream,
 
             peer_streams: slab::Slab::new(config::MAX_PEERS),
+
+            listener: listener,
 
             client_tx: client_tx,
         })
@@ -221,16 +258,46 @@ impl mio::Handler for Handler {
     fn ready(&mut self, event_loop: &mut mio::EventLoop<Self>,
              token: mio::Token, event_set: mio::EventSet)
     {
-        if token.0 == SERVER_TOKEN {
-            let intent = self.server_stream.on_ready(event_set);
-            self.process_server_intent(intent, event_loop);
-        } else {
-            let intent = match self.peer_streams.get_mut(token.0) {
-                Some(peer_stream) => peer_stream.on_ready(event_set),
+        match token {
+            mio::Token(LISTEN_TOKEN) => {
+                if event_set.is_readable() {
+                    // A peer wants to connect to us.
+                    match self.listener.accept() {
+                        Ok(Some(sock)) => {
+                            // TODO add it to peer streams
+                            info!("Peer connection accepted");
+                        },
 
-                None => unreachable!("Unknown token {} is ready", token.0),
-            };
-            self.process_peer_intent(intent, token, event_loop);
+                        Ok(None) => {
+                            warn!("No peer connection to accept");
+                        },
+
+                        Err(err) => {
+                            error!("Cannot accept peer connection: {}", err);
+                        }
+                    }
+                }
+                event_loop.reregister(
+                    &self.listener,
+                    token,
+                    mio::EventSet::all(),
+                    mio::PollOpt::edge() | mio::PollOpt::oneshot()
+                ).unwrap();
+            },
+
+            mio::Token(SERVER_TOKEN) => {
+                let intent = self.server_stream.on_ready(event_set);
+                self.process_server_intent(intent, event_loop);
+            },
+
+            mio::Token(peer_id) => {
+                let intent = match self.peer_streams.get_mut(peer_id) {
+                    Some(peer_stream) => peer_stream.on_ready(event_set),
+
+                    None => unreachable!("Unknown peer {} is ready", peer_id),
+                };
+                self.process_peer_intent(intent, token, event_loop);
+            }
         }
     }
 

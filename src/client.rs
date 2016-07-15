@@ -123,6 +123,12 @@ impl Client {
             ).unwrap()
         ));
 
+        self.send_to_server(server::ServerRequest::SetListenPortRequest(
+            server::SetListenPortRequest {
+                port: config::LISTEN_PORT,
+            }
+        ));
+
         loop {
             match self.recv() {
                 IncomingMessage::Proto(response) =>
