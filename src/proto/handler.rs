@@ -117,7 +117,7 @@ fn listener_bind<U>(addr_spec: U) -> io::Result<mio::tcp::TcpListener>
 impl Handler {
     fn new(
         client_tx: mpsc::Sender<Response>,
-        event_loop: &mut mio::EventLoop<Self>)
+        event_loop: &mut mio::deprecated::EventLoop<Self>)
         -> io::Result<Self>
     {
         let host = config::SERVER_HOST;
@@ -140,14 +140,14 @@ impl Handler {
         try!(event_loop.register(
             server_stream.evented(),
             mio::Token(SERVER_TOKEN),
-            mio::EventSet::all(),
+            mio::Ready::all(),
             mio::PollOpt::edge() | mio::PollOpt::oneshot()
         ));
 
         try!(event_loop.register(
             &listener,
             mio::Token(LISTEN_TOKEN),
-            mio::EventSet::all(),
+            mio::Ready::all(),
             mio::PollOpt::edge() | mio::PollOpt::oneshot()
         ));
 
@@ -167,7 +167,7 @@ impl Handler {
         peer_id: usize,
         ip: net::Ipv4Addr,
         port: u16,
-        event_loop: &mut mio::EventLoop<Self>)
+        event_loop: &mut mio::deprecated::EventLoop<Self>)
         -> Result<(), String>
     {
         let vacant_entry = match self.peer_streams.entry(peer_id) {
@@ -195,7 +195,7 @@ impl Handler {
         event_loop.register(
             peer_stream.evented(),
             mio::Token(peer_id),
-            mio::EventSet::all(),
+            mio::Ready::all(),
             mio::PollOpt::edge() | mio::PollOpt::oneshot()
         ).unwrap();
 
@@ -205,7 +205,7 @@ impl Handler {
     }
 
     fn process_server_intent(
-        &mut self, intent: Intent, event_loop: &mut mio::EventLoop<Self>)
+        &mut self, intent: Intent, event_loop: &mut mio::deprecated::EventLoop<Self>)
     {
         match intent {
             Intent::Done => {
@@ -227,7 +227,7 @@ impl Handler {
         &mut self,
         intent: Intent,
         token: mio::Token,
-        event_loop: &mut mio::EventLoop<Self>)
+        event_loop: &mut mio::deprecated::EventLoop<Self>)
     {
         match intent {
             Intent::Done => {
@@ -251,25 +251,21 @@ impl Handler {
     }
 }
 
-impl mio::Handler for Handler {
+impl mio::deprecated::Handler for Handler {
     type Timeout = ();
     type Message = Request;
 
-    fn ready(&mut self, event_loop: &mut mio::EventLoop<Self>,
-             token: mio::Token, event_set: mio::EventSet)
+    fn ready(&mut self, event_loop: &mut mio::deprecated::EventLoop<Self>,
+             token: mio::Token, event_set: mio::Ready)
     {
         match token {
             mio::Token(LISTEN_TOKEN) => {
                 if event_set.is_readable() {
                     // A peer wants to connect to us.
                     match self.listener.accept() {
-                        Ok(Some(sock)) => {
+                        Ok((sock, addr)) => {
                             // TODO add it to peer streams
-                            info!("Peer connection accepted");
-                        },
-
-                        Ok(None) => {
-                            warn!("No peer connection to accept");
+                            info!("Peer connection accepted from {}", addr);
                         },
 
                         Err(err) => {
@@ -280,7 +276,7 @@ impl mio::Handler for Handler {
                 event_loop.reregister(
                     &self.listener,
                     token,
-                    mio::EventSet::all(),
+                    mio::Ready::all(),
                     mio::PollOpt::edge() | mio::PollOpt::oneshot()
                 ).unwrap();
             },
@@ -301,7 +297,7 @@ impl mio::Handler for Handler {
         }
     }
 
-    fn notify(&mut self, event_loop: &mut mio::EventLoop<Self>,
+    fn notify(&mut self, event_loop: &mut mio::deprecated::EventLoop<Self>,
               request: Request)
     {
         match request {
@@ -342,17 +338,17 @@ impl mio::Handler for Handler {
     }
 }
 
-pub type Sender = mio::Sender<Request>;
+pub type Sender = mio::deprecated::Sender<Request>;
 
 pub struct Agent {
-    event_loop: mio::EventLoop<Handler>,
+    event_loop: mio::deprecated::EventLoop<Handler>,
     handler:    Handler,
 }
 
 impl Agent {
     pub fn new(client_tx: mpsc::Sender<Response>) -> io::Result<Self> {
         // Create the event loop.
-        let mut event_loop = try!(mio::EventLoop::new());
+        let mut event_loop = try!(mio::deprecated::EventLoop::new());
         // Create the handler for the event loop and register the handler's
         // sockets with the event loop.
         let handler = try!(Handler::new(client_tx, &mut event_loop));

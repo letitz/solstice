@@ -40,7 +40,7 @@ impl OutBuf {
     }
 
     fn try_write_to<T>(&mut self, mut writer: T) -> io::Result<Option<usize>>
-        where T: mio::TryWrite
+        where T: mio::deprecated::TryWrite
     {
         let result = writer.try_write(&self.bytes[self.cursor..]);
         if let Ok(Some(bytes_written)) = result {
@@ -73,7 +73,7 @@ pub enum Intent {
     Done,
     /// The stream wants to wait for the next event matching the given
     /// `EventSet`.
-    Continue(mio::EventSet),
+    Continue(mio::Ready),
 }
 
 /// This struct wraps around an mio tcp stream and handles packet reads and
@@ -172,7 +172,7 @@ impl<T: SendPacket> Stream<T>
     }
 
     /// The stream is ready to read, write, or both.
-    pub fn on_ready(&mut self, event_set: mio::EventSet) -> Intent {
+    pub fn on_ready(&mut self, event_set: mio::Ready) -> Intent {
         if event_set.is_hup() || event_set.is_error() {
             return Intent::Done
         }
@@ -205,13 +205,13 @@ impl<T: SendPacket> Stream<T>
 
         // We're always interested in reading more.
         let mut event_set =
-            mio::EventSet::readable() |
-            mio::EventSet::hup() |
-            mio::EventSet::error();
+            mio::Ready::readable() |
+            mio::Ready::hup() |
+            mio::Ready::error();
         // If there is still stuff to write in the queue, we're interested in
         // the socket becoming writable too.
         if self.queue.len() > 0 {
-            event_set = event_set | mio::EventSet::writable();
+            event_set = event_set | mio::Ready::writable();
         }
 
         Intent::Continue(event_set)
@@ -228,6 +228,6 @@ impl<T: SendPacket> Stream<T>
             return Intent::Done
         }
         self.queue.push_back(OutBuf::from(packet.into_bytes()));
-        Intent::Continue(mio::EventSet::readable() | mio::EventSet::writable())
+        Intent::Continue(mio::Ready::readable() | mio::Ready::writable())
     }
 }

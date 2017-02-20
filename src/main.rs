@@ -1,5 +1,3 @@
-#![feature(mpsc_select)]
-
 mod client;
 mod config;
 mod control;
@@ -11,11 +9,13 @@ extern crate byteorder;
 extern crate core;
 extern crate crypto;
 extern crate encoding;
+extern crate futures;
 #[macro_use] extern crate log;
 extern crate env_logger;
 extern crate mio;
 extern crate rustc_serialize;
 extern crate slab;
+extern crate tokio_core;
 extern crate ws;
 
 use std::sync::mpsc;

@@ -8,7 +8,7 @@ use std::io::{Read, Write};
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
 use encoding::{Encoding, DecoderTrap, EncoderTrap};
 use encoding::all::ISO_8859_1;
-use mio::TryRead;
+use mio::deprecated::TryRead;
 
 use super::constants::*;
 

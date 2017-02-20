@@ -12,26 +12,6 @@ use proto::server;
 use room;
 use user;
 
-/*===============*
- * TOKEN COUNTER *
- *===============*/
-
-struct TokenCounter {
-    next_token: u32
-}
-
-impl TokenCounter {
-    fn new() -> Self {
-        TokenCounter  { next_token: 0 }
-    }
-
-    fn next(&mut self) -> u32 {
-        let token = self.next_token;
-        self.next_token += 1;
-        token
-    }
-}
-
 
 #[derive(Debug)]
 enum IncomingMessage {
@@ -69,7 +49,7 @@ struct Peer {
 }
 
 pub struct Client {
-    proto_tx: mio::Sender<proto::Request>,
+    proto_tx: mio::deprecated::Sender<proto::Request>,
     proto_rx: mpsc::Receiver<proto::Response>,
 
     control_tx: Option<control::Sender>,
@@ -81,7 +61,6 @@ pub struct Client {
     users: user::UserMap,
 
     peers:         slab::Slab<Peer, usize>,
-    token_counter: TokenCounter,
 }
 
 impl Client {
@@ -89,7 +68,7 @@ impl Client {
     /// through `proto_tx` and `proto_rx`, and with the controller agent
     /// through `control_rx`.
     pub fn new(
-        proto_tx: mio::Sender<proto::Request>,
+        proto_tx: mio::deprecated::Sender<proto::Request>,
         proto_rx: mpsc::Receiver<proto::Response>,
         control_rx: mpsc::Receiver<control::Notification>)
         -> Self
@@ -107,7 +86,6 @@ impl Client {
             users: user::UserMap::new(),
 
             peers:         slab::Slab::new(config::MAX_PEERS),
-            token_counter: TokenCounter::new()
         }
     }
 
@@ -143,15 +121,7 @@ impl Client {
     // Necessary to break out in different function because self cannot be
     // borrowed in the select arms due to *macro things*.
     fn recv(&mut self) -> IncomingMessage {
-        let proto_rx   = &self.proto_rx;
-        let control_rx = &self.control_rx;
-        select! {
-            result = proto_rx.recv() =>
-                IncomingMessage::Proto(result.unwrap()),
-
-            result = control_rx.recv() =>
-                IncomingMessage::ControlNotification(result.unwrap())
-        }
+        IncomingMessage::Proto(self.proto_rx.recv().unwrap())
     }
 
     /// Send a request to the server.
