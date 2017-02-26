@@ -4,6 +4,7 @@ mod packet;
 pub mod peer;
 pub mod server;
 mod stream;
+mod codec;
 
 pub use self::handler::*;
 pub use self::packet::*;
