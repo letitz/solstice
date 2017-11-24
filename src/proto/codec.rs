@@ -406,4 +406,35 @@ mod tests {
             assert_eq!(buf.len(), 0);
         }
     }
+
+    #[test]
+    fn encode_u32_vector() {
+        let mut vec = vec![];
+        let mut expected_bytes = vec![13, U32_ENCODINGS.len() as u8, 0, 0, 0];
+        for &(val, ref encoded_bytes) in &U32_ENCODINGS {
+            vec.push(val);
+            expected_bytes.extend(encoded_bytes);
+        }
+
+        let mut bytes = vec![13];
+        vec.encode(&mut bytes).unwrap();
+
+        assert_eq!(bytes, expected_bytes);
+    }
+
+    #[test]
+    fn decode_u32_vector() {
+        let mut expected_vec = vec![];
+        let mut bytes = vec![U32_ENCODINGS.len() as u8, 0, 0, 0];
+        for &(expected_val, ref encoded_bytes) in &U32_ENCODINGS {
+            expected_vec.push(expected_val);
+            bytes.extend(encoded_bytes);
+        }
+
+        let mut buf = EasyBuf::from(bytes);
+        let vec = Vec::<u32>::decode(&mut buf).unwrap();
+
+        assert_eq!(vec, expected_vec);
+        assert_eq!(buf.len(), 0);
+    }
 }
