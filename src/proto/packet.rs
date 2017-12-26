@@ -42,13 +42,14 @@ impl Packet {
     fn from_wire(bytes: Vec<u8>) -> Self {
         Packet {
             cursor: U32_SIZE,
-            bytes:  bytes,
+            bytes: bytes,
         }
     }
 
     /// Provides the main way to read data out of a binary packet.
     pub fn read_value<T>(&mut self) -> Result<T, PacketReadError>
-        where T: ReadFromPacket
+    where
+        T: ReadFromPacket,
     {
         T::read_from_packet(self)
     }
@@ -72,14 +73,13 @@ impl MutPacket {
     /// Returns an empty packet with the given packet code.
     pub fn new() -> Self {
         // Leave space for the eventual size of the packet.
-        MutPacket {
-            bytes: vec![0; U32_SIZE]
-        }
+        MutPacket { bytes: vec![0; U32_SIZE] }
     }
 
     /// Provides the main way to write data into a binary packet.
     pub fn write_value<T>(&mut self, val: &T) -> io::Result<()>
-        where T: WriteToPacket
+    where
+        T: WriteToPacket,
     {
         val.write_to_packet(self)
     }
@@ -129,16 +129,15 @@ pub enum PacketReadError {
 impl fmt::Display for PacketReadError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            PacketReadError::InvalidBoolError(n) =>
-                write!(fmt, "InvalidBoolError: {}", n),
-            PacketReadError::InvalidU16Error(n) =>
-                write!(fmt, "InvalidU16Error: {}", n),
-            PacketReadError::InvalidStringError(ref bytes) =>
-                write!(fmt, "InvalidStringError: {:?}", bytes),
-            PacketReadError::InvalidUserStatusError(n) =>
-                write!(fmt, "InvalidUserStatusError: {}", n),
-            PacketReadError::IOError(ref err) =>
-                write!(fmt, "IOError: {}", err),
+            PacketReadError::InvalidBoolError(n) => write!(fmt, "InvalidBoolError: {}", n),
+            PacketReadError::InvalidU16Error(n) => write!(fmt, "InvalidU16Error: {}", n),
+            PacketReadError::InvalidStringError(ref bytes) => {
+                write!(fmt, "InvalidStringError: {:?}", bytes)
+            }
+            PacketReadError::InvalidUserStatusError(n) => {
+                write!(fmt, "InvalidUserStatusError: {}", n)
+            }
+            PacketReadError::IOError(ref err) => write!(fmt, "IOError: {}", err),
         }
     }
 }
@@ -146,26 +145,21 @@ impl fmt::Display for PacketReadError {
 impl error::Error for PacketReadError {
     fn description(&self) -> &str {
         match *self {
-            PacketReadError::InvalidBoolError(_) =>
-                "InvalidBoolError",
-            PacketReadError::InvalidU16Error(_) =>
-                "InvalidU16Error",
-            PacketReadError::InvalidStringError(_) =>
-                "InvalidStringError",
-            PacketReadError::InvalidUserStatusError(_) =>
-                "InvalidUserStatusError",
-            PacketReadError::IOError(_) =>
-                "IOError",
+            PacketReadError::InvalidBoolError(_) => "InvalidBoolError",
+            PacketReadError::InvalidU16Error(_) => "InvalidU16Error",
+            PacketReadError::InvalidStringError(_) => "InvalidStringError",
+            PacketReadError::InvalidUserStatusError(_) => "InvalidUserStatusError",
+            PacketReadError::IOError(_) => "IOError",
         }
     }
 
     fn cause(&self) -> Option<&error::Error> {
         match *self {
-            PacketReadError::InvalidBoolError(_)       => None,
-            PacketReadError::InvalidU16Error(_)        => None,
-            PacketReadError::InvalidStringError(_)     => None,
+            PacketReadError::InvalidBoolError(_) => None,
+            PacketReadError::InvalidU16Error(_) => None,
+            PacketReadError::InvalidStringError(_) => None,
             PacketReadError::InvalidUserStatusError(_) => None,
-            PacketReadError::IOError(ref err)          => Some(err),
+            PacketReadError::IOError(ref err) => Some(err),
         }
     }
 }
@@ -206,7 +200,7 @@ impl ReadFromPacket for bool {
         match try!(packet.read_u8()) {
             0 => Ok(false),
             1 => Ok(true),
-            n => Err(PacketReadError::InvalidBoolError(n))
+            n => Err(PacketReadError::InvalidBoolError(n)),
         }
     }
 }
@@ -216,7 +210,7 @@ impl ReadFromPacket for u16 {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
         let n = try!(u32::read_from_packet(packet));
         if n > MAX_PORT {
-            return Err(PacketReadError::InvalidU16Error(n))
+            return Err(PacketReadError::InvalidU16Error(n));
         }
         Ok(n as u16)
     }
@@ -241,7 +235,7 @@ impl ReadFromPacket for String {
 
         match ISO_8859_1.decode(&buffer, DecoderTrap::Strict) {
             Ok(string) => Ok(string),
-            Err(_) => Err(PacketReadError::InvalidStringError(buffer))
+            Err(_) => Err(PacketReadError::InvalidStringError(buffer)),
         }
     }
 }
@@ -301,7 +295,7 @@ impl WriteToPacket for str {
             Ok(bytes) => bytes,
             Err(_) => {
                 let copy = self.to_string();
-                return Err(io::Error::new(io::ErrorKind::Other, copy))
+                return Err(io::Error::new(io::ErrorKind::Other, copy));
             }
         };
         // Then write the bytes to the packet.
@@ -335,17 +329,17 @@ enum State {
 
 #[derive(Debug)]
 pub struct Parser {
-    state:          State,
+    state: State,
     num_bytes_left: usize,
-    buffer:         Vec<u8>,
+    buffer: Vec<u8>,
 }
 
 impl Parser {
     pub fn new() -> Self {
         Parser {
-            state:          State::ReadingLength,
+            state: State::ReadingLength,
             num_bytes_left: U32_SIZE,
-            buffer:         vec![0; U32_SIZE],
+            buffer: vec![0; U32_SIZE],
         }
     }
 
@@ -359,7 +353,8 @@ impl Parser {
     /// responsible for calling it once more to ensure that all packets are
     /// read as soon as possible.
     pub fn try_read<U>(&mut self, stream: &mut U) -> io::Result<Option<Packet>>
-        where U: io::Read
+    where
+        U: io::Read,
     {
         // Try to read as many bytes as we currently need from the underlying
         // byte stream.
@@ -369,7 +364,7 @@ impl Parser {
 
             Some(num_bytes_read) => {
                 self.num_bytes_left -= num_bytes_read;
-            },
+            }
         }
 
         // If we haven't read enough bytes, return.
@@ -383,8 +378,7 @@ impl Parser {
                 // If we have finished reading the length prefix, then
                 // deserialize it, switch states and try to read the packet
                 // bytes.
-                let message_len =
-                    LittleEndian::read_u32(&mut self.buffer) as usize;
+                let message_len = LittleEndian::read_u32(&mut self.buffer) as usize;
                 if message_len > MAX_MESSAGE_SIZE {
                     unimplemented!();
                 };
@@ -392,14 +386,14 @@ impl Parser {
                 self.num_bytes_left = message_len;
                 self.buffer.resize(message_len + U32_SIZE, 0);
                 self.try_read(stream)
-            },
+            }
 
             State::ReadingPacket => {
                 // If we have finished reading the packet, swap the full buffer
                 // out and return the packet made from the full buffer.
                 self.state = State::ReadingLength;
                 self.num_bytes_left = U32_SIZE;
-                let new_buffer = vec![0;U32_SIZE];
+                let new_buffer = vec![0; U32_SIZE];
                 let old_buffer = mem::replace(&mut self.buffer, new_buffer);
                 Ok(Some(Packet::from_wire(old_buffer)))
             }

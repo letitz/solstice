@@ -6,8 +6,8 @@ use std::io;
 use proto;
 
 const STATUS_OFFLINE: u32 = 1;
-const STATUS_AWAY:    u32 = 2;
-const STATUS_ONLINE:  u32 = 3;
+const STATUS_AWAY: u32 = 2;
+const STATUS_ONLINE: u32 = 3;
 
 /// This enumeration is the list of possible user statuses.
 #[derive(Clone, Copy, Debug, RustcDecodable, RustcEncodable)]
@@ -21,17 +21,13 @@ pub enum Status {
 }
 
 impl proto::ReadFromPacket for Status {
-    fn read_from_packet(packet: &mut proto::Packet)
-        -> Result<Self, proto::PacketReadError>
-    {
+    fn read_from_packet(packet: &mut proto::Packet) -> Result<Self, proto::PacketReadError> {
         let n: u32 = try!(packet.read_value());
         match n {
             STATUS_OFFLINE => Ok(Status::Offline),
-            STATUS_AWAY    => Ok(Status::Away),
-            STATUS_ONLINE  => Ok(Status::Online),
-            _              => {
-                Err(proto::PacketReadError::InvalidUserStatusError(n))
-            }
+            STATUS_AWAY => Ok(Status::Away),
+            STATUS_ONLINE => Ok(Status::Online),
+            _ => Err(proto::PacketReadError::InvalidUserStatusError(n)),
         }
     }
 }
@@ -40,8 +36,8 @@ impl proto::WriteToPacket for Status {
     fn write_to_packet(&self, packet: &mut proto::MutPacket) -> io::Result<()> {
         let n = match *self {
             Status::Offline => STATUS_OFFLINE,
-            Status::Away    => STATUS_AWAY,
-            Status::Online  => STATUS_ONLINE,
+            Status::Away => STATUS_AWAY,
+            Status::Online => STATUS_ONLINE,
         };
         try!(packet.write_value(&n));
         Ok(())
@@ -117,14 +113,10 @@ impl UserMap {
 
     /// Looks up the given user name in the map, returning a mutable reference
     /// to the associated data if found, or an error if not found.
-    pub fn get_mut_strict(&mut self, user_name: &str)
-        -> Result<&mut User, UserNotFoundError>
-    {
+    pub fn get_mut_strict(&mut self, user_name: &str) -> Result<&mut User, UserNotFoundError> {
         match self.map.get_mut(user_name) {
             Some(user) => Ok(user),
-            None => Err(UserNotFoundError {
-                user_name: user_name.to_string()
-            })
+            None => Err(UserNotFoundError { user_name: user_name.to_string() }),
         }
     }
 
@@ -135,22 +127,17 @@ impl UserMap {
     }
 
     /// Sets the given user's status to the given value, if such a user exists.
-    pub fn set_status(&mut self, user_name: &str, status: Status)
-        -> Result<(), UserNotFoundError>
-    {
+    pub fn set_status(&mut self, user_name: &str, status: Status) -> Result<(), UserNotFoundError> {
         if let Some(user) = self.map.get_mut(user_name) {
             user.status = status;
             Ok(())
         } else {
-            Err(UserNotFoundError {
-                user_name: user_name.to_string(),
-            })
+            Err(UserNotFoundError { user_name: user_name.to_string() })
         }
     }
 
     /// Returns the list of (user name, user data) representing all known users.
-    pub fn get_list(&self) -> Vec<(String, User)>
-    {
+    pub fn get_list(&self) -> Vec<(String, User)> {
         let mut users = Vec::new();
         for (user_name, user_data) in self.map.iter() {
             users.push((user_name.clone(), user_data.clone()));
@@ -159,8 +146,7 @@ impl UserMap {
     }
 
     /// Sets the set of privileged users to the given list.
-    pub fn set_all_privileged(&mut self, mut users: Vec<String>)
-    {
+    pub fn set_all_privileged(&mut self, mut users: Vec<String>) {
         self.privileged.clear();
         for user_name in users.drain(..) {
             self.privileged.insert(user_name);

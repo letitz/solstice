@@ -6,8 +6,8 @@ pub const USERNAME: &'static str = "abcdefgh";
 // why not even check it in to git
 pub const PASSWORD: &'static str = "ijklmnop";
 
-pub const SERVER_HOST : &'static str = "server.slsknet.org";
-pub const SERVER_PORT : u16 = 2242;
+pub const SERVER_HOST: &'static str = "server.slsknet.org";
+pub const SERVER_PORT: u16 = 2242;
 
 pub const LISTEN_HOST: &'static str = "0.0.0.0";
 pub const LISTEN_PORT: u16 = 2243;

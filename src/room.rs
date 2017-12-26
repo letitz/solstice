@@ -37,7 +37,7 @@ pub enum Visibility {
 #[derive(Clone, Debug, RustcDecodable, RustcEncodable)]
 pub struct Message {
     pub user_name: String,
-    pub message:   String,
+    pub message: String,
 }
 
 /// This structure contains the last known information about a chat room.
@@ -63,7 +63,7 @@ pub struct Room {
     /// The messages sent to this chat room, in chronological order.
     pub messages: Vec<Message>,
     /// The tickers displayed in this room.
-    pub tickers: Vec<(String, String)>
+    pub tickers: Vec<(String, String)>,
 }
 
 impl Room {
@@ -72,13 +72,13 @@ impl Room {
         Room {
             membership: Membership::NonMember,
             visibility: visibility,
-            operated:   false,
+            operated: false,
             user_count: user_count,
-            owner:      None,
-            operators:  collections::HashSet::new(),
-            members:    collections::HashSet::new(),
-            messages:   Vec::new(),
-            tickers:    Vec::new(),
+            owner: None,
+            operators: collections::HashSet::new(),
+            members: collections::HashSet::new(),
+            messages: Vec::new(),
+            tickers: Vec::new(),
         }
     }
 }
@@ -93,14 +93,16 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::RoomNotFound(ref room_name) =>
-                write!(f, "room {:?} not found", room_name),
+            Error::RoomNotFound(ref room_name) => write!(f, "room {:?} not found", room_name),
 
-            Error::MembershipChangeInvalid(old_membership, new_membership) =>
+            Error::MembershipChangeInvalid(old_membership, new_membership) => {
                 write!(
-                    f, "cannot change membership from {:?} to {:?}",
-                    old_membership, new_membership
-                ),
+                    f,
+                    "cannot change membership from {:?} to {:?}",
+                    old_membership,
+                    new_membership
+                )
+            }
         }
     }
 }
@@ -109,7 +111,7 @@ impl error::Error for Error {
     fn description(&self) -> &str {
         match *self {
             Error::RoomNotFound(_) => "room not found",
-            Error::MembershipChangeInvalid(_, _) => "cannot change membership"
+            Error::MembershipChangeInvalid(_, _) => "cannot change membership",
         }
     }
 }
@@ -125,9 +127,7 @@ pub struct RoomMap {
 impl RoomMap {
     /// Creates an empty mapping.
     pub fn new() -> Self {
-        RoomMap {
-            map: collections::HashMap::new()
-        }
+        RoomMap { map: collections::HashMap::new() }
     }
 
     /// Looks up the given room name in the map, returning an immutable
@@ -135,7 +135,7 @@ impl RoomMap {
     fn get_strict(&self, room_name: &str) -> Result<&Room, Error> {
         match self.map.get(room_name) {
             Some(room) => Ok(room),
-            None => Err(Error::RoomNotFound(room_name.to_string()))
+            None => Err(Error::RoomNotFound(room_name.to_string())),
         }
     }
 
@@ -144,16 +144,19 @@ impl RoomMap {
     fn get_mut_strict(&mut self, room_name: &str) -> Result<&mut Room, Error> {
         match self.map.get_mut(room_name) {
             Some(room) => Ok(room),
-            None => Err(Error::RoomNotFound(room_name.to_string()))
+            None => Err(Error::RoomNotFound(room_name.to_string())),
         }
     }
 
     /// Updates one room in the map based on the information received in
     /// a RoomListResponse and the potential previously stored information.
     fn update_one(
-        &mut self, name: String, visibility: Visibility, user_count: u32,
-        old_map: &mut collections::HashMap<String, Room>)
-    {
+        &mut self,
+        name: String,
+        visibility: Visibility,
+        user_count: u32,
+        old_map: &mut collections::HashMap<String, Room>,
+    ) {
         let room = match old_map.remove(&name) {
             None => Room::new(Visibility::Public, user_count as usize),
             Some(mut room) => {
@@ -171,25 +174,21 @@ impl RoomMap {
     /// server response.
     pub fn set_room_list(&mut self, mut response: server::RoomListResponse) {
         // Replace the old mapping with an empty one.
-        let mut old_map =
-            mem::replace(&mut self.map, collections::HashMap::new());
+        let mut old_map = mem::replace(&mut self.map, collections::HashMap::new());
 
         // Add all public rooms.
         for (name, user_count) in response.rooms.drain(..) {
-            self.update_one(
-                name, Visibility::Public, user_count, &mut old_map);
+            self.update_one(name, Visibility::Public, user_count, &mut old_map);
         }
 
         // Add all private, owned, rooms.
         for (name, user_count) in response.owned_private_rooms.drain(..) {
-            self.update_one(
-                name, Visibility::PrivateOwned, user_count, &mut old_map);
+            self.update_one(name, Visibility::PrivateOwned, user_count, &mut old_map);
         }
 
         // Add all private, unowned, rooms.
         for (name, user_count) in response.other_private_rooms.drain(..) {
-            self.update_one(
-                name, Visibility::PrivateOther, user_count, &mut old_map);
+            self.update_one(name, Visibility::PrivateOther, user_count, &mut old_map);
         }
 
         // Mark all operated rooms as necessary.
@@ -202,8 +201,7 @@ impl RoomMap {
     }
 
     /// Returns the list of (room name, room data) representing all known rooms.
-    pub fn get_room_list(&self) -> Vec<(String, Room)>
-    {
+    pub fn get_room_list(&self) -> Vec<(String, Room)> {
         let mut rooms = Vec::new();
         for (room_name, room) in self.map.iter() {
             rooms.push((room_name.clone(), room.clone()));
@@ -214,21 +212,20 @@ impl RoomMap {
     /// Records that we are now trying to join the given room.
     /// If the room is not found, or if its membership is not `NonMember`,
     /// returns an error.
-    pub fn start_joining(&mut self, room_name: &str)
-        -> Result<(), Error>
-    {
+    pub fn start_joining(&mut self, room_name: &str) -> Result<(), Error> {
         let room = try!(self.get_mut_strict(room_name));
 
         match room.membership {
             Membership::NonMember => {
                 room.membership = Membership::Joining;
                 Ok(())
-            },
+            }
 
             membership => {
                 Err(Error::MembershipChangeInvalid(
-                        membership, Membership::Joining)
-                )
+                    membership,
+                    Membership::Joining,
+                ))
             }
         }
     }
@@ -236,12 +233,12 @@ impl RoomMap {
     /// Records that we are now a member of the given room and updates the room
     /// information.
     pub fn join(
-        &mut self, room_name: &str,
+        &mut self,
+        room_name: &str,
         owner: Option<String>,
         mut operators: Vec<String>,
-        members: &Vec<(String, user::User)>)
-        -> Result<(), Error>
-    {
+        members: &Vec<(String, user::User)>,
+    ) -> Result<(), Error> {
         // First look up the room struct.
         let room = try!(self.get_mut_strict(room_name));
 
@@ -251,14 +248,15 @@ impl RoomMap {
         } else {
             warn!(
                 "Joined room {:?} but membership was already {:?}",
-                room_name, room.membership
+                room_name,
+                room.membership
             );
         }
 
         // Update the room struct.
         room.membership = Membership::Member;
         room.user_count = members.len();
-        room.owner      = owner;
+        room.owner = owner;
 
         room.operators.clear();
         for user_name in operators.drain(..) {
@@ -276,21 +274,20 @@ impl RoomMap {
     /// Records that we are now trying to leave the given room.
     /// If the room is not found, or if its membership status is not `Member`,
     /// returns an error.
-    pub fn start_leaving(&mut self, room_name: &str)
-        -> Result<(), Error>
-    {
+    pub fn start_leaving(&mut self, room_name: &str) -> Result<(), Error> {
         let room = try!(self.get_mut_strict(room_name));
 
         match room.membership {
             Membership::Member => {
                 room.membership = Membership::Leaving;
                 Ok(())
-            },
+            }
 
             membership => {
                 Err(Error::MembershipChangeInvalid(
-                        membership, Membership::Leaving)
-                )
+                    membership,
+                    Membership::Leaving,
+                ))
             }
         }
     }
@@ -302,10 +299,13 @@ impl RoomMap {
         match room.membership {
             Membership::Leaving => info!("Left room {:?}", room_name),
 
-            membership => warn!(
-                "Left room {:?} with wrong membership: {:?}",
-                room_name, membership
-            ),
+            membership => {
+                warn!(
+                    "Left room {:?} with wrong membership: {:?}",
+                    room_name,
+                    membership
+                )
+            }
         }
 
         room.membership = Membership::NonMember;
@@ -313,9 +313,7 @@ impl RoomMap {
     }
 
     /// Saves the given message as the last one in the given room.
-    pub fn add_message(&mut self, room_name: &str, message: Message)
-        -> Result<(), Error>
-    {
+    pub fn add_message(&mut self, room_name: &str, message: Message) -> Result<(), Error> {
         let room = try!(self.get_mut_strict(room_name));
         room.messages.push(message);
         Ok(())
@@ -323,9 +321,7 @@ impl RoomMap {
 
     /// Inserts the given user in the given room's set of members.
     /// Returns an error if the room is not found.
-    pub fn insert_member(&mut self, room_name: &str, user_name: String)
-        -> Result<(), Error>
-    {
+    pub fn insert_member(&mut self, room_name: &str, user_name: String) -> Result<(), Error> {
         let room = try!(self.get_mut_strict(room_name));
         room.members.insert(user_name);
         Ok(())
@@ -333,9 +329,7 @@ impl RoomMap {
 
     /// Removes the given user from the given room's set of members.
     /// Returns an error if the room is not found.
-    pub fn remove_member(&mut self, room_name: &str, user_name: &str)
-        -> Result<(), Error>
-    {
+    pub fn remove_member(&mut self, room_name: &str, user_name: &str) -> Result<(), Error> {
         let room = try!(self.get_mut_strict(room_name));
         room.members.remove(user_name);
         Ok(())
@@ -346,12 +340,12 @@ impl RoomMap {
      *---------*/
 
     pub fn set_tickers(
-        &mut self, room_name: &str, tickers: Vec<(String, String)>)
-        -> Result<(), Error>
-    {
+        &mut self,
+        room_name: &str,
+        tickers: Vec<(String, String)>,
+    ) -> Result<(), Error> {
         let room = try!(self.get_mut_strict(room_name));
         room.tickers = tickers;
         Ok(())
     }
 }
-

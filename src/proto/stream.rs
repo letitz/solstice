@@ -16,14 +16,14 @@ use super::packet::{MutPacket, Parser, ReadFromPacket, WriteToPacket};
 #[derive(Debug)]
 struct OutBuf {
     cursor: usize,
-    bytes: Vec<u8>
+    bytes: Vec<u8>,
 }
 
 impl From<Vec<u8>> for OutBuf {
     fn from(bytes: Vec<u8>) -> Self {
         OutBuf {
             cursor: 0,
-            bytes: bytes
+            bytes: bytes,
         }
     }
 }
@@ -40,7 +40,8 @@ impl OutBuf {
     }
 
     fn try_write_to<T>(&mut self, mut writer: T) -> io::Result<Option<usize>>
-        where T: mio::deprecated::TryWrite
+    where
+        T: mio::deprecated::TryWrite,
     {
         let result = writer.try_write(&self.bytes[self.cursor..]);
         if let Ok(Some(bytes_written)) = result {
@@ -79,39 +80,38 @@ pub enum Intent {
 /// This struct wraps around an mio tcp stream and handles packet reads and
 /// writes.
 #[derive(Debug)]
-pub struct Stream<T: SendPacket>
-{
+pub struct Stream<T: SendPacket> {
     parser: Parser,
-    queue:  VecDeque<OutBuf>,
+    queue: VecDeque<OutBuf>,
     sender: T,
     stream: mio::tcp::TcpStream,
 
     is_connected: bool,
 }
 
-impl<T: SendPacket> Stream<T>
-{
+impl<T: SendPacket> Stream<T> {
     /// Returns a new stream, asynchronously connected to the given address,
     /// which forwards incoming packets to the given sender.
     /// If an error occurs when connecting, returns an error.
     pub fn new<U>(addr_spec: U, sender: T) -> io::Result<Self>
-        where U: ToSocketAddrs + fmt::Debug
+    where
+        U: ToSocketAddrs + fmt::Debug,
     {
         for sock_addr in try!(addr_spec.to_socket_addrs()) {
             if let Ok(stream) = mio::tcp::TcpStream::connect(&sock_addr) {
                 return Ok(Stream {
                     parser: Parser::new(),
-                    queue:  VecDeque::new(),
+                    queue: VecDeque::new(),
                     sender: sender,
                     stream: stream,
 
                     is_connected: false,
-                })
+                });
             }
         }
         Err(io::Error::new(
             io::ErrorKind::Other,
-            format!("Cannot connect to {:?}", addr_spec)
+            format!("Cannot connect to {:?}", addr_spec),
         ))
     }
 
@@ -126,21 +126,15 @@ impl<T: SendPacket> Stream<T>
         loop {
             let mut packet = match self.parser.try_read(&mut self.stream) {
                 Ok(Some(packet)) => packet,
-                Ok(None) => {
-                    break
-                },
-                Err(e) => {
-                    return Err(format!("Error reading stream: {}", e))
-                }
+                Ok(None) => break,
+                Err(e) => return Err(format!("Error reading stream: {}", e)),
             };
             let value = match packet.read_value() {
                 Ok(value) => value,
-                Err(e) => {
-                    return Err(format!("Error parsing packet: {}", e))
-                }
+                Err(e) => return Err(format!("Error parsing packet: {}", e)),
             };
             if let Err(e) = self.sender.send_packet(value) {
-                return Err(format!("Error sending parsed packet: {}", e))
+                return Err(format!("Error sending parsed packet: {}", e));
             }
         }
         Ok(())
@@ -151,7 +145,7 @@ impl<T: SendPacket> Stream<T>
         loop {
             let mut outbuf = match self.queue.pop_front() {
                 Some(outbuf) => outbuf,
-                None => break
+                None => break,
             };
 
             let option = try!(outbuf.try_write_to(&mut self.stream));
@@ -161,10 +155,10 @@ impl<T: SendPacket> Stream<T>
                         self.queue.push_front(outbuf)
                     }
                     // Continue looping
-                },
+                }
                 None => {
                     self.queue.push_front(outbuf);
-                    break
+                    break;
                 }
             }
         }
@@ -174,20 +168,20 @@ impl<T: SendPacket> Stream<T>
     /// The stream is ready to read, write, or both.
     pub fn on_ready(&mut self, event_set: mio::Ready) -> Intent {
         if event_set.is_hup() || event_set.is_error() {
-            return Intent::Done
+            return Intent::Done;
         }
         if event_set.is_readable() {
             let result = self.on_readable();
             if let Err(e) = result {
                 error!("Stream input error: {}", e);
-                return Intent::Done
+                return Intent::Done;
             }
         }
         if event_set.is_writable() {
             let result = self.on_writable();
             if let Err(e) = result {
                 error!("Stream output error: {}", e);
-                return Intent::Done
+                return Intent::Done;
             }
         }
 
@@ -197,17 +191,14 @@ impl<T: SendPacket> Stream<T>
             // If we weren't already connected, notify the sink.
             if let Err(err) = self.sender.notify_open() {
                 error!("Cannot notify client that stream is open: {}", err);
-                return Intent::Done
+                return Intent::Done;
             }
             // And record the fact that we are now connected.
             self.is_connected = true;
         }
 
         // We're always interested in reading more.
-        let mut event_set =
-            mio::Ready::readable() |
-            mio::Ready::hup() |
-            mio::Ready::error();
+        let mut event_set = mio::Ready::readable() | mio::Ready::hup() | mio::Ready::error();
         // If there is still stuff to write in the queue, we're interested in
         // the socket becoming writable too.
         if self.queue.len() > 0 {
@@ -219,13 +210,14 @@ impl<T: SendPacket> Stream<T>
 
     /// The stream has been notified.
     pub fn on_notify<V>(&mut self, payload: &V) -> Intent
-        where V: WriteToPacket
+    where
+        V: WriteToPacket,
     {
         let mut packet = MutPacket::new();
         let result = packet.write_value(payload);
         if let Err(e) = result {
             error!("Error writing payload to packet: {}", e);
-            return Intent::Done
+            return Intent::Done;
         }
         self.queue.push_back(OutBuf::from(packet.into_bytes()));
         Intent::Continue(mio::Ready::readable() | mio::Ready::writable())

@@ -37,10 +37,8 @@ pub enum SendError {
 impl fmt::Display for SendError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            SendError::JSONEncoderError(ref err) =>
-                write!(fmt, "JSONEncoderError: {}", err),
-            SendError::WebSocketError(ref err) =>
-                write!(fmt, "WebSocketError: {}", err),
+            SendError::JSONEncoderError(ref err) => write!(fmt, "JSONEncoderError: {}", err),
+            SendError::WebSocketError(ref err) => write!(fmt, "WebSocketError: {}", err),
         }
     }
 }
@@ -49,7 +47,7 @@ impl error::Error for SendError {
     fn description(&self) -> &str {
         match *self {
             SendError::JSONEncoderError(_) => "JSONEncoderError",
-            SendError::WebSocketError(_)   => "WebSocketError",
+            SendError::WebSocketError(_) => "WebSocketError",
         }
     }
 
@@ -103,7 +101,7 @@ impl Handler {
     fn send_to_client(&self, notification: Notification) -> ws::Result<()> {
         match self.client_tx.send(notification) {
             Ok(()) => Ok(()),
-            Err(e)=> {
+            Err(e) => {
                 error!("Error sending notification to client: {}", e);
                 Err(ws::Error::new(ws::ErrorKind::Internal, ""))
             }
@@ -114,14 +112,16 @@ impl Handler {
 impl ws::Handler for Handler {
     fn on_open(&mut self, _: ws::Handshake) -> ws::Result<()> {
         info!("Websocket open");
-        self.send_to_client(Notification::Connected(Sender {
-            sender: self.socket_tx.clone()
-        }))
+        self.send_to_client(Notification::Connected(
+            Sender { sender: self.socket_tx.clone() },
+        ))
     }
 
     fn on_close(&mut self, code: ws::CloseCode, reason: &str) {
         info!("Websocket closed: code: {:?}, reason: {:?}", code, reason);
-        self.send_to_client(Notification::Disconnected).unwrap_or(())
+        self.send_to_client(Notification::Disconnected).unwrap_or(
+            (),
+        )
     }
 
     fn on_message(&mut self, msg: ws::Message) -> ws::Result<()> {
@@ -131,8 +131,9 @@ impl ws::Handler for Handler {
             ws::Message::Binary(_) => {
                 error!("Received binary websocket message from controller");
                 return Err(ws::Error::new(
-                    ws::ErrorKind::Protocol, "Binary message not supported"
-                ))
+                    ws::ErrorKind::Protocol,
+                    "Binary message not supported",
+                ));
             }
         };
 
@@ -141,9 +142,7 @@ impl ws::Handler for Handler {
             Ok(control_request) => control_request,
             Err(e) => {
                 error!("Received invalid JSON message from controller: {}", e);
-                return Err(ws::Error::new(
-                    ws::ErrorKind::Protocol, "Invalid JSON"
-                ))
+                return Err(ws::Error::new(ws::ErrorKind::Protocol, "Invalid JSON"));
             }
         };
 
@@ -157,36 +156,42 @@ impl ws::Handler for Handler {
 /// Start listening on the socket address stored in configuration, and send
 /// control notifications to the client through the given channel.
 pub fn listen(client_tx: mpsc::Sender<Notification>) {
-    let websocket_result = ws::Builder::new().with_settings(ws::Settings {
-        max_connections: 1,
-        ..ws::Settings::default()
-    }).build(|socket_tx| Handler {
-        client_tx: client_tx.clone(),
-        socket_tx: socket_tx,
-    });
+    let websocket_result = ws::Builder::new()
+        .with_settings(ws::Settings {
+            max_connections: 1,
+            ..ws::Settings::default()
+        })
+        .build(|socket_tx| {
+            Handler {
+                client_tx: client_tx.clone(),
+                socket_tx: socket_tx,
+            }
+        });
 
     let websocket = match websocket_result {
         Ok(websocket) => websocket,
         Err(e) => {
             error!("Unable to build websocket: {}", e);
-            client_tx.send(Notification::Error(
-                    format!("Unable to build websocket: {}", e)
-            )).unwrap();
-            return
+            client_tx
+                .send(Notification::Error(
+                    format!("Unable to build websocket: {}", e),
+                ))
+                .unwrap();
+            return;
         }
     };
 
-    let listen_result = websocket.listen(
-        (config::CONTROL_HOST, config::CONTROL_PORT)
-    );
+    let listen_result = websocket.listen((config::CONTROL_HOST, config::CONTROL_PORT));
 
     match listen_result {
         Ok(_) => (),
         Err(e) => {
             error!("Unable to listen on websocket: {}", e);
-            client_tx.send(Notification::Error(
-                    format!("Unable to listen on websocket: {}", e)
-            )).unwrap();
+            client_tx
+                .send(Notification::Error(
+                    format!("Unable to listen on websocket: {}", e),
+                ))
+                .unwrap();
         }
     }
 }

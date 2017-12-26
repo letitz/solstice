@@ -51,7 +51,7 @@ pub enum LoginStatusResponse {
         username: String,
         /// The reason the server gave for refusing the login request.
         reason: String,
-    }
+    },
 }
 
 /// This structure contains the list of all visible rooms, and their associated

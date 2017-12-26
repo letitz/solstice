@@ -11,7 +11,8 @@ extern crate core;
 extern crate crypto;
 extern crate encoding;
 extern crate futures;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate env_logger;
 extern crate mio;
 extern crate rustc_serialize;
@@ -45,9 +46,8 @@ fn main() {
     let client_to_proto_tx = proto_agent.channel();
     let (control_to_client_tx, control_to_client_rx) = mpsc::channel();
 
-    let mut client = client::Client::new(
-        client_to_proto_tx, proto_to_client_rx, control_to_client_rx
-    );
+    let mut client =
+        client::Client::new(client_to_proto_tx, proto_to_client_rx, control_to_client_rx);
 
     thread::spawn(move || control::listen(control_to_client_tx));
     thread::spawn(move || proto_agent.run().unwrap());

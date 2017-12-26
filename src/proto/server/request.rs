@@ -31,51 +31,51 @@ impl WriteToPacket for ServerRequest {
             ServerRequest::CannotConnectRequest(ref request) => {
                 try!(packet.write_value(&CODE_CANNOT_CONNECT));
                 try!(packet.write_value(request));
-            },
+            }
 
             ServerRequest::ConnectToPeerRequest(ref request) => {
                 try!(packet.write_value(&CODE_CONNECT_TO_PEER));
                 try!(packet.write_value(request));
-            },
+            }
 
             ServerRequest::FileSearchRequest(ref request) => {
                 try!(packet.write_value(&CODE_FILE_SEARCH));
                 try!(packet.write_value(request));
-            },
+            }
 
             ServerRequest::LoginRequest(ref request) => {
                 try!(packet.write_value(&CODE_LOGIN));
                 try!(packet.write_value(request));
-            },
+            }
 
             ServerRequest::PeerAddressRequest(ref request) => {
                 try!(packet.write_value(&CODE_PEER_ADDRESS));
                 try!(packet.write_value(request));
-            },
+            }
 
             ServerRequest::RoomJoinRequest(ref request) => {
                 try!(packet.write_value(&CODE_ROOM_JOIN));
                 try!(packet.write_value(request));
-            },
+            }
 
             ServerRequest::RoomLeaveRequest(ref request) => {
                 try!(packet.write_value(&CODE_ROOM_LEAVE));
                 try!(packet.write_value(request));
-            },
+            }
 
             ServerRequest::RoomListRequest => {
                 try!(packet.write_value(&CODE_ROOM_LIST));
-            },
+            }
 
             ServerRequest::RoomMessageRequest(ref request) => {
                 try!(packet.write_value(&CODE_ROOM_MESSAGE));
                 try!(packet.write_value(request));
-            },
+            }
 
             ServerRequest::SetListenPortRequest(ref request) => {
                 try!(packet.write_value(&CODE_SET_LISTEN_PORT));
                 try!(packet.write_value(request));
-            },
+            }
 
             ServerRequest::UserStatusRequest(ref request) => {
                 try!(packet.write_value(&CODE_USER_STATUS));
@@ -98,7 +98,7 @@ fn md5_str(string: &str) -> String {
 
 #[derive(Debug)]
 pub struct CannotConnectRequest {
-    pub token:     u32,
+    pub token: u32,
     pub user_name: String,
 }
 
@@ -116,8 +116,8 @@ impl WriteToPacket for CannotConnectRequest {
 
 #[derive(Debug)]
 pub struct ConnectToPeerRequest {
-    pub token:           u32,
-    pub user_name:       String,
+    pub token: u32,
+    pub user_name: String,
     pub connection_type: String,
 }
 
@@ -137,7 +137,7 @@ impl WriteToPacket for ConnectToPeerRequest {
 #[derive(Debug)]
 pub struct FileSearchRequest {
     pub ticket: u32,
-    pub query:  String,
+    pub query: String,
 }
 
 impl WriteToPacket for FileSearchRequest {
@@ -161,8 +161,12 @@ pub struct LoginRequest {
 }
 
 impl LoginRequest {
-    pub fn new(username: &str, password: &str, major: u32, minor: u32)
-        -> Result<Self, &'static str> {
+    pub fn new(
+        username: &str,
+        password: &str,
+        major: u32,
+        minor: u32,
+    ) -> Result<Self, &'static str> {
         if password.len() > 0 {
             Ok(LoginRequest {
                 username: username.to_string(),
@@ -213,7 +217,7 @@ impl WriteToPacket for PeerAddressRequest {
 
 #[derive(Debug)]
 pub struct RoomJoinRequest {
-    pub room_name: String
+    pub room_name: String,
 }
 
 impl WriteToPacket for RoomJoinRequest {
@@ -229,7 +233,7 @@ impl WriteToPacket for RoomJoinRequest {
 
 #[derive(Debug)]
 pub struct RoomLeaveRequest {
-    pub room_name: String
+    pub room_name: String,
 }
 
 impl WriteToPacket for RoomLeaveRequest {
@@ -246,7 +250,7 @@ impl WriteToPacket for RoomLeaveRequest {
 #[derive(Debug)]
 pub struct RoomMessageRequest {
     pub room_name: String,
-    pub message:   String,
+    pub message: String,
 }
 
 impl WriteToPacket for RoomMessageRequest {

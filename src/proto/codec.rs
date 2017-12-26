@@ -16,7 +16,7 @@ use tokio_io::codec::length_delimited;
 use proto::server::ServerResponse;
 
 /// Length of an encoded 32-bit integer in bytes.
-const U32_BYTE_LEN : usize = 4;
+const U32_BYTE_LEN: usize = 4;
 
 /*==============*
  * DECODE ERROR *
@@ -44,16 +44,13 @@ pub enum DecodeError {
 impl fmt::Display for DecodeError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            DecodeError::InvalidBoolError(n) =>
-                write!(fmt, "InvalidBoolError: {}", n),
-            DecodeError::InvalidU16Error(n) =>
-                write!(fmt, "InvalidU16Error: {}", n),
-            DecodeError::InvalidStringError(ref bytes) =>
-                write!(fmt, "InvalidStringError: {:?}", bytes),
-            DecodeError::InvalidUserStatusError(n) =>
-                write!(fmt, "InvalidUserStatusError: {}", n),
-            DecodeError::IOError(ref err) =>
-                write!(fmt, "IOError: {}", err),
+            DecodeError::InvalidBoolError(n) => write!(fmt, "InvalidBoolError: {}", n),
+            DecodeError::InvalidU16Error(n) => write!(fmt, "InvalidU16Error: {}", n),
+            DecodeError::InvalidStringError(ref bytes) => {
+                write!(fmt, "InvalidStringError: {:?}", bytes)
+            }
+            DecodeError::InvalidUserStatusError(n) => write!(fmt, "InvalidUserStatusError: {}", n),
+            DecodeError::IOError(ref err) => write!(fmt, "IOError: {}", err),
         }
     }
 }
@@ -61,26 +58,21 @@ impl fmt::Display for DecodeError {
 impl error::Error for DecodeError {
     fn description(&self) -> &str {
         match *self {
-            DecodeError::InvalidBoolError(_) =>
-                "InvalidBoolError",
-            DecodeError::InvalidU16Error(_) =>
-                "InvalidU16Error",
-            DecodeError::InvalidStringError(_)    =>
-                "InvalidStringError",
-            DecodeError::InvalidUserStatusError(_) =>
-                "InvalidUserStatusError",
-            DecodeError::IOError(_) =>
-                "IOError",
+            DecodeError::InvalidBoolError(_) => "InvalidBoolError",
+            DecodeError::InvalidU16Error(_) => "InvalidU16Error",
+            DecodeError::InvalidStringError(_) => "InvalidStringError",
+            DecodeError::InvalidUserStatusError(_) => "InvalidUserStatusError",
+            DecodeError::IOError(_) => "IOError",
         }
     }
 
     fn cause(&self) -> Option<&error::Error> {
         match *self {
-            DecodeError::InvalidBoolError(_)       => None,
-            DecodeError::InvalidU16Error(_)        => None,
-            DecodeError::InvalidStringError(_)     => None,
+            DecodeError::InvalidBoolError(_) => None,
+            DecodeError::InvalidU16Error(_) => None,
+            DecodeError::InvalidStringError(_) => None,
             DecodeError::InvalidUserStatusError(_) => None,
-            DecodeError::IOError(ref err)          => Some(err),
+            DecodeError::IOError(ref err) => Some(err),
         }
     }
 }
@@ -114,7 +106,7 @@ fn unexpected_eof_error(value_type: &str) -> DecodeError {
 /// This trait is implemented by types that can be decoded from messages with
 /// a `ProtoDecoder`.
 /// Only here to enable ProtoDecoder::decode_vec.
-pub trait ProtoDecode : Sized {
+pub trait ProtoDecode: Sized {
     /// Attempts to decode an instance of `Self` using the given decoder.
     fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError>;
 }
@@ -132,17 +124,17 @@ pub trait ProtoEncode {
 pub struct ProtoDecoder<'a> {
     // If bytes::Buf was object-safe we would just store &'a Buf. We work
     // around this limitation by storing the cursor itself.
-    inner: &'a mut io::Cursor<BytesMut>
+    inner: &'a mut io::Cursor<BytesMut>,
 }
 
 impl<'a> ProtoDecoder<'a> {
     fn new(cursor: &'a mut io::Cursor<BytesMut>) -> ProtoDecoder<'a> {
-        ProtoDecoder{inner: cursor}
+        ProtoDecoder { inner: cursor }
     }
 
     fn decode_u32(&mut self) -> Result<u32, DecodeError> {
         if self.inner.remaining() < U32_BYTE_LEN {
-            return Err(unexpected_eof_error("u32"))
+            return Err(unexpected_eof_error("u32"));
         }
         Ok(self.inner.get_u32::<LittleEndian>())
     }
@@ -150,19 +142,19 @@ impl<'a> ProtoDecoder<'a> {
     fn decode_u16(&mut self) -> Result<u16, DecodeError> {
         let n = self.decode_u32()?;
         if n > u16::MAX as u32 {
-            return Err(DecodeError::InvalidU16Error(n))
+            return Err(DecodeError::InvalidU16Error(n));
         }
         Ok(n as u16)
     }
 
     fn decode_bool(&mut self) -> Result<bool, DecodeError> {
         if self.inner.remaining() < 1 {
-            return Err(unexpected_eof_error("bool"))
+            return Err(unexpected_eof_error("bool"));
         }
         match self.inner.get_u8() {
             0 => Ok(false),
             1 => Ok(true),
-            n => Err(DecodeError::InvalidBoolError(n))
+            n => Err(DecodeError::InvalidBoolError(n)),
         }
     }
 
@@ -174,18 +166,21 @@ impl<'a> ProtoDecoder<'a> {
     fn decode_string(&mut self) -> Result<String, DecodeError> {
         let len = self.decode_u32()? as usize;
         if self.inner.remaining() < len {
-            return Err(unexpected_eof_error("string"))
+            return Err(unexpected_eof_error("string"));
         }
         let result = {
             let bytes = &self.inner.bytes()[..len];
-            WINDOWS_1252.decode(bytes, DecoderTrap::Strict)
-                .map_err(|_| DecodeError::InvalidStringError(bytes.to_vec()))
+            WINDOWS_1252.decode(bytes, DecoderTrap::Strict).map_err(
+                |_| {
+                    DecodeError::InvalidStringError(bytes.to_vec())
+                },
+            )
         };
         self.inner.advance(len);
         result
     }
 
-    fn decode_vec<T : ProtoDecode>(&mut self) -> Result<Vec<T>, DecodeError> {
+    fn decode_vec<T: ProtoDecode>(&mut self) -> Result<Vec<T>, DecodeError> {
         let len = self.decode_u32()? as usize;
         let mut vec = Vec::with_capacity(len);
         for _ in 0..len {
@@ -201,12 +196,12 @@ impl<'a> ProtoDecoder<'a> {
 pub struct ProtoEncoder<'a> {
     // If bytes::BufMut was object-safe we would store an &'a BufMut. We work
     // around this limiation by using BytesMut directly.
-    inner: &'a mut BytesMut
+    inner: &'a mut BytesMut,
 }
 
 impl<'a> ProtoEncoder<'a> {
     fn new(buf: &'a mut BytesMut) -> ProtoEncoder {
-        ProtoEncoder{inner: buf}
+        ProtoEncoder { inner: buf }
     }
 
     fn encode_u32(&mut self, val: u32) -> io::Result<()> {
@@ -231,7 +226,7 @@ impl<'a> ProtoEncoder<'a> {
 
     fn encode_ipv4_addr(&mut self, addr: net::Ipv4Addr) -> io::Result<()> {
         let mut octets = addr.octets();
-        octets.reverse();  // Little endian.
+        octets.reverse(); // Little endian.
         self.inner.extend(&octets);
         Ok(())
     }
@@ -250,7 +245,7 @@ impl<'a> ProtoEncoder<'a> {
         Ok(())
     }
 
-    fn encode_vec<T : ProtoEncode>(&mut self, vec: &[T]) -> io::Result<()> {
+    fn encode_vec<T: ProtoEncode>(&mut self, vec: &[T]) -> io::Result<()> {
         self.encode_u32(vec.len() as u32)?;
         for ref item in vec {
             item.encode(self)?;
@@ -343,7 +338,10 @@ impl<T: ProtoEncode> ProtoEncode for Vec<T> {
  *=================*/
 
 fn new_length_prefixed_framed<T, B>(inner: T) -> length_delimited::Framed<T, B>
-where T: AsyncRead + AsyncWrite, B: IntoBuf {
+where
+    T: AsyncRead + AsyncWrite,
+    B: IntoBuf,
+{
     length_delimited::Builder::new()
         .length_field_length(4)
         .little_endian()
@@ -356,8 +354,7 @@ impl Decoder for ServerResponseDecoder {
     type Item = ServerResponse;
     type Error = DecodeError;
 
-    fn decode(&mut self, buf: &mut BytesMut)
-        -> Result<Option<Self::Item>, Self::Error> {
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         unimplemented!();
     }
 }
@@ -383,14 +380,14 @@ mod tests {
     }
 
     // A few integers and their corresponding byte encodings.
-    const U32_ENCODINGS : [(u32, [u8; 4]); 8] = [
-        (0,        [  0,   0,   0,   0]),
-        (255,      [255,   0,   0,   0]),
-        (256,      [  0,   1,   0,   0]),
-        (65535,    [255, 255,   0,   0]),
-        (65536,    [  0,   0,   1,   0]),
-        (16777215, [255, 255, 255,   0]),
-        (16777216, [  0,   0,   0,   1]),
+    const U32_ENCODINGS: [(u32, [u8; 4]); 8] = [
+        (0, [0, 0, 0, 0]),
+        (255, [255, 0, 0, 0]),
+        (256, [0, 1, 0, 0]),
+        (65535, [255, 255, 0, 0]),
+        (65536, [0, 0, 1, 0]),
+        (16777215, [255, 255, 255, 0]),
+        (16777216, [0, 0, 0, 1]),
         (u32::MAX, [255, 255, 255, 255]),
     ];
 
@@ -458,7 +455,9 @@ mod tests {
             let mut expected_bytes = vec![13];
             expected_bytes.extend(encoded_bytes);
 
-            ProtoEncoder::new(&mut bytes).encode_u16(val as u16).unwrap();
+            ProtoEncoder::new(&mut bytes)
+                .encode_u16(val as u16)
+                .unwrap();
             assert_eq!(bytes, expected_bytes);
         }
     }
@@ -485,7 +484,9 @@ mod tests {
             expected_bytes.extend(encoded_bytes);
 
             let addr = net::Ipv4Addr::from(val);
-            ProtoEncoder::new(&mut bytes).encode_ipv4_addr(addr).unwrap();
+            ProtoEncoder::new(&mut bytes)
+                .encode_ipv4_addr(addr)
+                .unwrap();
             assert_eq!(bytes, expected_bytes);
         }
     }
@@ -501,12 +502,13 @@ mod tests {
     }
 
     // A few strings and their corresponding encodings.
-    const STRING_ENCODINGS: [(&'static str, &'static [u8]); 3] = [
-        ("",      &[0, 0, 0, 0]),
-        ("hey!",  &[4, 0, 0, 0, 104, 101, 121, 33]),
-        // Windows 1252 specific codepoints.
-        ("‘’“”€", &[5, 0, 0, 0, 145, 146, 147, 148, 128]),
-    ];
+    const STRING_ENCODINGS: [(&'static str, &'static [u8]); 3] =
+        [
+            ("", &[0, 0, 0, 0]),
+            ("hey!", &[4, 0, 0, 0, 104, 101, 121, 33]),
+            // Windows 1252 specific codepoints.
+            ("‘’“”€", &[5, 0, 0, 0, 145, 146, 147, 148, 128]),
+        ];
 
     #[test]
     fn encode_string() {
@@ -524,7 +526,9 @@ mod tests {
     #[should_panic]
     fn encode_invalid_string() {
         let mut bytes = BytesMut::with_capacity(100);
-        ProtoEncoder::new(&mut bytes).encode_string("忠犬ハチ公").unwrap();
+        ProtoEncoder::new(&mut bytes)
+            .encode_string("忠犬ハチ公")
+            .unwrap();
     }
 
     #[test]

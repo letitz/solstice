@@ -32,7 +32,7 @@ const LISTEN_TOKEN: usize = config::MAX_PEERS + 1;
 pub enum Request {
     PeerConnect(usize, net::Ipv4Addr, u16),
     PeerMessage(usize, peer::Message),
-    ServerRequest(ServerRequest)
+    ServerRequest(ServerRequest),
 }
 
 #[derive(Debug)]
@@ -67,7 +67,7 @@ impl SendPacket for ServerResponseSender {
  *======================*/
 
 pub struct PeerResponseSender {
-    sender:  mpsc::Sender<Response>,
+    sender: mpsc::Sender<Response>,
     peer_id: usize,
 }
 
@@ -101,54 +101,53 @@ struct Handler {
 }
 
 fn listener_bind<U>(addr_spec: U) -> io::Result<mio::tcp::TcpListener>
-    where U: ToSocketAddrs + fmt::Debug
+where
+    U: ToSocketAddrs + fmt::Debug,
 {
     for socket_addr in try!(addr_spec.to_socket_addrs()) {
         if let Ok(listener) = mio::tcp::TcpListener::bind(&socket_addr) {
-            return Ok(listener)
+            return Ok(listener);
         }
     }
     Err(io::Error::new(
         io::ErrorKind::Other,
-        format!("Cannot bind to {:?}", addr_spec)
+        format!("Cannot bind to {:?}", addr_spec),
     ))
 }
 
 impl Handler {
     fn new(
         client_tx: mpsc::Sender<Response>,
-        event_loop: &mut mio::deprecated::EventLoop<Self>)
-        -> io::Result<Self>
-    {
+        event_loop: &mut mio::deprecated::EventLoop<Self>,
+    ) -> io::Result<Self> {
         let host = config::SERVER_HOST;
         let port = config::SERVER_PORT;
         let server_stream = try!(Stream::new(
             (host, port),
-            ServerResponseSender(client_tx.clone())
+            ServerResponseSender(client_tx.clone()),
         ));
 
         info!("Connected to server at {}:{}", host, port);
 
-        let listener = try!(
-            listener_bind((config::LISTEN_HOST, config::LISTEN_PORT))
-        );
+        let listener = try!(listener_bind((config::LISTEN_HOST, config::LISTEN_PORT)));
         info!(
             "Listening for connections on {}:{}",
-            config::LISTEN_HOST, config::LISTEN_PORT
+            config::LISTEN_HOST,
+            config::LISTEN_PORT
         );
 
         try!(event_loop.register(
             server_stream.evented(),
             mio::Token(SERVER_TOKEN),
             mio::Ready::all(),
-            mio::PollOpt::edge() | mio::PollOpt::oneshot()
+            mio::PollOpt::edge() | mio::PollOpt::oneshot(),
         ));
 
         try!(event_loop.register(
             &listener,
             mio::Token(LISTEN_TOKEN),
             mio::Ready::all(),
-            mio::PollOpt::edge() | mio::PollOpt::oneshot()
+            mio::PollOpt::edge() | mio::PollOpt::oneshot(),
         ));
 
         Ok(Handler {
@@ -167,14 +166,14 @@ impl Handler {
         peer_id: usize,
         ip: net::Ipv4Addr,
         port: u16,
-        event_loop: &mut mio::deprecated::EventLoop<Self>)
-        -> Result<(), String>
-    {
+        event_loop: &mut mio::deprecated::EventLoop<Self>,
+    ) -> Result<(), String> {
         let vacant_entry = match self.peer_streams.entry(peer_id) {
             None => return Err("id out of range".to_string()),
 
-            Some(slab::Entry::Occupied(occupied_entry)) =>
-                return Err("id already taken".to_string()),
+            Some(slab::Entry::Occupied(occupied_entry)) => {
+                return Err("id already taken".to_string())
+            }
 
             Some(slab::Entry::Vacant(vacant_entry)) => vacant_entry,
         };
@@ -182,22 +181,24 @@ impl Handler {
         info!("Opening peer connection {} to {}:{}", peer_id, ip, port);
 
         let sender = PeerResponseSender {
-            sender:  self.client_tx.clone(),
-            peer_id: peer_id
+            sender: self.client_tx.clone(),
+            peer_id: peer_id,
         };
 
         let peer_stream = match Stream::new((ip, port), sender) {
             Ok(peer_stream) => peer_stream,
 
-            Err(err) => return Err(format!("i/o error: {}", err))
+            Err(err) => return Err(format!("i/o error: {}", err)),
         };
 
-        event_loop.register(
-            peer_stream.evented(),
-            mio::Token(peer_id),
-            mio::Ready::all(),
-            mio::PollOpt::edge() | mio::PollOpt::oneshot()
-        ).unwrap();
+        event_loop
+            .register(
+                peer_stream.evented(),
+                mio::Token(peer_id),
+                mio::Ready::all(),
+                mio::PollOpt::edge() | mio::PollOpt::oneshot(),
+            )
+            .unwrap();
 
         vacant_entry.insert(peer_stream);
 
@@ -205,20 +206,24 @@ impl Handler {
     }
 
     fn process_server_intent(
-        &mut self, intent: Intent, event_loop: &mut mio::deprecated::EventLoop<Self>)
-    {
+        &mut self,
+        intent: Intent,
+        event_loop: &mut mio::deprecated::EventLoop<Self>,
+    ) {
         match intent {
             Intent::Done => {
                 error!("Server connection closed");
                 // TODO notify client and shut down
-            },
+            }
             Intent::Continue(event_set) => {
-                event_loop.reregister(
-                    self.server_stream.evented(),
-                    mio::Token(SERVER_TOKEN),
-                    event_set,
-                    mio::PollOpt::edge() | mio::PollOpt::oneshot()
-                ).unwrap();
+                event_loop
+                    .reregister(
+                        self.server_stream.evented(),
+                        mio::Token(SERVER_TOKEN),
+                        event_set,
+                        mio::PollOpt::edge() | mio::PollOpt::oneshot(),
+                    )
+                    .unwrap();
             }
         }
     }
@@ -227,26 +232,28 @@ impl Handler {
         &mut self,
         intent: Intent,
         token: mio::Token,
-        event_loop: &mut mio::deprecated::EventLoop<Self>)
-    {
+        event_loop: &mut mio::deprecated::EventLoop<Self>,
+    ) {
         match intent {
             Intent::Done => {
                 self.peer_streams.remove(token.0);
-                self.client_tx.send(
-                    Response::PeerConnectionClosed(token.0)
-                ).unwrap();
-            },
+                self.client_tx
+                    .send(Response::PeerConnectionClosed(token.0))
+                    .unwrap();
+            }
 
             Intent::Continue(event_set) => {
                 if let Some(peer_stream) = self.peer_streams.get_mut(token.0) {
-                    event_loop.reregister(
-                        peer_stream.evented(),
-                        token,
-                        event_set,
-                        mio::PollOpt::edge() | mio::PollOpt::oneshot()
-                    ).unwrap();
+                    event_loop
+                        .reregister(
+                            peer_stream.evented(),
+                            token,
+                            event_set,
+                            mio::PollOpt::edge() | mio::PollOpt::oneshot(),
+                        )
+                        .unwrap();
                 }
-            },
+            }
         }
     }
 }
@@ -255,9 +262,12 @@ impl mio::deprecated::Handler for Handler {
     type Timeout = ();
     type Message = Request;
 
-    fn ready(&mut self, event_loop: &mut mio::deprecated::EventLoop<Self>,
-             token: mio::Token, event_set: mio::Ready)
-    {
+    fn ready(
+        &mut self,
+        event_loop: &mut mio::deprecated::EventLoop<Self>,
+        token: mio::Token,
+        event_set: mio::Ready,
+    ) {
         match token {
             mio::Token(LISTEN_TOKEN) => {
                 if event_set.is_readable() {
@@ -266,25 +276,27 @@ impl mio::deprecated::Handler for Handler {
                         Ok((sock, addr)) => {
                             // TODO add it to peer streams
                             info!("Peer connection accepted from {}", addr);
-                        },
+                        }
 
                         Err(err) => {
                             error!("Cannot accept peer connection: {}", err);
                         }
                     }
                 }
-                event_loop.reregister(
-                    &self.listener,
-                    token,
-                    mio::Ready::all(),
-                    mio::PollOpt::edge() | mio::PollOpt::oneshot()
-                ).unwrap();
-            },
+                event_loop
+                    .reregister(
+                        &self.listener,
+                        token,
+                        mio::Ready::all(),
+                        mio::PollOpt::edge() | mio::PollOpt::oneshot(),
+                    )
+                    .unwrap();
+            }
 
             mio::Token(SERVER_TOKEN) => {
                 let intent = self.server_stream.on_ready(event_set);
                 self.process_server_intent(intent, event_loop);
-            },
+            }
 
             mio::Token(peer_id) => {
                 let intent = match self.peer_streams.get_mut(peer_id) {
@@ -297,22 +309,22 @@ impl mio::deprecated::Handler for Handler {
         }
     }
 
-    fn notify(&mut self, event_loop: &mut mio::deprecated::EventLoop<Self>,
-              request: Request)
-    {
+    fn notify(&mut self, event_loop: &mut mio::deprecated::EventLoop<Self>, request: Request) {
         match request {
-            Request::PeerConnect(peer_id, ip, port) =>
-                if let Err(err) =
-                    self.connect_to_peer(peer_id, ip, port, event_loop)
-                {
+            Request::PeerConnect(peer_id, ip, port) => {
+                if let Err(err) = self.connect_to_peer(peer_id, ip, port, event_loop) {
                     error!(
                         "Cannot open peer connection {} to {}:{}: {}",
-                        peer_id, ip, port, err
+                        peer_id,
+                        ip,
+                        port,
+                        err
                     );
-                    self.client_tx.send(
-                        Response::PeerConnectionClosed(peer_id)
-                    ).unwrap();
-                },
+                    self.client_tx
+                        .send(Response::PeerConnectionClosed(peer_id))
+                        .unwrap();
+                }
+            }
 
             Request::PeerMessage(peer_id, message) => {
                 let intent = match self.peer_streams.get_mut(peer_id) {
@@ -320,20 +332,19 @@ impl mio::deprecated::Handler for Handler {
                     None => {
                         error!(
                             "Cannot send peer message {:?}: unknown id {}",
-                            message, peer_id
+                            message,
+                            peer_id
                         );
-                        return
+                        return;
                     }
                 };
-                self.process_peer_intent(
-                    intent, mio::Token(peer_id), event_loop
-                );
-            },
+                self.process_peer_intent(intent, mio::Token(peer_id), event_loop);
+            }
 
             Request::ServerRequest(server_request) => {
                 let intent = self.server_stream.on_notify(&server_request);
                 self.process_server_intent(intent, event_loop);
-            },
+            }
         }
     }
 }
@@ -342,7 +353,7 @@ pub type Sender = mio::deprecated::Sender<Request>;
 
 pub struct Agent {
     event_loop: mio::deprecated::EventLoop<Handler>,
-    handler:    Handler,
+    handler: Handler,
 }
 
 impl Agent {
@@ -355,7 +366,7 @@ impl Agent {
 
         Ok(Agent {
             event_loop: event_loop,
-            handler:    handler,
+            handler: handler,
         })
     }
 
