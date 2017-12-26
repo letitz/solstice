@@ -1,13 +1,13 @@
 use std::io;
 
-use bytes::BytesMut;
+use bytes::{Buf, BytesMut};
 use futures::{Async, AsyncSink, Poll, Sink, StartSend, Stream};
 use tokio_io::{AsyncRead, AsyncWrite};
-use tokio_io::codec::{Decoder, Encoder, length_delimited};
+use tokio_io::codec::length_delimited;
 
-use super::peer;
-use super::codec::DecodeError;
-use super::{ServerResponse, ServerRequest};
+use proto::peer;
+use proto::{DecodeError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder, ServerResponse,
+            ServerRequest};
 
 /* ------- *
  * Helpers *
@@ -24,16 +24,27 @@ fn decode_server_response(bytes: &mut BytesMut) -> Result<ServerResponse, Decode
     unimplemented!();
 }
 
-fn encode_server_request(request: &ServerRequest) -> BytesMut {
+fn encode_server_request(request: &ServerRequest) -> Result<BytesMut, io::Error> {
     unimplemented!();
 }
 
-fn decode_peer_message(bytes: &mut BytesMut) -> Result<peer::Message, DecodeError> {
-    unimplemented!();
+fn decode_peer_message(bytes: BytesMut) -> Result<peer::Message, DecodeError> {
+    let mut cursor = io::Cursor::new(bytes);
+    let message = peer::Message::decode(&mut ProtoDecoder::new(&mut cursor))?;
+    if cursor.has_remaining() {
+        warn!(
+            "Received peer message with trailing bytes. Message:\n{:?}Bytes:{:?}",
+            message,
+            cursor.bytes()
+        );
+    }
+    Ok(message)
 }
 
-fn encode_peer_message(message: &peer::Message) -> BytesMut {
-    unimplemented!();
+fn encode_peer_message(message: &peer::Message) -> Result<BytesMut, io::Error> {
+    let mut bytes = BytesMut::new();
+    message.encode(&mut ProtoEncoder::new(&mut bytes))?;
+    Ok(bytes)
 }
 
 /* --------------- *
@@ -72,7 +83,8 @@ impl<T: AsyncWrite> Sink for ServerTransport<T> {
     type SinkError = io::Error;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        match self.framed.start_send(encode_server_request(&item)) {
+        let bytes = encode_server_request(&item)?;
+        match self.framed.start_send(bytes) {
             Ok(AsyncSink::Ready) => Ok(AsyncSink::Ready),
             Ok(AsyncSink::NotReady(_)) => Ok(AsyncSink::NotReady(item)),
             Err(err) => Err(err),
@@ -104,8 +116,8 @@ impl<T: AsyncRead> Stream for PeerTransport<T> {
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         match self.framed.poll() {
-            Ok(Async::Ready(Some(mut bytes))) => {
-                let message = decode_peer_message(&mut bytes)?;
+            Ok(Async::Ready(Some(bytes))) => {
+                let message = decode_peer_message(bytes)?;
                 Ok(Async::Ready(Some(message)))
             }
             Ok(Async::Ready(None)) => Ok(Async::Ready(None)),
@@ -120,7 +132,8 @@ impl<T: AsyncWrite> Sink for PeerTransport<T> {
     type SinkError = io::Error;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        match self.framed.start_send(encode_peer_message(&item)) {
+        let bytes = encode_peer_message(&item)?;
+        match self.framed.start_send(bytes) {
             Ok(AsyncSink::Ready) => Ok(AsyncSink::Ready),
             Ok(AsyncSink::NotReady(_)) => Ok(AsyncSink::NotReady(item)),
             Err(err) => Err(err),

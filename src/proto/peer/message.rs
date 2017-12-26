@@ -1,7 +1,8 @@
 use std::io;
 
-use super::super::{MutPacket, Packet, PacketReadError, ReadFromPacket, WriteToPacket};
-use super::constants::*;
+use proto::{DecodeError, MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecoder,
+            ProtoEncode, ProtoEncoder, ReadFromPacket, WriteToPacket};
+use proto::peer::constants::*;
 
 /*=========*
  * MESSAGE *
@@ -36,6 +37,41 @@ impl ReadFromPacket for Message {
         }
 
         Ok(message)
+    }
+}
+
+impl ProtoDecode for Message {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let code = decoder.decode_u32()?;
+        let message = match code {
+            CODE_PIERCE_FIREWALL => {
+                let val = decoder.decode_u32()?;
+                Message::PierceFirewall(val)
+            }
+            CODE_PEER_INIT => {
+                let peer_init = PeerInit::decode(decoder)?;
+                Message::PeerInit(peer_init)
+            }
+            code => Message::Unknown(code),
+        };
+        Ok(message)
+    }
+}
+
+impl ProtoEncode for Message {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        match *self {
+            Message::PierceFirewall(token) => {
+                encoder.encode_u32(CODE_PIERCE_FIREWALL)?;
+                encoder.encode_u32(token)?;
+            }
+            Message::PeerInit(ref request) => {
+                encoder.encode_u32(CODE_PEER_INIT)?;
+                request.encode(encoder)?;
+            }
+            Message::Unknown(_) => unreachable!(),
+        }
+        Ok(())
     }
 }
 
@@ -84,5 +120,27 @@ impl WriteToPacket for PeerInit {
         try!(packet.write_value(&self.connection_type));
         try!(packet.write_value(&self.token));
         Ok(())
+    }
+}
+
+impl ProtoEncode for PeerInit {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        encoder.encode_string(&self.user_name)?;
+        encoder.encode_string(&self.connection_type)?;
+        encoder.encode_u32(self.token)?;
+        Ok(())
+    }
+}
+
+impl ProtoDecode for PeerInit {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let user_name = decoder.decode_string()?;
+        let connection_type = decoder.decode_string()?;
+        let token = decoder.decode_u32()?;
+        Ok(PeerInit {
+            user_name: user_name,
+            connection_type: connection_type,
+            token: token,
+        })
     }
 }

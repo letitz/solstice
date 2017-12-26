@@ -116,23 +116,23 @@ pub trait ProtoEncode {
 // messages.
 pub struct ProtoDecoder<'a> {
     // If bytes::Buf was object-safe we would just store &'a Buf. We work
-    // around this limitation by storing the cursor itself.
+    // around this limitation by explicitly naming the implementing type.
     inner: &'a mut io::Cursor<BytesMut>,
 }
 
 impl<'a> ProtoDecoder<'a> {
-    fn new(cursor: &'a mut io::Cursor<BytesMut>) -> ProtoDecoder<'a> {
-        ProtoDecoder { inner: cursor }
+    pub fn new(inner: &'a mut io::Cursor<BytesMut>) -> Self {
+        ProtoDecoder { inner: inner }
     }
 
-    fn decode_u32(&mut self) -> Result<u32, DecodeError> {
+    pub fn decode_u32(&mut self) -> Result<u32, DecodeError> {
         if self.inner.remaining() < U32_BYTE_LEN {
             return Err(unexpected_eof_error("u32"));
         }
         Ok(self.inner.get_u32::<LittleEndian>())
     }
 
-    fn decode_u16(&mut self) -> Result<u16, DecodeError> {
+    pub fn decode_u16(&mut self) -> Result<u16, DecodeError> {
         let n = self.decode_u32()?;
         if n > u16::MAX as u32 {
             return Err(DecodeError::InvalidU16Error(n));
@@ -140,7 +140,7 @@ impl<'a> ProtoDecoder<'a> {
         Ok(n as u16)
     }
 
-    fn decode_bool(&mut self) -> Result<bool, DecodeError> {
+    pub fn decode_bool(&mut self) -> Result<bool, DecodeError> {
         if self.inner.remaining() < 1 {
             return Err(unexpected_eof_error("bool"));
         }
@@ -151,12 +151,12 @@ impl<'a> ProtoDecoder<'a> {
         }
     }
 
-    fn decode_ipv4_addr(&mut self) -> Result<net::Ipv4Addr, DecodeError> {
+    pub fn decode_ipv4_addr(&mut self) -> Result<net::Ipv4Addr, DecodeError> {
         let ip = self.decode_u32()?;
         Ok(net::Ipv4Addr::from(ip))
     }
 
-    fn decode_string(&mut self) -> Result<String, DecodeError> {
+    pub fn decode_string(&mut self) -> Result<String, DecodeError> {
         let len = self.decode_u32()? as usize;
         if self.inner.remaining() < len {
             return Err(unexpected_eof_error("string"));
@@ -173,7 +173,7 @@ impl<'a> ProtoDecoder<'a> {
         result
     }
 
-    fn decode_vec<T: ProtoDecode>(&mut self) -> Result<Vec<T>, DecodeError> {
+    pub fn decode_vec<T: ProtoDecode>(&mut self) -> Result<Vec<T>, DecodeError> {
         let len = self.decode_u32()? as usize;
         let mut vec = Vec::with_capacity(len);
         for _ in 0..len {
@@ -187,17 +187,18 @@ impl<'a> ProtoDecoder<'a> {
 // A `ProtoEncoder` knows how to encode various types of values into protocol
 // messages.
 pub struct ProtoEncoder<'a> {
-    // If bytes::BufMut was object-safe we would store an &'a BufMut. We work
-    // around this limiation by using BytesMut directly.
+    // We would like to store an &'a BufMut instead, but not only is it not
+    // object-safe yet, it does not grow the buffer on writes either... So we
+    // don't want to template this struct like ProtoDecoder either.
     inner: &'a mut BytesMut,
 }
 
 impl<'a> ProtoEncoder<'a> {
-    fn new(buf: &'a mut BytesMut) -> ProtoEncoder {
-        ProtoEncoder { inner: buf }
+    pub fn new(inner: &'a mut BytesMut) -> Self {
+        ProtoEncoder { inner: inner }
     }
 
-    fn encode_u32(&mut self, val: u32) -> io::Result<()> {
+    pub fn encode_u32(&mut self, val: u32) -> io::Result<()> {
         if self.inner.remaining_mut() < U32_BYTE_LEN {
             self.inner.reserve(U32_BYTE_LEN);
         }
@@ -205,11 +206,11 @@ impl<'a> ProtoEncoder<'a> {
         Ok(())
     }
 
-    fn encode_u16(&mut self, val: u16) -> io::Result<()> {
+    pub fn encode_u16(&mut self, val: u16) -> io::Result<()> {
         self.encode_u32(val as u32)
     }
 
-    fn encode_bool(&mut self, val: bool) -> io::Result<()> {
+    pub fn encode_bool(&mut self, val: bool) -> io::Result<()> {
         if !self.inner.has_remaining_mut() {
             self.inner.reserve(1);
         }
@@ -217,14 +218,14 @@ impl<'a> ProtoEncoder<'a> {
         Ok(())
     }
 
-    fn encode_ipv4_addr(&mut self, addr: net::Ipv4Addr) -> io::Result<()> {
+    pub fn encode_ipv4_addr(&mut self, addr: net::Ipv4Addr) -> io::Result<()> {
         let mut octets = addr.octets();
         octets.reverse(); // Little endian.
         self.inner.extend(&octets);
         Ok(())
     }
 
-    fn encode_string(&mut self, val: &str) -> io::Result<()> {
+    pub fn encode_string(&mut self, val: &str) -> io::Result<()> {
         // Encode the string.
         let bytes = match WINDOWS_1252.encode(val, EncoderTrap::Strict) {
             Ok(bytes) => bytes,
@@ -238,7 +239,7 @@ impl<'a> ProtoEncoder<'a> {
         Ok(())
     }
 
-    fn encode_vec<T: ProtoEncode>(&mut self, vec: &[T]) -> io::Result<()> {
+    pub fn encode_vec<T: ProtoEncode>(&mut self, vec: &[T]) -> io::Result<()> {
         self.encode_u32(vec.len() as u32)?;
         for ref item in vec {
             item.encode(self)?;
