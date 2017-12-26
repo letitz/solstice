@@ -5,15 +5,8 @@ use std::net;
 use std::u16;
 
 use bytes::{Buf, BufMut, BytesMut, LittleEndian};
-use bytes::buf::IntoBuf;
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::WINDOWS_1252;
-use tokio_core::io::EasyBuf;
-use tokio_io::{AsyncRead, AsyncWrite};
-use tokio_io::codec::{Decoder, Encoder};
-use tokio_io::codec::length_delimited;
-
-use proto::server::ServerResponse;
 
 /// Length of an encoded 32-bit integer in bytes.
 const U32_BYTE_LEN: usize = 4;
@@ -87,9 +80,9 @@ fn unexpected_eof_error(value_type: &str) -> DecodeError {
     DecodeError::from(io::Error::new(io::ErrorKind::UnexpectedEof, value_type))
 }
 
-/*=================*
- * DECODE / ENCODE *
- *=================*/
+/*===================================*
+ * BASIC TYPES ENCODING AND DECODING *
+ *===================================*/
 
 // The protocol is pretty basic, though quirky. Base types are serialized in
 // the following way:
@@ -105,7 +98,7 @@ fn unexpected_eof_error(value_type: &str) -> DecodeError {
 
 /// This trait is implemented by types that can be decoded from messages with
 /// a `ProtoDecoder`.
-/// Only here to enable ProtoDecoder::decode_vec.
+/// Only here to enable `ProtoDecoder::decode_vec`.
 pub trait ProtoDecode: Sized {
     /// Attempts to decode an instance of `Self` using the given decoder.
     fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError>;
@@ -330,32 +323,6 @@ impl<T: ProtoDecode> ProtoDecode for Vec<T> {
 impl<T: ProtoEncode> ProtoEncode for Vec<T> {
     fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
         encoder.encode_vec(self)
-    }
-}
-
-/*=================*
- * DECODER/ENCODER *
- *=================*/
-
-fn new_length_prefixed_framed<T, B>(inner: T) -> length_delimited::Framed<T, B>
-where
-    T: AsyncRead + AsyncWrite,
-    B: IntoBuf,
-{
-    length_delimited::Builder::new()
-        .length_field_length(4)
-        .little_endian()
-        .new_framed(inner)
-}
-
-struct ServerResponseDecoder;
-
-impl Decoder for ServerResponseDecoder {
-    type Item = ServerResponse;
-    type Error = DecodeError;
-
-    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        unimplemented!();
     }
 }
 

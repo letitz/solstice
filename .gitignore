@@ -4,6 +4,9 @@
 *.rlib
 *.dll
 
+# Rustfmt backups
+*.bk
+
 # Executables
 *.exe
 
