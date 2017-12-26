@@ -4,10 +4,16 @@ use std::io;
 use std::net;
 use std::u16;
 
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use bytes::{Buf, BufMut, BytesMut, LittleEndian};
+use bytes::buf::IntoBuf;
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::WINDOWS_1252;
 use tokio_core::io::EasyBuf;
+use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_io::codec::{Decoder, Encoder};
+use tokio_io::codec::length_delimited;
+
+use proto::server::ServerResponse;
 
 /// Length of an encoded 32-bit integer in bytes.
 const U32_BYTE_LEN : usize = 4;
@@ -85,162 +91,274 @@ impl From<io::Error> for DecodeError {
     }
 }
 
+fn unexpected_eof_error(value_type: &str) -> DecodeError {
+    DecodeError::from(io::Error::new(io::ErrorKind::UnexpectedEof, value_type))
+}
+
 /*=================*
  * DECODE / ENCODE *
  *=================*/
 
-/// This trait is implemented by types that can be decoded from messages.
-/// Decoding values from messages is attempted only after an entire frame has
-/// been received, so it is an error if not enough data is available.
-pub trait Decode: Sized {
-    /// Attempts to decode an instance of `Self` from the bytes in `buf`.
-    fn decode(buf: &mut EasyBuf) -> Result<Self, DecodeError>;
+// The protocol is pretty basic, though quirky. Base types are serialized in
+// the following way:
+//
+//   * 32-bit integers are serialized in 4 bytes, little-endian.
+//   * 16-bit integers are serialized as 32-bit integers with upper bytes set
+//     to 0.
+//   * Booleans are serialized as single bytes, containing either 0 or 1.
+//   * IPv4 addresses are serialized as 32-bit integers.
+//   * Strings are serialized as 32-bit-length-prefixed arrays of Windows 1252
+//     encoded characters.
+//   * Vectors are serialized as length-prefixed arrays of serialized values.
+
+/// This trait is implemented by types that can be decoded from messages with
+/// a `ProtoDecoder`.
+/// Only here to enable ProtoDecoder::decode_vec.
+pub trait ProtoDecode : Sized {
+    /// Attempts to decode an instance of `Self` using the given decoder.
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError>;
 }
 
-/// This trait is implemented by types that can be encoded into messages.
-pub trait Encode {
-    /// Attempts to encode `self` to the given byte buffer.
-    fn encode(&self, &mut Vec<u8>) -> io::Result<()>;
+/// This trait is implemented by types that can be encoded into messages with
+/// a `ProtoEncoder`.
+/// Only here to enable `ProtoEncoder::encode_vec`.
+pub trait ProtoEncode {
+    /// Attempts to encode `self` with the given encoder.
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()>;
 }
 
-// 32-bit integers are serialized in 4 bytes, little-endian.
+// A `ProtoDecoder` knows how to decode various types of values from protocol
+// messages.
+pub struct ProtoDecoder<'a> {
+    // If bytes::Buf was object-safe we would just store &'a Buf. We work
+    // around this limitation by storing the cursor itself.
+    inner: &'a mut io::Cursor<BytesMut>
+}
 
-impl Decode for u32 {
-    fn decode(buf: &mut EasyBuf) -> Result<Self, DecodeError> {
-        if buf.len() < U32_BYTE_LEN {
-            return Err(DecodeError::from(
-                    io::Error::new(io::ErrorKind::UnexpectedEof, "u32")));
+impl<'a> ProtoDecoder<'a> {
+    fn new(cursor: &'a mut io::Cursor<BytesMut>) -> ProtoDecoder<'a> {
+        ProtoDecoder{inner: cursor}
+    }
+
+    fn decode_u32(&mut self) -> Result<u32, DecodeError> {
+        if self.inner.remaining() < U32_BYTE_LEN {
+            return Err(unexpected_eof_error("u32"))
         }
-        buf.drain_to(U32_BYTE_LEN).as_slice().read_u32::<LittleEndian>()
-            .map_err(DecodeError::from)
+        Ok(self.inner.get_u32::<LittleEndian>())
     }
-}
 
-impl Encode for u32 {
-    fn encode(&self, buf: &mut Vec<u8>) -> io::Result<()> {
-        buf.write_u32::<LittleEndian>(*self)
-    }
-}
-
-// Booleans are serialized as single bytes, containing either 0 or 1.
-
-impl Decode for bool {
-    fn decode(buf: &mut EasyBuf) -> Result<Self, DecodeError> {
-        if buf.len() < 1 {
-            return Err(DecodeError::from(
-                    io::Error::new(io::ErrorKind::UnexpectedEof, "bool")));
-        }
-        match buf.drain_to(1).as_slice()[0] {
-            0 => Ok(false),
-            1 => Ok(true),
-            n => Err(DecodeError::InvalidBoolError(n))
-        }
-    }
-}
-
-impl Encode for bool {
-    fn encode(&self, buf: &mut Vec<u8>) -> io::Result<()> {
-        buf.push(*self as u8);
-        Ok(())
-    }
-}
-
-// 16-bit integers are serialized as 32-bit integers with upper bytes set to 0.
-
-impl Decode for u16 {
-    fn decode(buf: &mut EasyBuf) -> Result<Self, DecodeError> {
-        let n = try!(u32::decode(buf));
+    fn decode_u16(&mut self) -> Result<u16, DecodeError> {
+        let n = self.decode_u32()?;
         if n > u16::MAX as u32 {
             return Err(DecodeError::InvalidU16Error(n))
         }
         Ok(n as u16)
     }
-}
 
-impl Encode for u16 {
-    fn encode(&self, buf: &mut Vec<u8>) -> io::Result<()> {
-        (*self as u32).encode(buf)
-    }
-}
-
-// IPv4 addresses are serialized just as 32-bit integers.
-
-impl Decode for net::Ipv4Addr {
-    fn decode(buf: &mut EasyBuf) -> Result<Self, DecodeError> {
-        let ip = try!(u32::decode(buf));
-        Ok(net::Ipv4Addr::from(ip))
-    }
-}
-
-impl Encode for net::Ipv4Addr {
-    fn encode(&self, buf: &mut Vec<u8>) -> io::Result<()> {
-        let mut octets = self.octets();
-        octets.reverse();  // Little endian.
-        buf.extend(&octets);
-        Ok(())
-    }
-}
-
-// Strings are serialized as 32-bit-length-prefixed arrays of Windows 1252
-// encoded characters.
-
-impl Decode for String {
-    fn decode(buf: &mut EasyBuf) -> Result<Self, DecodeError> {
-        let len = try!(u32::decode(buf)) as usize;
-        let contents = buf.drain_to(len);
-        match WINDOWS_1252.decode(contents.as_slice(), DecoderTrap::Strict) {
-            Ok(string) => Ok(string),
-            Err(_) =>
-                Err(DecodeError::InvalidStringError(
-                        contents.as_slice().to_vec()))
+    fn decode_bool(&mut self) -> Result<bool, DecodeError> {
+        if self.inner.remaining() < 1 {
+            return Err(unexpected_eof_error("bool"))
+        }
+        match self.inner.get_u8() {
+            0 => Ok(false),
+            1 => Ok(true),
+            n => Err(DecodeError::InvalidBoolError(n))
         }
     }
-}
 
-impl Encode for str {
-    fn encode(&self, buf: &mut Vec<u8>) -> io::Result<()> {
-        // Encode the string.
-        let bytes = match WINDOWS_1252.encode(self, EncoderTrap::Strict) {
-            Ok(bytes) => bytes,
-            Err(_) => {
-                let copy = self.to_string();
-                return Err(io::Error::new(io::ErrorKind::InvalidData, copy));
-            }
+    fn decode_ipv4_addr(&mut self) -> Result<net::Ipv4Addr, DecodeError> {
+        let ip = self.decode_u32()?;
+        Ok(net::Ipv4Addr::from(ip))
+    }
+
+    fn decode_string(&mut self) -> Result<String, DecodeError> {
+        let len = self.decode_u32()? as usize;
+        if self.inner.remaining() < len {
+            return Err(unexpected_eof_error("string"))
+        }
+        let result = {
+            let bytes = &self.inner.bytes()[..len];
+            WINDOWS_1252.decode(bytes, DecoderTrap::Strict)
+                .map_err(|_| DecodeError::InvalidStringError(bytes.to_vec()))
         };
-        // Prefix the bytes with the length.
-        (bytes.len() as u32).encode(buf)?;
-        buf.extend(bytes);
-        Ok(())
+        self.inner.advance(len);
+        result
     }
-}
 
-// Apparently deref coercion does not work for trait methods.
-impl Encode for String {
-    fn encode(&self, buf: &mut Vec<u8>) -> io::Result<()> {
-        (self as &str).encode(buf)
-    }
-}
-
-// Vectors are serialized as length-prefixed arrays of serialized values.
-
-impl<T: Decode> Decode for Vec<T> {
-    fn decode(buf: &mut EasyBuf) -> Result<Self, DecodeError> {
-        let len = try!(u32::decode(buf)) as usize;
+    fn decode_vec<T : ProtoDecode>(&mut self) -> Result<Vec<T>, DecodeError> {
+        let len = self.decode_u32()? as usize;
         let mut vec = Vec::with_capacity(len);
         for _ in 0..len {
-            vec.push(try!(T::decode(buf)));
+            let val = T::decode(self)?;
+            vec.push(val);
         }
         Ok(vec)
     }
 }
 
-impl<T: Encode> Encode for Vec<T> {
-    fn encode(&self, buf: &mut Vec<u8>) -> io::Result<()> {
-        (self.len() as u32).encode(buf)?;
-        for ref item in self {
-            item.encode(buf)?;
+// A `ProtoEncoder` knows how to encode various types of values into protocol
+// messages.
+pub struct ProtoEncoder<'a> {
+    // If bytes::BufMut was object-safe we would store an &'a BufMut. We work
+    // around this limiation by using BytesMut directly.
+    inner: &'a mut BytesMut
+}
+
+impl<'a> ProtoEncoder<'a> {
+    fn new(buf: &'a mut BytesMut) -> ProtoEncoder {
+        ProtoEncoder{inner: buf}
+    }
+
+    fn encode_u32(&mut self, val: u32) -> io::Result<()> {
+        if self.inner.remaining_mut() < U32_BYTE_LEN {
+            self.inner.reserve(U32_BYTE_LEN);
+        }
+        self.inner.put_u32::<LittleEndian>(val);
+        Ok(())
+    }
+
+    fn encode_u16(&mut self, val: u16) -> io::Result<()> {
+        self.encode_u32(val as u32)
+    }
+
+    fn encode_bool(&mut self, val: bool) -> io::Result<()> {
+        if !self.inner.has_remaining_mut() {
+            self.inner.reserve(1);
+        }
+        self.inner.put_u8(val as u8);
+        Ok(())
+    }
+
+    fn encode_ipv4_addr(&mut self, addr: net::Ipv4Addr) -> io::Result<()> {
+        let mut octets = addr.octets();
+        octets.reverse();  // Little endian.
+        self.inner.extend(&octets);
+        Ok(())
+    }
+
+    fn encode_string(&mut self, val: &str) -> io::Result<()> {
+        // Encode the string.
+        let bytes = match WINDOWS_1252.encode(val, EncoderTrap::Strict) {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                return Err(io::Error::new(io::ErrorKind::InvalidData, val.to_string()));
+            }
+        };
+        // Prefix the bytes with the length.
+        self.encode_u32(bytes.len() as u32)?;
+        self.inner.extend(bytes);
+        Ok(())
+    }
+
+    fn encode_vec<T : ProtoEncode>(&mut self, vec: &[T]) -> io::Result<()> {
+        self.encode_u32(vec.len() as u32)?;
+        for ref item in vec {
+            item.encode(self)?;
         }
         Ok(())
+    }
+}
+
+impl ProtoDecode for u32 {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        decoder.decode_u32()
+    }
+}
+
+impl ProtoEncode for u32 {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        encoder.encode_u32(*self)
+    }
+}
+
+impl ProtoDecode for bool {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        decoder.decode_bool()
+    }
+}
+
+impl ProtoEncode for bool {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        encoder.encode_bool(*self)
+    }
+}
+
+impl ProtoDecode for u16 {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        decoder.decode_u16()
+    }
+}
+
+impl ProtoEncode for u16 {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        encoder.encode_u16(*self)
+    }
+}
+
+impl ProtoDecode for net::Ipv4Addr {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        decoder.decode_ipv4_addr()
+    }
+}
+
+impl ProtoEncode for net::Ipv4Addr {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        encoder.encode_ipv4_addr(*self)
+    }
+}
+
+impl ProtoDecode for String {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        decoder.decode_string()
+    }
+}
+
+impl ProtoEncode for str {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        encoder.encode_string(self)
+    }
+}
+
+// Apparently deref coercion does not work for trait methods.
+impl ProtoEncode for String {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        encoder.encode_string(self)
+    }
+}
+
+impl<T: ProtoDecode> ProtoDecode for Vec<T> {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        decoder.decode_vec::<T>()
+    }
+}
+
+impl<T: ProtoEncode> ProtoEncode for Vec<T> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        encoder.encode_vec(self)
+    }
+}
+
+/*=================*
+ * DECODER/ENCODER *
+ *=================*/
+
+fn new_length_prefixed_framed<T, B>(inner: T) -> length_delimited::Framed<T, B>
+where T: AsyncRead + AsyncWrite, B: IntoBuf {
+    length_delimited::Builder::new()
+        .length_field_length(4)
+        .little_endian()
+        .new_framed(inner)
+}
+
+struct ServerResponseDecoder;
+
+impl Decoder for ServerResponseDecoder {
+    type Item = ServerResponse;
+    type Error = DecodeError;
+
+    fn decode(&mut self, buf: &mut BytesMut)
+        -> Result<Option<Self::Item>, Self::Error> {
+        unimplemented!();
     }
 }
 
@@ -250,13 +368,19 @@ impl<T: Encode> Encode for Vec<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Decode, Encode};
+    use super::{ProtoDecoder, ProtoEncoder, ProtoDecode, ProtoEncode};
 
+    use std::io;
     use std::net;
     use std::u16;
     use std::u32;
 
-    use tokio_core::io::EasyBuf;
+    use bytes::{Buf, BytesMut};
+
+    // Helper for succinctness in tests below.
+    fn new_cursor(vec: Vec<u8>) -> io::Cursor<BytesMut> {
+        io::Cursor::new(BytesMut::from(vec))
+    }
 
     // A few integers and their corresponding byte encodings.
     const U32_ENCODINGS : [(u32, [u8; 4]); 8] = [
@@ -273,10 +397,11 @@ mod tests {
     #[test]
     fn encode_u32() {
         for &(val, ref encoded_bytes) in &U32_ENCODINGS {
-            let mut bytes = vec![13];
-            val.encode(&mut bytes).unwrap();
+            let mut bytes = BytesMut::from(vec![13]);
             let mut expected_bytes = vec![13];
             expected_bytes.extend(encoded_bytes);
+
+            ProtoEncoder::new(&mut bytes).encode_u32(val).unwrap();
             assert_eq!(bytes, expected_bytes);
         }
     }
@@ -284,38 +409,42 @@ mod tests {
     #[test]
     fn decode_u32() {
         for &(expected_val, ref bytes) in &U32_ENCODINGS {
-            let mut buf = EasyBuf::from(bytes.to_vec());
-            let val = u32::decode(&mut buf).unwrap();
+            let mut cursor = new_cursor(bytes.to_vec());
+            let val = ProtoDecoder::new(&mut cursor).decode_u32().unwrap();
             assert_eq!(val, expected_val);
-            assert_eq!(buf.len(), 0);
+            assert_eq!(cursor.remaining(), 0);
         }
     }
 
     #[test]
     fn encode_bool() {
-        let mut bytes = vec![13];
-        false.encode(&mut bytes);
-        assert_eq!(bytes, [13, 0]);
+        let mut bytes = BytesMut::from(vec![13]);
+        ProtoEncoder::new(&mut bytes).encode_bool(false).unwrap();
+        assert_eq!(*bytes, [13, 0]);
 
         bytes.truncate(1);
-        true.encode(&mut bytes);
-        assert_eq!(bytes, [13, 1]);
+        ProtoEncoder::new(&mut bytes).encode_bool(true).unwrap();
+        assert_eq!(*bytes, [13, 1]);
     }
 
     #[test]
     fn decode_bool() {
-        let mut buf = EasyBuf::from(vec![0]);
-        let mut val = bool::decode(&mut buf).unwrap();
+        let mut cursor = new_cursor(vec![0]);
+        let mut val = ProtoDecoder::new(&mut cursor).decode_bool().unwrap();
         assert!(!val);
-        assert_eq!(buf.len(), 0);
+        assert_eq!(cursor.remaining(), 0);
 
-        buf = EasyBuf::from(vec![1]);
-        val = bool::decode(&mut buf).unwrap();
+        cursor = new_cursor(vec![1]);
+        val = ProtoDecoder::new(&mut cursor).decode_bool().unwrap();
         assert!(val);
-        assert_eq!(buf.len(), 0);
+        assert_eq!(cursor.remaining(), 0);
+    }
 
-        buf = EasyBuf::from(vec![42]);
-        assert!(!bool::decode(&mut buf).is_ok());
+    #[test]
+    #[should_panic]
+    fn decode_bool_invalid() {
+        let mut cursor = new_cursor(vec![42]);
+        ProtoDecoder::new(&mut cursor).decode_bool().unwrap();
     }
 
     #[test]
@@ -324,11 +453,12 @@ mod tests {
             if val > u16::MAX as u32 {
                 continue;
             }
-            let mut bytes = vec![13];
-            (val as u16).encode(&mut bytes).unwrap();
 
+            let mut bytes = BytesMut::from(vec![13]);
             let mut expected_bytes = vec![13];
             expected_bytes.extend(encoded_bytes);
+
+            ProtoEncoder::new(&mut bytes).encode_u16(val as u16).unwrap();
             assert_eq!(bytes, expected_bytes);
         }
     }
@@ -336,14 +466,13 @@ mod tests {
     #[test]
     fn decode_u16() {
         for &(expected_val, ref bytes) in &U32_ENCODINGS {
+            let mut cursor = new_cursor(bytes.to_vec());
             if expected_val <= u16::MAX as u32 {
-                let mut buf = EasyBuf::from(bytes.to_vec());
-                let val = u16::decode(&mut buf).unwrap();
+                let val = ProtoDecoder::new(&mut cursor).decode_u16().unwrap();
                 assert_eq!(val, expected_val as u16);
-                assert_eq!(buf.len(), 0);
+                assert_eq!(cursor.remaining(), 0);
             } else {
-                let mut buf = EasyBuf::from(bytes.to_vec());
-                assert!(!u16::decode(&mut buf).is_ok());
+                assert!(ProtoDecoder::new(&mut cursor).decode_u16().is_err());
             }
         }
     }
@@ -351,11 +480,12 @@ mod tests {
     #[test]
     fn encode_ipv4() {
         for &(val, ref encoded_bytes) in &U32_ENCODINGS {
-            let mut bytes = vec![13];
-            net::Ipv4Addr::from(val).encode(&mut bytes).unwrap();
-
+            let mut bytes = BytesMut::from(vec![13]);
             let mut expected_bytes = vec![13];
             expected_bytes.extend(encoded_bytes);
+
+            let addr = net::Ipv4Addr::from(val);
+            ProtoEncoder::new(&mut bytes).encode_ipv4_addr(addr).unwrap();
             assert_eq!(bytes, expected_bytes);
         }
     }
@@ -363,10 +493,10 @@ mod tests {
     #[test]
     fn decode_ipv4() {
         for &(expected_val, ref bytes) in &U32_ENCODINGS {
-            let mut buf = EasyBuf::from(bytes.to_vec());
-            let val = net::Ipv4Addr::decode(&mut buf).unwrap();
+            let mut cursor = new_cursor(bytes.to_vec());
+            let val = ProtoDecoder::new(&mut cursor).decode_ipv4_addr().unwrap();
             assert_eq!(val, net::Ipv4Addr::from(expected_val));
-            assert_eq!(buf.len(), 0);
+            assert_eq!(cursor.remaining(), 0);
         }
     }
 
@@ -381,11 +511,11 @@ mod tests {
     #[test]
     fn encode_string() {
         for &(string, encoded_bytes) in &STRING_ENCODINGS {
-            let mut bytes = vec![13];
-            string.encode(&mut bytes).unwrap();
-
+            let mut bytes = BytesMut::from(vec![13]);
             let mut expected_bytes = vec![13];
             expected_bytes.extend(encoded_bytes);
+
+            ProtoEncoder::new(&mut bytes).encode_string(string).unwrap();
             assert_eq!(bytes, expected_bytes);
         }
     }
@@ -393,17 +523,17 @@ mod tests {
     #[test]
     #[should_panic]
     fn encode_invalid_string() {
-        let mut bytes = vec![];
-        "忠犬ハチ公".encode(&mut bytes).unwrap();
+        let mut bytes = BytesMut::with_capacity(100);
+        ProtoEncoder::new(&mut bytes).encode_string("忠犬ハチ公").unwrap();
     }
 
     #[test]
     fn decode_string() {
         for &(expected_string, bytes) in &STRING_ENCODINGS {
-            let mut buf = EasyBuf::from(bytes.to_vec());
-            let string = String::decode(&mut buf).unwrap();
+            let mut cursor = new_cursor(bytes.to_vec());
+            let string = ProtoDecoder::new(&mut cursor).decode_string().unwrap();
             assert_eq!(string, expected_string);
-            assert_eq!(buf.len(), 0);
+            assert_eq!(cursor.remaining(), 0);
         }
     }
 
@@ -416,8 +546,8 @@ mod tests {
             expected_bytes.extend(encoded_bytes);
         }
 
-        let mut bytes = vec![13];
-        vec.encode(&mut bytes).unwrap();
+        let mut bytes = BytesMut::from(vec![13]);
+        ProtoEncoder::new(&mut bytes).encode_vec(&vec).unwrap();
 
         assert_eq!(bytes, expected_bytes);
     }
@@ -431,10 +561,10 @@ mod tests {
             bytes.extend(encoded_bytes);
         }
 
-        let mut buf = EasyBuf::from(bytes);
-        let vec = Vec::<u32>::decode(&mut buf).unwrap();
+        let mut cursor = new_cursor(bytes);
+        let vec = ProtoDecoder::new(&mut cursor).decode_vec::<u32>().unwrap();
 
         assert_eq!(vec, expected_vec);
-        assert_eq!(buf.len(), 0);
+        assert_eq!(cursor.remaining(), 0);
     }
 }

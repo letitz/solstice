@@ -6,6 +6,7 @@ mod room;
 mod user;
 
 extern crate byteorder;
+extern crate bytes;
 extern crate core;
 extern crate crypto;
 extern crate encoding;
@@ -16,6 +17,7 @@ extern crate mio;
 extern crate rustc_serialize;
 extern crate slab;
 extern crate tokio_core;
+extern crate tokio_io;
 extern crate ws;
 
 use std::sync::mpsc;

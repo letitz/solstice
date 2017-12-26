@@ -5,6 +5,7 @@ authors = ["letitz"]
 
 [dependencies]
 byteorder = "^0.5.1"
+bytes = "^0.4"
 encoding = "^0.2"
 env_logger = "^0.3.2"
 futures = "^0.1"
@@ -14,4 +15,5 @@ rust-crypto = "^0.2.34"
 rustc-serialize = "^0.3.17"
 slab = "^0.2"
 tokio-core = "^0.1"
+tokio-io = "^0.1"
 ws = "^0.4"
