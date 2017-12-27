@@ -32,6 +32,9 @@ pub enum DecodeError {
     InvalidUserStatusError(u32),
     /// Encountered the enclosed I/O error while decoding.
     IOError(io::Error),
+    /// Attempted to decode a message with the enclosed code, unknown to this
+    /// library.
+    UnknownCodeError(u32),
 }
 
 impl fmt::Display for DecodeError {
@@ -44,6 +47,7 @@ impl fmt::Display for DecodeError {
             }
             DecodeError::InvalidUserStatusError(n) => write!(fmt, "InvalidUserStatusError: {}", n),
             DecodeError::IOError(ref err) => write!(fmt, "IOError: {}", err),
+            DecodeError::UnknownCodeError(code) => write!(fmt, "UnknownCodeError: {}", code),
         }
     }
 }
@@ -56,6 +60,7 @@ impl error::Error for DecodeError {
             DecodeError::InvalidStringError(_) => "InvalidStringError",
             DecodeError::InvalidUserStatusError(_) => "InvalidUserStatusError",
             DecodeError::IOError(_) => "IOError",
+            DecodeError::UnknownCodeError(code) => "UnknownCodeError",
         }
     }
 
@@ -66,6 +71,7 @@ impl error::Error for DecodeError {
             DecodeError::InvalidStringError(_) => None,
             DecodeError::InvalidUserStatusError(_) => None,
             DecodeError::IOError(ref err) => Some(err),
+            DecodeError::UnknownCodeError(_) => None,
         }
     }
 }
