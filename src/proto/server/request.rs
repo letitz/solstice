@@ -593,40 +593,39 @@ mod tests {
 
     use super::*;
 
-    fn roundtrip<T: Debug + Eq + ProtoDecode + ProtoEncode>(input: &T) -> T {
+    fn roundtrip(input: ServerRequest) {
         let mut bytes = BytesMut::new();
         input.encode(&mut ProtoEncoder::new(&mut bytes)).unwrap();
 
         let mut cursor = io::Cursor::new(bytes);
-        T::decode(&mut ProtoDecoder::new(&mut cursor)).unwrap()
+        let output = ServerRequest::decode(&mut ProtoDecoder::new(&mut cursor)).unwrap();
+
+        assert_eq!(output, input);
     }
 
     #[test]
     fn roundtrip_cannot_connect_request() {
-        let input = ServerRequest::CannotConnectRequest(CannotConnectRequest {
+        roundtrip(ServerRequest::CannotConnectRequest(CannotConnectRequest {
             token: 1337,
             user_name: "alice".to_string(),
-        });
-        assert_eq!(roundtrip(&input), input);
+        }))
     }
 
     #[test]
     fn roundtrip_connect_to_peer_request() {
-        let input = ServerRequest::ConnectToPeerRequest(ConnectToPeerRequest {
+        roundtrip(ServerRequest::ConnectToPeerRequest(ConnectToPeerRequest {
             token: 1337,
             user_name: "alice".to_string(),
             connection_type: "P".to_string(),
-        });
-        assert_eq!(roundtrip(&input), input);
+        }))
     }
 
     #[test]
     fn roundtrip_file_search_request() {
-        let input = ServerRequest::FileSearchRequest(FileSearchRequest {
+        roundtrip(ServerRequest::FileSearchRequest(FileSearchRequest {
             ticket: 1337,
             query: "foo.txt".to_string(),
-        });
-        assert_eq!(roundtrip(&input), input);
+        }))
     }
 
     #[test]
@@ -643,62 +642,54 @@ mod tests {
 
     #[test]
     fn roundtrip_login_request() {
-        let input = ServerRequest::LoginRequest(LoginRequest::new("alice", "password1234", 1337, 42).unwrap());
-        assert_eq!(roundtrip(&input), input);
+        roundtrip(ServerRequest::LoginRequest(LoginRequest::new("alice", "password1234", 1337, 42).unwrap()))
     }
 
     #[test]
     fn roundtrip_peer_address_request() {
-        let input = ServerRequest::PeerAddressRequest(PeerAddressRequest {
+        roundtrip(ServerRequest::PeerAddressRequest(PeerAddressRequest {
             username: "alice".to_string(),
-        });
-        assert_eq!(roundtrip(&input), input);
+        }))
     }
 
     #[test]
     fn roundtrip_room_join_request() {
-        let input = ServerRequest::RoomJoinRequest(RoomJoinRequest {
+        roundtrip(ServerRequest::RoomJoinRequest(RoomJoinRequest {
             room_name: "best room ever".to_string(),
-        });
-        assert_eq!(roundtrip(&input), input);
+        }))
     }
 
     #[test]
     fn roundtrip_room_leave_request() {
-        let input = ServerRequest::RoomLeaveRequest(RoomLeaveRequest {
+        roundtrip(ServerRequest::RoomLeaveRequest(RoomLeaveRequest {
             room_name: "best room ever".to_string()
-        });
-        assert_eq!(roundtrip(&input), input);
+        }))
     }
 
     #[test]
     fn roundtrip_room_list_request() {
-        let input = ServerRequest::RoomListRequest;
-        assert_eq!(roundtrip(&input), input);
+        roundtrip(ServerRequest::RoomListRequest)
     }
 
     #[test]
     fn roundtrip_room_message_request() {
-        let input = ServerRequest::RoomMessageRequest(RoomMessageRequest {
+        roundtrip(ServerRequest::RoomMessageRequest(RoomMessageRequest {
             room_name: "best room ever".to_string(),
             message: "hello world!".to_string(),
-        });
-        assert_eq!(roundtrip(&input), input);
+        }))
     }
 
     #[test]
     fn roundtrip_set_listen_port_request() {
-        let input = ServerRequest::SetListenPortRequest(SetListenPortRequest {
+        roundtrip(ServerRequest::SetListenPortRequest(SetListenPortRequest {
             port: 1337,
-        });
-        assert_eq!(roundtrip(&input), input);
+        }))
     }
 
     #[test]
     fn roundtrip_user_status_request() {
-        let input = ServerRequest::UserStatusRequest(UserStatusRequest {
+        roundtrip(ServerRequest::UserStatusRequest(UserStatusRequest {
             user_name: "alice".to_string(),
-        });
-        assert_eq!(roundtrip(&input), input);
+        }))
     }
 }
