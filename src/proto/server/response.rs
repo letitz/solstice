@@ -1,8 +1,9 @@
+use std::io;
 use std::net;
 
-use super::constants::*;
-use super::super::packet::{Packet, PacketReadError, ReadFromPacket};
-
+use proto::server::constants::*;
+use proto::{DecodeError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
+use proto::packet::{Packet, PacketReadError, ReadFromPacket};
 use user;
 
 /*=================*
@@ -95,6 +96,28 @@ impl ReadFromPacket for ServerResponse {
             )
         }
         Ok(resp)
+    }
+}
+
+impl ProtoEncode for ServerResponse {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        match *self {
+            _ => {
+                unimplemented!();
+            },
+        }
+    }
+}
+
+impl ProtoDecode for ServerResponse {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let code = decoder.decode_u32()?;
+        let request = match code {
+            _ => {
+                return Err(DecodeError::UnknownCodeError(code));
+            },
+        };
+        Ok(request)
     }
 }
 
