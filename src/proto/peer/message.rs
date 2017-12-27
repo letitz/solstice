@@ -47,12 +47,14 @@ impl ProtoDecode for Message {
             CODE_PIERCE_FIREWALL => {
                 let val = decoder.decode_u32()?;
                 Message::PierceFirewall(val)
-            }
+            },
             CODE_PEER_INIT => {
                 let peer_init = PeerInit::decode(decoder)?;
                 Message::PeerInit(peer_init)
-            }
-            code => Message::Unknown(code),
+            },
+            _ => {
+                return Err(DecodeError::UnknownCodeError(code));
+            },
         };
         Ok(message)
     }
@@ -64,11 +66,11 @@ impl ProtoEncode for Message {
             Message::PierceFirewall(token) => {
                 encoder.encode_u32(CODE_PIERCE_FIREWALL)?;
                 encoder.encode_u32(token)?;
-            }
+            },
             Message::PeerInit(ref request) => {
                 encoder.encode_u32(CODE_PEER_INIT)?;
                 request.encode(encoder)?;
-            }
+            },
             Message::Unknown(_) => unreachable!(),
         }
         Ok(())
@@ -164,6 +166,16 @@ mod tests {
         let output = Message::decode(&mut ProtoDecoder::new(&mut cursor)).unwrap();
 
         assert_eq!(output, input);
+    }
+
+    #[test]
+    #[should_panic]
+    fn invalid_code() {
+        let mut bytes = BytesMut::new();
+        ProtoEncoder::new(&mut bytes).encode_u32(1337).unwrap();
+
+        let mut cursor = io::Cursor::new(bytes);
+        Message::decode(&mut ProtoDecoder::new(&mut cursor)).unwrap();
     }
 
     #[test]
