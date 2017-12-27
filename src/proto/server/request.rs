@@ -3,14 +3,25 @@ use std::io;
 use crypto::md5::Md5;
 use crypto::digest::Digest;
 
-use super::constants::*;
-use super::super::packet::{MutPacket, WriteToPacket};
+use proto::{DecodeError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
+use proto::packet::{MutPacket, WriteToPacket};
+use proto::server::constants::*;
+
+/* ------- *
+ * Helpers *
+ * ------- */
+
+fn md5_str(string: &str) -> String {
+    let mut hasher = Md5::new();
+    hasher.input_str(string);
+    hasher.result_str()
+}
 
 /*================*
  * SERVER REQUEST *
  *================*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum ServerRequest {
     CannotConnectRequest(CannotConnectRequest),
     ConnectToPeerRequest(ConnectToPeerRequest),
@@ -86,17 +97,11 @@ impl WriteToPacket for ServerRequest {
     }
 }
 
-fn md5_str(string: &str) -> String {
-    let mut hasher = Md5::new();
-    hasher.input_str(string);
-    hasher.result_str()
-}
-
 /*================*
  * CANNOT CONNECT *
  *================*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct CannotConnectRequest {
     pub token: u32,
     pub user_name: String,
@@ -110,11 +115,29 @@ impl WriteToPacket for CannotConnectRequest {
     }
 }
 
+impl ProtoEncode for CannotConnectRequest {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        encoder.encode_u32(self.token)?;
+        encoder.encode_string(&self.user_name)
+    }
+}
+
+impl ProtoDecode for CannotConnectRequest {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let token = decoder.decode_u32()?;
+        let user_name = decoder.decode_string()?;
+        Ok(Self {
+            token: token,
+            user_name: user_name,
+        })
+    }
+}
+
 /*=================*
  * CONNECT TO PEER *
  *=================*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct ConnectToPeerRequest {
     pub token: u32,
     pub user_name: String,
@@ -130,11 +153,32 @@ impl WriteToPacket for ConnectToPeerRequest {
     }
 }
 
+impl ProtoEncode for ConnectToPeerRequest {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        encoder.encode_u32(self.token)?;
+        encoder.encode_string(&self.user_name)?;
+        encoder.encode_string(&self.connection_type)
+    }
+}
+
+impl ProtoDecode for ConnectToPeerRequest {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let token = decoder.decode_u32()?;
+        let user_name = decoder.decode_string()?;
+        let connection_type = decoder.decode_string()?;
+        Ok(Self {
+            token: token,
+            user_name: user_name,
+            connection_type: connection_type,
+        })
+    }
+}
+
 /*=============*
  * FILE SEARCH *
  *=============*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct FileSearchRequest {
     pub ticket: u32,
     pub query: String,
@@ -148,16 +192,40 @@ impl WriteToPacket for FileSearchRequest {
     }
 }
 
+impl ProtoEncode for FileSearchRequest {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        encoder.encode_u32(self.ticket)?;
+        encoder.encode_string(&self.query)
+    }
+}
+
+impl ProtoDecode for FileSearchRequest {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let ticket = decoder.decode_u32()?;
+        let query = decoder.decode_string()?;
+        Ok(Self {
+            ticket: ticket,
+            query: query,
+        })
+    }
+}
+
 /*=======*
  * LOGIN *
  *=======*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct LoginRequest {
     username: String,
     password: String,
+    digest: String,
     major: u32,
     minor: u32,
+}
+
+fn userpass_md5(username: &str, password: &str) -> String {
+    let userpass = String::new() + username + password;
+    md5_str(&userpass)
 }
 
 impl LoginRequest {
@@ -171,6 +239,7 @@ impl LoginRequest {
             Ok(LoginRequest {
                 username: username.to_string(),
                 password: password.to_string(),
+                digest: userpass_md5(username, password),
                 major: major,
                 minor: minor,
             })
@@ -178,20 +247,47 @@ impl LoginRequest {
             Err("Empty password")
         }
     }
+
+    fn has_correct_digest(&self) -> bool {
+        self.digest == userpass_md5(&self.username, &self.password)
+    }
 }
 
 impl WriteToPacket for LoginRequest {
     fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
-        let userpass = String::new() + &self.username + &self.password;
-        let userpass_md5 = md5_str(&userpass);
-
         try!(packet.write_value(&self.username));
         try!(packet.write_value(&self.password));
         try!(packet.write_value(&self.major));
-        try!(packet.write_value(&userpass_md5));
+        try!(packet.write_value(&self.digest));
         try!(packet.write_value(&self.minor));
-
         Ok(())
+    }
+}
+
+impl ProtoEncode for LoginRequest {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        encoder.encode_string(&self.username)?;
+        encoder.encode_string(&self.password)?;
+        encoder.encode_u32(self.major)?;
+        encoder.encode_string(&self.digest)?;
+        encoder.encode_u32(self.minor)
+    }
+}
+
+impl ProtoDecode for LoginRequest {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let username = decoder.decode_string()?;
+        let password = decoder.decode_string()?;
+        let major = decoder.decode_u32()?;
+        let digest = decoder.decode_string()?;
+        let minor = decoder.decode_u32()?;
+        Ok(Self {
+            username: username,
+            password: password,
+            digest: digest,
+            major: major,
+            minor: minor,
+        })
     }
 }
 
@@ -199,7 +295,7 @@ impl WriteToPacket for LoginRequest {
  * PEER ADDRESS *
  *==============*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct PeerAddressRequest {
     pub username: String,
 }
@@ -215,7 +311,7 @@ impl WriteToPacket for PeerAddressRequest {
  * ROOM JOIN *
  *===========*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct RoomJoinRequest {
     pub room_name: String,
 }
@@ -231,7 +327,7 @@ impl WriteToPacket for RoomJoinRequest {
  * ROOM LEAVE *
  *============*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct RoomLeaveRequest {
     pub room_name: String,
 }
@@ -247,7 +343,7 @@ impl WriteToPacket for RoomLeaveRequest {
  * ROOM MESSAGE *
  *==============*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct RoomMessageRequest {
     pub room_name: String,
     pub message: String,
@@ -265,7 +361,7 @@ impl WriteToPacket for RoomMessageRequest {
  * SET LISTEN PORT *
  *=================*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct SetListenPortRequest {
     pub port: u16,
 }
@@ -281,7 +377,7 @@ impl WriteToPacket for SetListenPortRequest {
  * USER STATUS *
  *=============*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct UserStatusRequest {
     pub user_name: String,
 }
@@ -290,5 +386,73 @@ impl WriteToPacket for UserStatusRequest {
     fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
         try!(packet.write_value(&self.user_name));
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fmt::Debug;
+    use std::io;
+
+    use bytes::BytesMut;
+
+    use proto::{DecodeError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
+
+    use super::*;
+
+    fn roundtrip<T: Debug + Eq + ProtoDecode + ProtoEncode>(input: &T) -> T {
+        let mut bytes = BytesMut::new();
+        input.encode(&mut ProtoEncoder::new(&mut bytes)).unwrap();
+
+        let mut cursor = io::Cursor::new(bytes);
+        T::decode(&mut ProtoDecoder::new(&mut cursor)).unwrap()
+    }
+
+    #[test]
+    fn roundtrip_cannot_connect_request() {
+        let input = CannotConnectRequest {
+            token: 1337,
+            user_name: "alice".to_string(),
+        };
+        assert_eq!(roundtrip(&input), input);
+    }
+
+    #[test]
+    fn roundtrip_connect_to_peer_request() {
+        let input = ConnectToPeerRequest {
+            token: 1337,
+            user_name: "alice".to_string(),
+            connection_type: "P".to_string(),
+        };
+        assert_eq!(roundtrip(&input), input);
+    }
+
+    #[test]
+    fn roundtrip_file_search_request() {
+        let input = FileSearchRequest {
+            ticket: 1337,
+            query: "foo.txt".to_string(),
+        };
+        assert_eq!(roundtrip(&input), input);
+    }
+
+    #[test]
+    #[should_panic]
+    fn new_login_request_with_empty_password() {
+        LoginRequest::new("alice", "", 1337, 42).unwrap();
+    }
+
+    #[test]
+    fn new_login_request_has_correct_digest() {
+        let request = LoginRequest::new("alice", "password1234", 1337, 42).unwrap();
+        assert!(request.has_correct_digest());
+    }
+
+    #[test]
+    fn roundtrip_login_request() {
+        let input = LoginRequest::new("alice", "password1234", 1337, 42).unwrap();
+        let output = roundtrip(&input);
+        assert_eq!(output, input);
+        assert!(output.has_correct_digest());
     }
 }
