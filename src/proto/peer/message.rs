@@ -156,14 +156,19 @@ mod tests {
 
     use super::*;
 
-    fn roundtrip<T: Debug + Eq + ProtoDecode + ProtoEncode>(input: T) {
+    fn roundtrip(input: Message) {
         let mut bytes = BytesMut::new();
         input.encode(&mut ProtoEncoder::new(&mut bytes)).unwrap();
 
         let mut cursor = io::Cursor::new(bytes);
-        let output = T::decode(&mut ProtoDecoder::new(&mut cursor)).unwrap();
+        let output = Message::decode(&mut ProtoDecoder::new(&mut cursor)).unwrap();
 
         assert_eq!(output, input);
+    }
+
+    #[test]
+    fn roundtrip_pierce_firewall() {
+        roundtrip(Message::PierceFirewall(1337))
     }
 
     #[test]
