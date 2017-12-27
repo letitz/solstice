@@ -9,7 +9,7 @@ use proto::peer::constants::*;
  *=========*/
 
 /// This enum contains all the possible messages peers can exchange.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Message {
     PierceFirewall(u32),
     PeerInit(PeerInit),
@@ -94,7 +94,7 @@ impl WriteToPacket for Message {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PeerInit {
     pub user_name: String,
     pub connection_type: String,
@@ -142,5 +142,36 @@ impl ProtoDecode for PeerInit {
             connection_type: connection_type,
             token: token,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fmt::Debug;
+    use std::io;
+
+    use bytes::BytesMut;
+
+    use proto::{DecodeError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
+
+    use super::*;
+
+    fn roundtrip<T: Debug + Eq + ProtoDecode + ProtoEncode>(input: T) {
+        let mut bytes = BytesMut::new();
+        input.encode(&mut ProtoEncoder::new(&mut bytes)).unwrap();
+
+        let mut cursor = io::Cursor::new(bytes);
+        let output = T::decode(&mut ProtoDecoder::new(&mut cursor)).unwrap();
+
+        assert_eq!(output, input);
+    }
+
+    #[test]
+    fn roundtrip_peer_init() {
+        roundtrip(Message::PeerInit(PeerInit {
+            user_name: "alice".to_string(),
+            connection_type: "P".to_string(),
+            token: 1337,
+        }));
     }
 }
