@@ -307,6 +307,21 @@ impl WriteToPacket for PeerAddressRequest {
     }
 }
 
+impl ProtoEncode for PeerAddressRequest {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        encoder.encode_string(&self.username)
+    }
+}
+
+impl ProtoDecode for PeerAddressRequest {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let username = decoder.decode_string()?;
+        Ok(Self {
+            username: username,
+        })
+    }
+}
+
 /*===========*
  * ROOM JOIN *
  *===========*/
@@ -323,6 +338,21 @@ impl WriteToPacket for RoomJoinRequest {
     }
 }
 
+impl ProtoEncode for RoomJoinRequest {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        encoder.encode_string(&self.room_name)
+    }
+}
+
+impl ProtoDecode for RoomJoinRequest {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let room_name = decoder.decode_string()?;
+        Ok(Self {
+            room_name: room_name,
+        })
+    }
+}
+
 /*============*
  * ROOM LEAVE *
  *============*/
@@ -336,6 +366,21 @@ impl WriteToPacket for RoomLeaveRequest {
     fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
         try!(packet.write_value(&self.room_name));
         Ok(())
+    }
+}
+
+impl ProtoEncode for RoomLeaveRequest {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        encoder.encode_string(&self.room_name)
+    }
+}
+
+impl ProtoDecode for RoomLeaveRequest {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let room_name = decoder.decode_string()?;
+        Ok(Self {
+            room_name: room_name,
+        })
     }
 }
 
@@ -357,6 +402,24 @@ impl WriteToPacket for RoomMessageRequest {
     }
 }
 
+impl ProtoEncode for RoomMessageRequest {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        encoder.encode_string(&self.room_name)?;
+        encoder.encode_string(&self.message)
+    }
+}
+
+impl ProtoDecode for RoomMessageRequest {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let room_name = decoder.decode_string()?;
+        let message = decoder.decode_string()?;
+        Ok(Self {
+            room_name: room_name,
+            message: message,
+        })
+    }
+}
+
 /*=================*
  * SET LISTEN PORT *
  *=================*/
@@ -370,6 +433,21 @@ impl WriteToPacket for SetListenPortRequest {
     fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
         try!(packet.write_value(&self.port));
         Ok(())
+    }
+}
+
+impl ProtoEncode for SetListenPortRequest {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        encoder.encode_u16(self.port)
+    }
+}
+
+impl ProtoDecode for SetListenPortRequest {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let port = decoder.decode_u16()?;
+        Ok(Self {
+            port: port,
+        })
     }
 }
 
@@ -388,6 +466,25 @@ impl WriteToPacket for UserStatusRequest {
         Ok(())
     }
 }
+
+impl ProtoEncode for UserStatusRequest {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        encoder.encode_string(&self.user_name)
+    }
+}
+
+impl ProtoDecode for UserStatusRequest {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let user_name = decoder.decode_string()?;
+        Ok(Self {
+            user_name: user_name,
+        })
+    }
+}
+
+/*=======*
+ * TESTS *
+ *=======*/
 
 #[cfg(test)]
 mod tests {
@@ -451,8 +548,55 @@ mod tests {
     #[test]
     fn roundtrip_login_request() {
         let input = LoginRequest::new("alice", "password1234", 1337, 42).unwrap();
-        let output = roundtrip(&input);
-        assert_eq!(output, input);
-        assert!(output.has_correct_digest());
+        assert_eq!(roundtrip(&input), input);
+    }
+
+    #[test]
+    fn roundtrip_peer_address_request() {
+        let input = PeerAddressRequest {
+            username: "alice".to_string(),
+        };
+        assert_eq!(roundtrip(&input), input);
+    }
+
+    #[test]
+    fn roundtrip_room_join_request() {
+        let input = RoomJoinRequest {
+            room_name: "best room ever".to_string(),
+        };
+        assert_eq!(roundtrip(&input), input);
+    }
+
+    #[test]
+    fn roundtrip_room_leave_request() {
+        let input = RoomLeaveRequest {
+            room_name: "best room ever".to_string(),
+        };
+        assert_eq!(roundtrip(&input), input);
+    }
+
+    #[test]
+    fn roundtrip_room_message_request() {
+        let input = RoomMessageRequest {
+            room_name: "best room ever".to_string(),
+            message: "hello world!".to_string(),
+        };
+        assert_eq!(roundtrip(&input), input);
+    }
+
+    #[test]
+    fn roundtrip_set_listen_port_request() {
+        let input = SetListenPortRequest {
+            port: 1337,
+        };
+        assert_eq!(roundtrip(&input), input);
+    }
+
+    #[test]
+    fn roundtrip_user_status_request() {
+        let input = UserStatusRequest {
+            user_name: "alice".to_string(),
+        };
+        assert_eq!(roundtrip(&input), input);
     }
 }
