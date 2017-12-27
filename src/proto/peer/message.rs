@@ -169,13 +169,15 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn invalid_code() {
         let mut bytes = BytesMut::new();
         ProtoEncoder::new(&mut bytes).encode_u32(1337).unwrap();
 
         let mut cursor = io::Cursor::new(bytes);
-        Message::decode(&mut ProtoDecoder::new(&mut cursor)).unwrap();
+        match Message::decode(&mut ProtoDecoder::new(&mut cursor)) {
+            Err(DecodeError::UnknownCodeError(1337)) => {},
+            result => panic!(result),
+        }
     }
 
     #[test]

@@ -604,6 +604,18 @@ mod tests {
     }
 
     #[test]
+    fn invalid_code() {
+        let mut bytes = BytesMut::new();
+        ProtoEncoder::new(&mut bytes).encode_u32(1337).unwrap();
+
+        let mut cursor = io::Cursor::new(bytes);
+        match ServerRequest::decode(&mut ProtoDecoder::new(&mut cursor)) {
+            Err(DecodeError::UnknownCodeError(1337)) => {},
+            result => panic!(result),
+        }
+    }
+
+    #[test]
     fn roundtrip_cannot_connect_request() {
         roundtrip(ServerRequest::CannotConnectRequest(CannotConnectRequest {
             token: 1337,
