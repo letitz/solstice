@@ -110,6 +110,10 @@ impl ProtoEncode for ServerResponse {
                 encoder.encode_u32(CODE_FILE_SEARCH)?;
                 response.encode(encoder)?;
             },
+            ServerResponse::LoginResponse(ref response) => {
+                encoder.encode_u32(CODE_LOGIN)?;
+                response.encode(encoder)?;
+            },
             _ => {
                 unimplemented!();
             },
@@ -129,6 +133,10 @@ impl ProtoDecode for ServerResponse {
             CODE_FILE_SEARCH => {
                 let response = FileSearchResponse::decode(decoder)?;
                 ServerResponse::FileSearchResponse(response)
+            },
+            CODE_LOGIN => {
+                let response = LoginResponse::decode(decoder)?;
+                ServerResponse::LoginResponse(response)
             },
             _ => {
                 return Err(DecodeError::UnknownCodeError(code));
@@ -286,6 +294,49 @@ impl ReadFromPacket for LoginResponse {
                 reason: try!(packet.read_value()),
             })
         }
+    }
+}
+
+impl ProtoEncode for LoginResponse {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        match *self {
+            LoginResponse::LoginOk { ref motd, ip, password_md5_opt: _ } => {
+                encoder.encode_bool(true)?;
+                encoder.encode_string(motd)?;
+                encoder.encode_ipv4_addr(ip)?;
+            },
+            LoginResponse::LoginFail { ref reason } => {
+                encoder.encode_bool(false)?;
+                encoder.encode_string(reason)?;
+            },
+        };
+        Ok(())
+    }
+}
+
+impl ProtoDecode for LoginResponse {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let ok = decoder.decode_bool()?;
+        if !ok {
+            let reason = decoder.decode_string()?;
+            return Ok(LoginResponse::LoginFail {
+                reason: reason,
+            })
+        }
+
+        let motd = decoder.decode_string()?;
+        let ip = decoder.decode_ipv4_addr()?;
+
+        match decoder.decode_bool() {
+            Ok(value) => debug!("LoginResponse last field: {}", value),
+            Err(e) => debug!("Error reading LoginResponse field: {:?}", e),
+        }
+
+        Ok(LoginResponse::LoginOk {
+            motd: motd,
+            ip: ip,
+            password_md5_opt: None,
+        })
     }
 }
 
@@ -758,6 +809,22 @@ mod tests {
             user_name: "alice".to_string(),
             ticket: 1337,
             query: "foo.txt".to_string(),
+        }))
+    }
+
+    #[test]
+    fn roundtrip_login_ok() {
+        roundtrip(ServerResponse::LoginResponse(LoginResponse::LoginOk {
+            motd: "welcome one welcome all!".to_string(),
+            ip: net::Ipv4Addr::new(127, 0, 0, 1),
+            password_md5_opt: None,
+        }))
+    }
+
+    #[test]
+    fn roundtrip_login_fail() {
+        roundtrip(ServerResponse::LoginResponse(LoginResponse::LoginFail {
+            reason: "I just don't like you".to_string(),
         }))
     }
 }
