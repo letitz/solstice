@@ -338,15 +338,26 @@ impl<T: ProtoEncode> ProtoEncode for Vec<T> {
  *=======*/
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::{ProtoDecoder, ProtoEncoder, ProtoDecode, ProtoEncode};
 
+    use std::fmt;
     use std::io;
     use std::net;
     use std::u16;
     use std::u32;
 
     use bytes::{Buf, BytesMut};
+
+    pub fn roundtrip<T: fmt::Debug + Eq + PartialEq + ProtoDecode + ProtoEncode>(input: T) {
+        let mut bytes = BytesMut::new();
+        input.encode(&mut ProtoEncoder::new(&mut bytes)).unwrap();
+
+        let mut cursor = io::Cursor::new(bytes);
+        let output = T::decode(&mut ProtoDecoder::new(&mut cursor)).unwrap();
+
+        assert_eq!(output, input);
+    }
 
     // Helper for succinctness in tests below.
     fn new_cursor(vec: Vec<u8>) -> io::Cursor<BytesMut> {
@@ -388,6 +399,13 @@ mod tests {
     }
 
     #[test]
+    fn roundtrip_u32() {
+        for &(val, _) in &U32_ENCODINGS {
+            roundtrip(val)
+        }
+    }
+
+    #[test]
     fn encode_bool() {
         let mut bytes = BytesMut::from(vec![13]);
         ProtoEncoder::new(&mut bytes).encode_bool(false).unwrap();
@@ -416,6 +434,12 @@ mod tests {
     fn decode_bool_invalid() {
         let mut cursor = new_cursor(vec![42]);
         ProtoDecoder::new(&mut cursor).decode_bool().unwrap();
+    }
+
+    #[test]
+    fn roundtrip_bool() {
+        roundtrip(false);
+        roundtrip(true);
     }
 
     #[test]
@@ -451,6 +475,22 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    fn decode_u16_invalid() {
+        let mut cursor = new_cursor(vec![0, 0, 1, 0]);
+        ProtoDecoder::new(&mut cursor).decode_u16().unwrap();
+    }
+
+    #[test]
+    fn roundtrip_u16() {
+        for &(val, _) in &U32_ENCODINGS {
+            if val <= u16::MAX as u32 {
+                roundtrip(val)
+            }
+        }
+    }
+
+    #[test]
     fn encode_ipv4() {
         for &(val, ref encoded_bytes) in &U32_ENCODINGS {
             let mut bytes = BytesMut::from(vec![13]);
@@ -472,6 +512,13 @@ mod tests {
             let val = ProtoDecoder::new(&mut cursor).decode_ipv4_addr().unwrap();
             assert_eq!(val, net::Ipv4Addr::from(expected_val));
             assert_eq!(cursor.remaining(), 0);
+        }
+    }
+
+    #[test]
+    fn roundtrip_ipv4() {
+        for &(val, _) in &U32_ENCODINGS {
+            roundtrip(net::Ipv4Addr::from(val))
         }
     }
 
@@ -516,6 +563,13 @@ mod tests {
     }
 
     #[test]
+    fn roundtrip_string() {
+        for &(string, _) in &STRING_ENCODINGS {
+            roundtrip(string.to_string())
+        }
+    }
+
+    #[test]
     fn encode_u32_vector() {
         let mut vec = vec![];
         let mut expected_bytes = vec![13, U32_ENCODINGS.len() as u8, 0, 0, 0];
@@ -544,5 +598,10 @@ mod tests {
 
         assert_eq!(vec, expected_vec);
         assert_eq!(cursor.remaining(), 0);
+    }
+
+    #[test]
+    fn roundtrip_u32_vector() {
+        roundtrip(vec![0u32, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     }
 }

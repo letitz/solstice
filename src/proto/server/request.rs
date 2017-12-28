@@ -590,18 +590,9 @@ mod tests {
     use bytes::BytesMut;
 
     use proto::{DecodeError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
+    use proto::codec::tests::roundtrip;
 
     use super::*;
-
-    fn roundtrip(input: ServerRequest) {
-        let mut bytes = BytesMut::new();
-        input.encode(&mut ProtoEncoder::new(&mut bytes)).unwrap();
-
-        let mut cursor = io::Cursor::new(bytes);
-        let output = ServerRequest::decode(&mut ProtoDecoder::new(&mut cursor)).unwrap();
-
-        assert_eq!(output, input);
-    }
 
     #[test]
     fn invalid_code() {
