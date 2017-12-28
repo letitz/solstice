@@ -126,6 +126,10 @@ impl ProtoEncode for ServerResponse {
                 encoder.encode_u32(CODE_PEER_ADDRESS)?;
                 response.encode(encoder)?;
             },
+            ServerResponse::PrivilegedUsersResponse(ref response) => {
+                encoder.encode_u32(CODE_PRIVILEGED_USERS)?;
+                response.encode(encoder)?;
+            },
             _ => {
                 unimplemented!();
             },
@@ -161,6 +165,10 @@ impl ProtoDecode for ServerResponse {
             CODE_PEER_ADDRESS => {
                 let response = PeerAddressResponse::decode(decoder)?;
                 ServerResponse::PeerAddressResponse(response)
+            },
+            CODE_PRIVILEGED_USERS => {
+                let response = PrivilegedUsersResponse::decode(decoder)?;
+                ServerResponse::PrivilegedUsersResponse(response)
             },
             _ => {
                 return Err(DecodeError::UnknownCodeError(code));
@@ -472,7 +480,6 @@ impl ProtoDecode for PeerAddressResponse {
     }
 }
 
-
 /*==================*
  * PRIVILEGED USERS *
  *==================*/
@@ -486,6 +493,21 @@ impl ReadFromPacket for PrivilegedUsersResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
         let users = try!(packet.read_value());
         Ok(PrivilegedUsersResponse { users: users })
+    }
+}
+
+impl ProtoEncode for PrivilegedUsersResponse {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        encoder.encode_vec(&self.users)
+    }
+}
+
+impl ProtoDecode for PrivilegedUsersResponse {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let users = decoder.decode_vec::<String>()?;
+        Ok(Self {
+            users: users,
+        })
     }
 }
 
@@ -924,6 +946,17 @@ mod tests {
             username: "alice".to_string(),
             ip: net::Ipv4Addr::new(127, 0, 0, 1),
             port: 1337,
+        }))
+    }
+
+    #[test]
+    fn roundtrip_privileged_users() {
+        roundtrip(ServerResponse::PrivilegedUsersResponse(PrivilegedUsersResponse {
+            users: vec![
+                "alice".to_string(),
+                "bob".to_string(),
+                "chris".to_string(),
+            ],
         }))
     }
 }
