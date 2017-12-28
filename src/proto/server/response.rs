@@ -114,6 +114,10 @@ impl ProtoEncode for ServerResponse {
                 encoder.encode_u32(CODE_LOGIN)?;
                 response.encode(encoder)?;
             },
+            ServerResponse::ParentMinSpeedResponse(ref response) => {
+                encoder.encode_u32(CODE_PARENT_MIN_SPEED)?;
+                response.encode(encoder)?;
+            },
             _ => {
                 unimplemented!();
             },
@@ -137,6 +141,10 @@ impl ProtoDecode for ServerResponse {
             CODE_LOGIN => {
                 let response = LoginResponse::decode(decoder)?;
                 ServerResponse::LoginResponse(response)
+            },
+            CODE_PARENT_MIN_SPEED => {
+                let response = ParentMinSpeedResponse::decode(decoder)?;
+                ServerResponse::ParentMinSpeedResponse(response)
             },
             _ => {
                 return Err(DecodeError::UnknownCodeError(code));
@@ -353,6 +361,21 @@ impl ReadFromPacket for ParentMinSpeedResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
         let value = try!(packet.read_value());
         Ok(ParentMinSpeedResponse { value: value })
+    }
+}
+
+impl ProtoEncode for ParentMinSpeedResponse {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        encoder.encode_u32(self.value)
+    }
+}
+
+impl ProtoDecode for ParentMinSpeedResponse {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let value = decoder.decode_u32()?;
+        Ok(Self {
+            value: value
+        })
     }
 }
 
@@ -825,6 +848,13 @@ mod tests {
     fn roundtrip_login_fail() {
         roundtrip(ServerResponse::LoginResponse(LoginResponse::LoginFail {
             reason: "I just don't like you".to_string(),
+        }))
+    }
+
+    #[test]
+    fn roundtrip_parent_min_speed() {
+        roundtrip(ServerResponse::ParentMinSpeedResponse(ParentMinSpeedResponse {
+            value: 1337,
         }))
     }
 }
