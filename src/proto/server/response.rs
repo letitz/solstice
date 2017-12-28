@@ -118,6 +118,10 @@ impl ProtoEncode for ServerResponse {
                 encoder.encode_u32(CODE_PARENT_MIN_SPEED)?;
                 response.encode(encoder)?;
             },
+            ServerResponse::ParentSpeedRatioResponse(ref response) => {
+                encoder.encode_u32(CODE_PARENT_SPEED_RATIO)?;
+                response.encode(encoder)?;
+            },
             _ => {
                 unimplemented!();
             },
@@ -145,6 +149,10 @@ impl ProtoDecode for ServerResponse {
             CODE_PARENT_MIN_SPEED => {
                 let response = ParentMinSpeedResponse::decode(decoder)?;
                 ServerResponse::ParentMinSpeedResponse(response)
+            },
+            CODE_PARENT_SPEED_RATIO => {
+                let response = ParentSpeedRatioResponse::decode(decoder)?;
+                ServerResponse::ParentSpeedRatioResponse(response)
             },
             _ => {
                 return Err(DecodeError::UnknownCodeError(code));
@@ -392,6 +400,21 @@ impl ReadFromPacket for ParentSpeedRatioResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
         let value = try!(packet.read_value());
         Ok(ParentSpeedRatioResponse { value: value })
+    }
+}
+
+impl ProtoEncode for ParentSpeedRatioResponse {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        encoder.encode_u32(self.value)
+    }
+}
+
+impl ProtoDecode for ParentSpeedRatioResponse {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let value = decoder.decode_u32()?;
+        Ok(Self {
+            value: value
+        })
     }
 }
 
@@ -854,6 +877,13 @@ mod tests {
     #[test]
     fn roundtrip_parent_min_speed() {
         roundtrip(ServerResponse::ParentMinSpeedResponse(ParentMinSpeedResponse {
+            value: 1337,
+        }))
+    }
+
+    #[test]
+    fn roundtrip_parent_speed_ratio() {
+        roundtrip(ServerResponse::ParentSpeedRatioResponse(ParentSpeedRatioResponse {
             value: 1337,
         }))
     }
