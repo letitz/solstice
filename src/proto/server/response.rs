@@ -10,7 +10,7 @@ use user;
  * SERVER RESPONSE *
  *=================*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum ServerResponse {
     ConnectToPeerResponse(ConnectToPeerResponse),
     FileSearchResponse(FileSearchResponse),
@@ -254,7 +254,7 @@ impl ProtoDecode for FileSearchResponse {
  * LOGIN *
  *=======*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum LoginResponse {
     LoginOk {
         motd: String,
@@ -293,7 +293,7 @@ impl ReadFromPacket for LoginResponse {
  * PARENT MIN SPEED *
  *==================*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct ParentMinSpeedResponse {
     pub value: u32,
 }
@@ -309,7 +309,7 @@ impl ReadFromPacket for ParentMinSpeedResponse {
  * PARENT SPEED RATIO *
  *====================*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct ParentSpeedRatioResponse {
     pub value: u32,
 }
@@ -325,7 +325,7 @@ impl ReadFromPacket for ParentSpeedRatioResponse {
  * PEER ADDRESS *
  *==============*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct PeerAddressResponse {
     username: String,
     ip: net::Ipv4Addr,
@@ -350,7 +350,7 @@ impl ReadFromPacket for PeerAddressResponse {
  * PRIVILEGED USERS *
  *==================*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct PrivilegedUsersResponse {
     pub users: Vec<String>,
 }
@@ -366,7 +366,7 @@ impl ReadFromPacket for PrivilegedUsersResponse {
  * ROOM JOIN *
  *===========*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct RoomJoinResponse {
     pub room_name: String,
     pub users: Vec<(String, user::User)>,
@@ -470,7 +470,7 @@ impl RoomJoinResponse {
  * ROOM LEAVE *
  *============*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct RoomLeaveResponse {
     pub room_name: String,
 }
@@ -485,7 +485,7 @@ impl ReadFromPacket for RoomLeaveResponse {
  * ROOM LIST *
  *===========*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct RoomListResponse {
     pub rooms: Vec<(String, u32)>,
     pub owned_private_rooms: Vec<(String, u32)>,
@@ -540,7 +540,7 @@ impl RoomListResponse {
  * ROOM MESSAGE *
  *==============*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct RoomMessageResponse {
     pub room_name: String,
     pub user_name: String,
@@ -564,7 +564,7 @@ impl ReadFromPacket for RoomMessageResponse {
  * ROOM MESSAGE *
  *==============*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct RoomTickersResponse {
     pub room_name: String,
     pub tickers: Vec<(String, String)>,
@@ -593,7 +593,7 @@ impl ReadFromPacket for RoomTickersResponse {
  * ROOM USER JOINED *
  *==================*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct RoomUserJoinedResponse {
     pub room_name: String,
     pub user_name: String,
@@ -637,7 +637,7 @@ impl ReadFromPacket for RoomUserJoinedResponse {
  * ROOM USER LEFT *
  *================*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct RoomUserLeftResponse {
     pub room_name: String,
     pub user_name: String,
@@ -658,7 +658,7 @@ impl ReadFromPacket for RoomUserLeftResponse {
  * USER INFO *
  *===========*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct UserInfoResponse {
     pub user_name: String,
     pub average_speed: usize,
@@ -688,7 +688,7 @@ impl ReadFromPacket for UserInfoResponse {
  * USER STATUS *
  *=============*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct UserStatusResponse {
     pub user_name: String,
     pub status: user::Status,
@@ -712,7 +712,7 @@ impl ReadFromPacket for UserStatusResponse {
  * WISHLIST INTERVAL *
  *===================*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct WishlistIntervalResponse {
     pub seconds: u32,
 }
@@ -742,22 +742,22 @@ mod tests {
 
     #[test]
     fn roundtrip_connect_to_peer() {
-        roundtrip(ConnectToPeerResponse {
+        roundtrip(ServerResponse::ConnectToPeerResponse(ConnectToPeerResponse {
             user_name: "alice".to_string(),
             connection_type: "P".to_string(),
             ip: net::Ipv4Addr::new(192, 168, 254, 1),
             port: 1337,
             token: 42,
             is_privileged: true,
-        })
+        }))
     }
 
     #[test]
     fn roundtrip_file_search() {
-        roundtrip(FileSearchResponse {
+        roundtrip(ServerResponse::FileSearchResponse(FileSearchResponse {
             user_name: "alice".to_string(),
             ticket: 1337,
             query: "foo.txt".to_string(),
-        })
+        }))
     }
 }

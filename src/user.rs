@@ -10,7 +10,7 @@ const STATUS_AWAY: u32 = 2;
 const STATUS_ONLINE: u32 = 3;
 
 /// This enumeration is the list of possible user statuses.
-#[derive(Clone, Copy, Debug, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
 pub enum Status {
     /// The user if offline.
     Offline,
@@ -47,7 +47,7 @@ impl proto::WriteToPacket for Status {
 /// This structure contains the last known information about a fellow user.
 /// It does not store the name, as that is stored implicitly as the key in the
 /// user hash table.
-#[derive(Clone, Debug, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
 pub struct User {
     /// The last known status of the user.
     pub status: Status,
