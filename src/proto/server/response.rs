@@ -122,6 +122,10 @@ impl ProtoEncode for ServerResponse {
                 encoder.encode_u32(CODE_PARENT_SPEED_RATIO)?;
                 response.encode(encoder)?;
             },
+            ServerResponse::PeerAddressResponse(ref response) => {
+                encoder.encode_u32(CODE_PEER_ADDRESS)?;
+                response.encode(encoder)?;
+            },
             _ => {
                 unimplemented!();
             },
@@ -153,6 +157,10 @@ impl ProtoDecode for ServerResponse {
             CODE_PARENT_SPEED_RATIO => {
                 let response = ParentSpeedRatioResponse::decode(decoder)?;
                 ServerResponse::ParentSpeedRatioResponse(response)
+            },
+            CODE_PEER_ADDRESS => {
+                let response = PeerAddressResponse::decode(decoder)?;
+                ServerResponse::PeerAddressResponse(response)
             },
             _ => {
                 return Err(DecodeError::UnknownCodeError(code));
@@ -442,6 +450,28 @@ impl ReadFromPacket for PeerAddressResponse {
         })
     }
 }
+
+impl ProtoEncode for PeerAddressResponse {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        encoder.encode_string(&self.username)?;
+        encoder.encode_ipv4_addr(self.ip)?;
+        encoder.encode_u16(self.port)
+    }
+}
+
+impl ProtoDecode for PeerAddressResponse {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let username = decoder.decode_string()?;
+        let ip = decoder.decode_ipv4_addr()?;
+        let port = decoder.decode_u16()?;
+        Ok(Self {
+            username: username,
+            ip: ip,
+            port: port,
+        })
+    }
+}
+
 
 /*==================*
  * PRIVILEGED USERS *
@@ -885,6 +915,15 @@ mod tests {
     fn roundtrip_parent_speed_ratio() {
         roundtrip(ServerResponse::ParentSpeedRatioResponse(ParentSpeedRatioResponse {
             value: 1337,
+        }))
+    }
+
+    #[test]
+    fn roundtrip_peer_address() {
+        roundtrip(ServerResponse::PeerAddressResponse(PeerAddressResponse {
+            username: "alice".to_string(),
+            ip: net::Ipv4Addr::new(127, 0, 0, 1),
+            port: 1337,
         }))
     }
 }
