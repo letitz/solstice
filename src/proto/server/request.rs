@@ -103,46 +103,46 @@ impl ProtoEncode for ServerRequest {
             ServerRequest::CannotConnectRequest(ref request) => {
                 encoder.encode_u32(CODE_CANNOT_CONNECT)?;
                 request.encode(encoder)?;
-            },
+            }
             ServerRequest::ConnectToPeerRequest(ref request) => {
                 encoder.encode_u32(CODE_CONNECT_TO_PEER)?;
                 request.encode(encoder)?;
-            },
+            }
             ServerRequest::FileSearchRequest(ref request) => {
                 encoder.encode_u32(CODE_FILE_SEARCH)?;
                 request.encode(encoder)?;
-            },
+            }
             ServerRequest::LoginRequest(ref request) => {
                 encoder.encode_u32(CODE_LOGIN)?;
                 request.encode(encoder)?;
-            },
+            }
             ServerRequest::PeerAddressRequest(ref request) => {
                 encoder.encode_u32(CODE_PEER_ADDRESS)?;
                 request.encode(encoder)?;
-            },
+            }
             ServerRequest::RoomJoinRequest(ref request) => {
                 encoder.encode_u32(CODE_ROOM_JOIN)?;
                 request.encode(encoder)?;
-            },
+            }
             ServerRequest::RoomLeaveRequest(ref request) => {
                 encoder.encode_u32(CODE_ROOM_LEAVE)?;
                 request.encode(encoder)?;
-            },
+            }
             ServerRequest::RoomListRequest => {
                 encoder.encode_u32(CODE_ROOM_LIST)?;
-            },
+            }
             ServerRequest::RoomMessageRequest(ref request) => {
                 encoder.encode_u32(CODE_ROOM_MESSAGE)?;
                 request.encode(encoder)?;
-            },
+            }
             ServerRequest::SetListenPortRequest(ref request) => {
                 encoder.encode_u32(CODE_SET_LISTEN_PORT)?;
                 request.encode(encoder)?;
-            },
+            }
             ServerRequest::UserStatusRequest(ref request) => {
                 encoder.encode_u32(CODE_USER_STATUS)?;
                 request.encode(encoder)?;
-            },
+            }
         }
         Ok(())
     }
@@ -155,49 +155,47 @@ impl ProtoDecode for ServerRequest {
             CODE_CANNOT_CONNECT => {
                 let request = CannotConnectRequest::decode(decoder)?;
                 ServerRequest::CannotConnectRequest(request)
-            },
+            }
             CODE_CONNECT_TO_PEER => {
                 let request = ConnectToPeerRequest::decode(decoder)?;
                 ServerRequest::ConnectToPeerRequest(request)
-            },
+            }
             CODE_FILE_SEARCH => {
                 let request = FileSearchRequest::decode(decoder)?;
                 ServerRequest::FileSearchRequest(request)
-            },
+            }
             CODE_LOGIN => {
                 let request = LoginRequest::decode(decoder)?;
                 ServerRequest::LoginRequest(request)
-            },
+            }
             CODE_PEER_ADDRESS => {
                 let request = PeerAddressRequest::decode(decoder)?;
                 ServerRequest::PeerAddressRequest(request)
-            },
+            }
             CODE_ROOM_JOIN => {
                 let request = RoomJoinRequest::decode(decoder)?;
                 ServerRequest::RoomJoinRequest(request)
-            },
+            }
             CODE_ROOM_LEAVE => {
                 let request = RoomLeaveRequest::decode(decoder)?;
                 ServerRequest::RoomLeaveRequest(request)
-            },
-            CODE_ROOM_LIST => {
-                ServerRequest::RoomListRequest
-            },
+            }
+            CODE_ROOM_LIST => ServerRequest::RoomListRequest,
             CODE_ROOM_MESSAGE => {
                 let request = RoomMessageRequest::decode(decoder)?;
                 ServerRequest::RoomMessageRequest(request)
-            },
+            }
             CODE_SET_LISTEN_PORT => {
                 let request = SetListenPortRequest::decode(decoder)?;
                 ServerRequest::SetListenPortRequest(request)
-            },
+            }
             CODE_USER_STATUS => {
                 let request = UserStatusRequest::decode(decoder)?;
                 ServerRequest::UserStatusRequest(request)
-            },
+            }
             _ => {
                 return Err(DecodeError::UnknownCodeError(code));
-            },
+            }
         };
         Ok(request)
     }
@@ -601,7 +599,7 @@ mod tests {
 
         let mut cursor = io::Cursor::new(bytes);
         match ServerRequest::decode(&mut ProtoDecoder::new(&mut cursor)) {
-            Err(DecodeError::UnknownCodeError(1337)) => {},
+            Err(DecodeError::UnknownCodeError(1337)) => {}
             result => panic!(result),
         }
     }
@@ -645,28 +643,31 @@ mod tests {
 
     #[test]
     fn roundtrip_login_request() {
-        roundtrip(ServerRequest::LoginRequest(LoginRequest::new("alice", "password1234", 1337, 42).unwrap()))
+        roundtrip(ServerRequest::LoginRequest(
+            LoginRequest::new("alice", "password1234", 1337, 42)
+                .unwrap(),
+        ))
     }
 
     #[test]
     fn roundtrip_peer_address_request() {
-        roundtrip(ServerRequest::PeerAddressRequest(PeerAddressRequest {
-            username: "alice".to_string(),
-        }))
+        roundtrip(ServerRequest::PeerAddressRequest(
+            PeerAddressRequest { username: "alice".to_string() },
+        ))
     }
 
     #[test]
     fn roundtrip_room_join_request() {
-        roundtrip(ServerRequest::RoomJoinRequest(RoomJoinRequest {
-            room_name: "best room ever".to_string(),
-        }))
+        roundtrip(ServerRequest::RoomJoinRequest(
+            RoomJoinRequest { room_name: "best room ever".to_string() },
+        ))
     }
 
     #[test]
     fn roundtrip_room_leave_request() {
-        roundtrip(ServerRequest::RoomLeaveRequest(RoomLeaveRequest {
-            room_name: "best room ever".to_string()
-        }))
+        roundtrip(ServerRequest::RoomLeaveRequest(
+            RoomLeaveRequest { room_name: "best room ever".to_string() },
+        ))
     }
 
     #[test]
@@ -684,15 +685,15 @@ mod tests {
 
     #[test]
     fn roundtrip_set_listen_port_request() {
-        roundtrip(ServerRequest::SetListenPortRequest(SetListenPortRequest {
-            port: 1337,
-        }))
+        roundtrip(ServerRequest::SetListenPortRequest(
+            SetListenPortRequest { port: 1337 },
+        ))
     }
 
     #[test]
     fn roundtrip_user_status_request() {
-        roundtrip(ServerRequest::UserStatusRequest(UserStatusRequest {
-            user_name: "alice".to_string(),
-        }))
+        roundtrip(ServerRequest::UserStatusRequest(
+            UserStatusRequest { user_name: "alice".to_string() },
+        ))
     }
 }

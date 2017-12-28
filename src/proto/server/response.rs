@@ -105,34 +105,34 @@ impl ProtoEncode for ServerResponse {
             ServerResponse::ConnectToPeerResponse(ref response) => {
                 encoder.encode_u32(CODE_CONNECT_TO_PEER)?;
                 response.encode(encoder)?;
-            },
+            }
             ServerResponse::FileSearchResponse(ref response) => {
                 encoder.encode_u32(CODE_FILE_SEARCH)?;
                 response.encode(encoder)?;
-            },
+            }
             ServerResponse::LoginResponse(ref response) => {
                 encoder.encode_u32(CODE_LOGIN)?;
                 response.encode(encoder)?;
-            },
+            }
             ServerResponse::ParentMinSpeedResponse(ref response) => {
                 encoder.encode_u32(CODE_PARENT_MIN_SPEED)?;
                 response.encode(encoder)?;
-            },
+            }
             ServerResponse::ParentSpeedRatioResponse(ref response) => {
                 encoder.encode_u32(CODE_PARENT_SPEED_RATIO)?;
                 response.encode(encoder)?;
-            },
+            }
             ServerResponse::PeerAddressResponse(ref response) => {
                 encoder.encode_u32(CODE_PEER_ADDRESS)?;
                 response.encode(encoder)?;
-            },
+            }
             ServerResponse::PrivilegedUsersResponse(ref response) => {
                 encoder.encode_u32(CODE_PRIVILEGED_USERS)?;
                 response.encode(encoder)?;
-            },
+            }
             _ => {
                 unimplemented!();
-            },
+            }
         };
         Ok(())
     }
@@ -145,34 +145,34 @@ impl ProtoDecode for ServerResponse {
             CODE_CONNECT_TO_PEER => {
                 let response = ConnectToPeerResponse::decode(decoder)?;
                 ServerResponse::ConnectToPeerResponse(response)
-            },
+            }
             CODE_FILE_SEARCH => {
                 let response = FileSearchResponse::decode(decoder)?;
                 ServerResponse::FileSearchResponse(response)
-            },
+            }
             CODE_LOGIN => {
                 let response = LoginResponse::decode(decoder)?;
                 ServerResponse::LoginResponse(response)
-            },
+            }
             CODE_PARENT_MIN_SPEED => {
                 let response = ParentMinSpeedResponse::decode(decoder)?;
                 ServerResponse::ParentMinSpeedResponse(response)
-            },
+            }
             CODE_PARENT_SPEED_RATIO => {
                 let response = ParentSpeedRatioResponse::decode(decoder)?;
                 ServerResponse::ParentSpeedRatioResponse(response)
-            },
+            }
             CODE_PEER_ADDRESS => {
                 let response = PeerAddressResponse::decode(decoder)?;
                 ServerResponse::PeerAddressResponse(response)
-            },
+            }
             CODE_PRIVILEGED_USERS => {
                 let response = PrivilegedUsersResponse::decode(decoder)?;
                 ServerResponse::PrivilegedUsersResponse(response)
-            },
+            }
             _ => {
                 return Err(DecodeError::UnknownCodeError(code));
-            },
+            }
         };
         Ok(response)
     }
@@ -332,15 +332,19 @@ impl ReadFromPacket for LoginResponse {
 impl ProtoEncode for LoginResponse {
     fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
         match *self {
-            LoginResponse::LoginOk { ref motd, ip, password_md5_opt: _ } => {
+            LoginResponse::LoginOk {
+                ref motd,
+                ip,
+                password_md5_opt: _,
+            } => {
                 encoder.encode_bool(true)?;
                 encoder.encode_string(motd)?;
                 encoder.encode_ipv4_addr(ip)?;
-            },
+            }
             LoginResponse::LoginFail { ref reason } => {
                 encoder.encode_bool(false)?;
                 encoder.encode_string(reason)?;
-            },
+            }
         };
         Ok(())
     }
@@ -351,9 +355,7 @@ impl ProtoDecode for LoginResponse {
         let ok = decoder.decode_bool()?;
         if !ok {
             let reason = decoder.decode_string()?;
-            return Ok(LoginResponse::LoginFail {
-                reason: reason,
-            })
+            return Ok(LoginResponse::LoginFail { reason: reason });
         }
 
         let motd = decoder.decode_string()?;
@@ -397,9 +399,7 @@ impl ProtoEncode for ParentMinSpeedResponse {
 impl ProtoDecode for ParentMinSpeedResponse {
     fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
         let value = decoder.decode_u32()?;
-        Ok(Self {
-            value: value
-        })
+        Ok(Self { value: value })
     }
 }
 
@@ -428,9 +428,7 @@ impl ProtoEncode for ParentSpeedRatioResponse {
 impl ProtoDecode for ParentSpeedRatioResponse {
     fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
         let value = decoder.decode_u32()?;
-        Ok(Self {
-            value: value
-        })
+        Ok(Self { value: value })
     }
 }
 
@@ -505,9 +503,7 @@ impl ProtoEncode for PrivilegedUsersResponse {
 impl ProtoDecode for PrivilegedUsersResponse {
     fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
         let users = decoder.decode_vec::<String>()?;
-        Ok(Self {
-            users: users,
-        })
+        Ok(Self { users: users })
     }
 }
 
@@ -891,14 +887,16 @@ mod tests {
 
     #[test]
     fn roundtrip_connect_to_peer() {
-        roundtrip(ServerResponse::ConnectToPeerResponse(ConnectToPeerResponse {
-            user_name: "alice".to_string(),
-            connection_type: "P".to_string(),
-            ip: net::Ipv4Addr::new(192, 168, 254, 1),
-            port: 1337,
-            token: 42,
-            is_privileged: true,
-        }))
+        roundtrip(ServerResponse::ConnectToPeerResponse(
+            ConnectToPeerResponse {
+                user_name: "alice".to_string(),
+                connection_type: "P".to_string(),
+                ip: net::Ipv4Addr::new(192, 168, 254, 1),
+                port: 1337,
+                token: 42,
+                is_privileged: true,
+            },
+        ))
     }
 
     #[test]
@@ -928,16 +926,16 @@ mod tests {
 
     #[test]
     fn roundtrip_parent_min_speed() {
-        roundtrip(ServerResponse::ParentMinSpeedResponse(ParentMinSpeedResponse {
-            value: 1337,
-        }))
+        roundtrip(ServerResponse::ParentMinSpeedResponse(
+            ParentMinSpeedResponse { value: 1337 },
+        ))
     }
 
     #[test]
     fn roundtrip_parent_speed_ratio() {
-        roundtrip(ServerResponse::ParentSpeedRatioResponse(ParentSpeedRatioResponse {
-            value: 1337,
-        }))
+        roundtrip(ServerResponse::ParentSpeedRatioResponse(
+            ParentSpeedRatioResponse { value: 1337 },
+        ))
     }
 
     #[test]
@@ -951,12 +949,15 @@ mod tests {
 
     #[test]
     fn roundtrip_privileged_users() {
-        roundtrip(ServerResponse::PrivilegedUsersResponse(PrivilegedUsersResponse {
-            users: vec![
-                "alice".to_string(),
-                "bob".to_string(),
-                "chris".to_string(),
-            ],
-        }))
+        roundtrip(ServerResponse::PrivilegedUsersResponse(
+            PrivilegedUsersResponse {
+                users: vec![
+                    "alice".to_string(),
+                    "bob".to_string(),
+                    "chris".to_string(),
+                    "dory".to_string(),
+                ],
+            },
+        ))
     }
 }
