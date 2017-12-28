@@ -106,6 +106,10 @@ impl ProtoEncode for ServerResponse {
                 encoder.encode_u32(CODE_CONNECT_TO_PEER)?;
                 response.encode(encoder)?;
             },
+            ServerResponse::FileSearchResponse(ref response) => {
+                encoder.encode_u32(CODE_FILE_SEARCH)?;
+                response.encode(encoder)?;
+            },
             _ => {
                 unimplemented!();
             },
@@ -121,6 +125,10 @@ impl ProtoDecode for ServerResponse {
             CODE_CONNECT_TO_PEER => {
                 let response = ConnectToPeerResponse::decode(decoder)?;
                 ServerResponse::ConnectToPeerResponse(response)
+            },
+            CODE_FILE_SEARCH => {
+                let response = FileSearchResponse::decode(decoder)?;
+                ServerResponse::FileSearchResponse(response)
             },
             _ => {
                 return Err(DecodeError::UnknownCodeError(code));
@@ -199,7 +207,7 @@ impl ProtoDecode for ConnectToPeerResponse {
  * FILE SEARCH *
  *=============*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct FileSearchResponse {
     pub user_name: String,
     pub ticket: u32,
@@ -211,6 +219,28 @@ impl ReadFromPacket for FileSearchResponse {
         let user_name = try!(packet.read_value());
         let ticket = try!(packet.read_value());
         let query = try!(packet.read_value());
+
+        Ok(FileSearchResponse {
+            user_name: user_name,
+            ticket: ticket,
+            query: query,
+        })
+    }
+}
+
+impl ProtoEncode for FileSearchResponse {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        encoder.encode_string(&self.user_name)?;
+        encoder.encode_u32(self.ticket)?;
+        encoder.encode_string(&self.query)
+    }
+}
+
+impl ProtoDecode for FileSearchResponse {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let user_name = decoder.decode_string()?;
+        let ticket = decoder.decode_u32()?;
+        let query = decoder.decode_string()?;
 
         Ok(FileSearchResponse {
             user_name: user_name,
@@ -719,6 +749,15 @@ mod tests {
             port: 1337,
             token: 42,
             is_privileged: true,
+        })
+    }
+
+    #[test]
+    fn roundtrip_file_search() {
+        roundtrip(FileSearchResponse {
+            user_name: "alice".to_string(),
+            ticket: 1337,
+            query: "foo.txt".to_string(),
         })
     }
 }
