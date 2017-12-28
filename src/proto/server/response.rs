@@ -102,22 +102,31 @@ impl ReadFromPacket for ServerResponse {
 impl ProtoEncode for ServerResponse {
     fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
         match *self {
+            ServerResponse::ConnectToPeerResponse(ref response) => {
+                encoder.encode_u32(CODE_CONNECT_TO_PEER)?;
+                response.encode(encoder)?;
+            },
             _ => {
                 unimplemented!();
             },
-        }
+        };
+        Ok(())
     }
 }
 
 impl ProtoDecode for ServerResponse {
     fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
         let code = decoder.decode_u32()?;
-        let request = match code {
+        let response = match code {
+            CODE_CONNECT_TO_PEER => {
+                let response = ConnectToPeerResponse::decode(decoder)?;
+                ServerResponse::ConnectToPeerResponse(response)
+            },
             _ => {
                 return Err(DecodeError::UnknownCodeError(code));
             },
         };
-        Ok(request)
+        Ok(response)
     }
 }
 
@@ -125,7 +134,7 @@ impl ProtoDecode for ServerResponse {
  * CONNECT TO PEER *
  *=================*/
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct ConnectToPeerResponse {
     pub user_name: String,
     pub connection_type: String,
@@ -143,6 +152,37 @@ impl ReadFromPacket for ConnectToPeerResponse {
         let port = try!(packet.read_value());
         let token = try!(packet.read_value());
         let is_privileged = try!(packet.read_value());
+
+        Ok(ConnectToPeerResponse {
+            user_name: user_name,
+            connection_type: connection_type,
+            ip: ip,
+            port: port,
+            token: token,
+            is_privileged: is_privileged,
+        })
+    }
+}
+
+impl ProtoEncode for ConnectToPeerResponse {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        encoder.encode_string(&self.user_name)?;
+        encoder.encode_string(&self.connection_type)?;
+        encoder.encode_ipv4_addr(self.ip)?;
+        encoder.encode_u16(self.port)?;
+        encoder.encode_u32(self.token)?;
+        encoder.encode_bool(self.is_privileged)
+    }
+}
+
+impl ProtoDecode for ConnectToPeerResponse {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let user_name = decoder.decode_string()?;
+        let connection_type = decoder.decode_string()?;
+        let ip = decoder.decode_ipv4_addr()?;
+        let port = decoder.decode_u16()?;
+        let token = decoder.decode_u32()?;
+        let is_privileged = decoder.decode_bool()?;
 
         Ok(ConnectToPeerResponse {
             user_name: user_name,
@@ -651,5 +691,34 @@ impl ReadFromPacket for WishlistIntervalResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
         let seconds = try!(packet.read_value());
         Ok(WishlistIntervalResponse { seconds: seconds })
+    }
+}
+
+/*=======*
+ * TESTS *
+ *=======*/
+
+#[cfg(test)]
+mod tests {
+    use std::io;
+    use std::net;
+
+    use bytes::BytesMut;
+
+    use proto::{DecodeError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
+    use proto::codec::tests::roundtrip;
+
+    use super::*;
+
+    #[test]
+    fn roundtrip_connect_to_peer() {
+        roundtrip(ConnectToPeerResponse {
+            user_name: "alice".to_string(),
+            connection_type: "P".to_string(),
+            ip: net::Ipv4Addr::new(192, 168, 254, 1),
+            port: 1337,
+            token: 42,
+            is_privileged: true,
+        })
     }
 }
