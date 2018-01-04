@@ -308,16 +308,29 @@ impl ProtoDecode for String {
     }
 }
 
+// It would be nice to use AsRef<str> for the following stringy types instead
+// of having to spell them out, but trying that fails because E0119:
+// "upstream crates may add new impl of trait `core::convert::AsRef<str>` for
+// type `bool` in future versions".
+// We could probably work around this with more complex type logic (e.g.
+// wrapping primitive types in a newtype for which we implement
+// Proto{De,En}code) but it is not really worth the hassle.
+
 impl ProtoEncode for str {
     fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
         encoder.encode_string(self)
     }
 }
 
-// Apparently deref coercion does not work for trait methods.
 impl ProtoEncode for String {
     fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
         encoder.encode_string(self)
+    }
+}
+
+impl<'a> ProtoEncode for &'a String {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        encoder.encode_string(*self)
     }
 }
 

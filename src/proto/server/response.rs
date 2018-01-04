@@ -611,6 +611,94 @@ impl RoomJoinResponse {
     }
 }
 
+// This struct is defined to enable decoding a vector of such values for
+// `RoomJoinResponse`, but its data is inlined in the `User` struct.
+// For details about individual fields, see said `User` struct.
+#[derive(Debug, Eq, PartialEq)]
+struct UserInfo {
+    average_speed: u32,
+    num_downloads: u32,
+    unknown: u32,
+    num_files: u32,
+    num_folders: u32,
+}
+
+impl<'a> From<&'a user::User> for UserInfo {
+    fn from(user: &'a user::User) -> Self {
+        Self {
+            average_speed: user.average_speed as u32,
+            num_downloads: user.num_downloads as u32,
+            unknown: user.unknown as u32,
+            num_files: user.num_files as u32,
+            num_folders: user.num_folders as u32,
+        }
+    }
+}
+
+impl ProtoEncode for UserInfo {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        encoder.encode_u32(self.average_speed)?;
+        encoder.encode_u32(self.num_downloads)?;
+        encoder.encode_u32(self.unknown)?;
+        encoder.encode_u32(self.num_files)?;
+        encoder.encode_u32(self.num_folders)
+    }
+}
+
+impl ProtoDecode for UserInfo {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let average_speed = decoder.decode_u32()?;
+        let num_downloads = decoder.decode_u32()?;
+        let unknown = decoder.decode_u32()?;
+        let num_files = decoder.decode_u32()?;
+        let num_folders = decoder.decode_u32()?;
+        Ok(Self {
+            average_speed: average_speed,
+            num_downloads: num_downloads,
+            unknown: unknown,
+            num_files: num_files,
+            num_folders: num_folders,
+        })
+    }
+}
+
+impl ProtoEncode for RoomJoinResponse {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+        let mut user_names = vec![];
+        let mut user_statuses = vec![];
+        let mut user_infos = vec![];
+        let mut user_free_slots = vec![];
+        let mut user_countries = vec![];
+        for &(ref user_name, ref user) in &self.users {
+            user_names.push(user_name);
+            user_statuses.push(user.status);
+            user_infos.push(UserInfo::from(user));
+            user_free_slots.push(user.num_free_slots as u32);
+            user_countries.push(&user.country);
+        }
+
+        encoder.encode_string(&self.room_name)?;
+        encoder.encode_vec(&user_names)?;
+        encoder.encode_vec(&user_statuses)?;
+        encoder.encode_vec(&user_infos)?;
+        encoder.encode_vec(&user_free_slots)?;
+        encoder.encode_vec(&user_countries)?;
+
+        if let &Some(ref owner) = &self.owner {
+            encoder.encode_string(owner)?;
+            encoder.encode_vec(&self.operators)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl ProtoDecode for RoomJoinResponse {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        unimplemented!();
+    }
+}
+
 /*============*
  * ROOM LEAVE *
  *============*/

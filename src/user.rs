@@ -44,6 +44,29 @@ impl proto::WriteToPacket for Status {
     }
 }
 
+impl proto::ProtoEncode for Status {
+    fn encode(&self, encoder: &mut proto::ProtoEncoder) -> io::Result<()> {
+        let value = match *self {
+            Status::Offline => STATUS_OFFLINE,
+            Status::Away => STATUS_AWAY,
+            Status::Online => STATUS_ONLINE,
+        };
+        encoder.encode_u32(value)
+    }
+}
+
+impl proto::ProtoDecode for Status {
+    fn decode(decoder: &mut proto::ProtoDecoder) -> Result<Self, proto::DecodeError> {
+        let value = decoder.decode_u32()?;
+        match value {
+            STATUS_OFFLINE => Ok(Status::Offline),
+            STATUS_AWAY => Ok(Status::Away),
+            STATUS_ONLINE => Ok(Status::Online),
+            _ => Err(proto::DecodeError::InvalidUserStatusError(value)),
+        }
+    }
+}
+
 /// This structure contains the last known information about a fellow user.
 /// It does not store the name, as that is stored implicitly as the key in the
 /// user hash table.
