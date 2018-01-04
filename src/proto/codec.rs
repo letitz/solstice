@@ -131,6 +131,10 @@ impl<'a> ProtoDecoder<'a> {
         ProtoDecoder { inner: inner }
     }
 
+    pub fn has_remaining(&self) -> bool {
+        self.inner.has_remaining()
+    }
+
     pub fn decode_u32(&mut self) -> Result<u32, DecodeError> {
         if self.inner.remaining() < U32_BYTE_LEN {
             return Err(unexpected_eof_error("u32"));

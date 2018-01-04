@@ -130,6 +130,10 @@ impl ProtoEncode for ServerResponse {
                 encoder.encode_u32(CODE_PRIVILEGED_USERS)?;
                 response.encode(encoder)?;
             }
+            ServerResponse::RoomJoinResponse(ref response) => {
+                encoder.encode_u32(CODE_ROOM_JOIN)?;
+                response.encode(encoder)?;
+            }
             _ => {
                 unimplemented!();
             }
@@ -169,6 +173,10 @@ impl ProtoDecode for ServerResponse {
             CODE_PRIVILEGED_USERS => {
                 let response = PrivilegedUsersResponse::decode(decoder)?;
                 ServerResponse::PrivilegedUsersResponse(response)
+            }
+            CODE_ROOM_JOIN => {
+                let response = RoomJoinResponse::decode(decoder)?;
+                ServerResponse::RoomJoinResponse(response)
             }
             _ => {
                 return Err(DecodeError::UnknownCodeError(code));
@@ -684,7 +692,7 @@ impl ProtoEncode for RoomJoinResponse {
         encoder.encode_vec(&user_free_slots)?;
         encoder.encode_vec(&user_countries)?;
 
-        if let &Some(ref owner) = &self.owner {
+        if let Some(ref owner) = self.owner {
             encoder.encode_string(owner)?;
             encoder.encode_vec(&self.operators)?;
         }
@@ -693,9 +701,76 @@ impl ProtoEncode for RoomJoinResponse {
     }
 }
 
+fn build_users(
+    mut names: Vec<String>,
+    mut statuses: Vec<user::Status>,
+    mut infos: Vec<UserInfo>,
+    mut free_slots: Vec<u32>,
+    mut countries: Vec<String>,
+) -> Vec<(String, user::User)> {
+    let mut users = vec![];
+
+    loop {
+        let name_opt = names.pop();
+        let status_opt = statuses.pop();
+        let info_opt = infos.pop();
+        let slots_opt = free_slots.pop();
+        let country_opt = countries.pop();
+
+        match (name_opt, status_opt, info_opt, slots_opt, country_opt) {
+            (Some(name), Some(status), Some(info), Some(slots), Some(country)) => {
+                users.push((
+                    name,
+                    user::User {
+                        status: status,
+                        average_speed: info.average_speed as usize,
+                        num_downloads: info.num_downloads as usize,
+                        unknown: info.unknown as usize,
+                        num_files: info.num_files as usize,
+                        num_folders: info.num_folders as usize,
+                        num_free_slots: slots as usize,
+                        country: country,
+                    },
+                ))
+            }
+            _ => break,
+        }
+    }
+
+    users.reverse();
+    users
+}
+
 impl ProtoDecode for RoomJoinResponse {
     fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
-        unimplemented!();
+        let room_name = decoder.decode_string()?;
+        let user_names = decoder.decode_vec::<String>()?;
+        let user_statuses = decoder.decode_vec::<user::Status>()?;
+        let user_infos = decoder.decode_vec::<UserInfo>()?;
+        let user_free_slots = decoder.decode_vec::<u32>()?;
+        let user_countries = decoder.decode_vec::<String>()?;
+
+        let mut owner = None;
+        let mut operators = vec![];
+        if decoder.has_remaining() {
+            owner = Some(decoder.decode_string()?);
+            operators = decoder.decode_vec::<String>()?;
+        }
+
+        let users = build_users(
+            user_names,
+            user_statuses,
+            user_infos,
+            user_free_slots,
+            user_countries,
+        );
+
+        Ok(Self {
+            room_name: room_name,
+            users: users,
+            owner: owner,
+            operators: operators,
+        })
     }
 }
 
@@ -1047,5 +1122,52 @@ mod tests {
                 ],
             },
         ))
+    }
+
+    #[test]
+    fn roundtrip_room_join() {
+        roundtrip(ServerResponse::RoomJoinResponse(RoomJoinResponse {
+            room_name: "red".to_string(),
+            users: vec![
+                (
+                    "alice".to_string(),
+                    user::User {
+                        status: user::Status::Online,
+                        average_speed: 1000,
+                        num_downloads: 1001,
+                        unknown: 1002,
+                        num_files: 1003,
+                        num_folders: 1004,
+                        num_free_slots: 1005,
+                        country: "US".to_string(),
+                    }
+                ),
+                (
+                    "barbara".to_string(),
+                    user::User {
+                        status: user::Status::Away,
+                        average_speed: 2000,
+                        num_downloads: 2001,
+                        unknown: 2002,
+                        num_files: 2003,
+                        num_folders: 2004,
+                        num_free_slots: 2005,
+                        country: "DE".to_string(),
+                    }
+                ),
+            ],
+            owner: Some("carol".to_string()),
+            operators: vec!["deirdre".to_string(), "erica".to_string()],
+        }))
+    }
+
+    #[test]
+    fn roundtrip_room_join_no_owner() {
+        roundtrip(ServerResponse::RoomJoinResponse(RoomJoinResponse {
+            room_name: "red".to_string(),
+            users: vec![],
+            owner: None,
+            operators: vec![],
+        }))
     }
 }
