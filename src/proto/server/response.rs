@@ -141,6 +141,10 @@ impl ProtoEncode for ServerResponse {
                 encoder.encode_u32(CODE_ROOM_LIST)?;
                 response.encode(encoder)?;
             }
+            ServerResponse::RoomMessageResponse(ref response) => {
+                encoder.encode_u32(CODE_ROOM_MESSAGE)?;
+                response.encode(encoder)?;
+            }
             _ => {
                 unimplemented!();
             }
@@ -192,6 +196,10 @@ impl ProtoDecode for ServerResponse {
             CODE_ROOM_LIST => {
                 let response = RoomListResponse::decode(decoder)?;
                 ServerResponse::RoomListResponse(response)
+            }
+            CODE_ROOM_MESSAGE => {
+                let response = RoomMessageResponse::decode(decoder)?;
+                ServerResponse::RoomMessageResponse(response)
             }
             _ => {
                 return Err(DecodeError::UnknownCodeError(code));
@@ -968,6 +976,27 @@ impl ReadFromPacket for RoomMessageResponse {
     }
 }
 
+impl ProtoEncode for RoomMessageResponse {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        encoder.encode_string(&self.room_name)?;
+        encoder.encode_string(&self.user_name)?;
+        encoder.encode_string(&self.message)
+    }
+}
+
+impl ProtoDecode for RoomMessageResponse {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let room_name = decoder.decode_string()?;
+        let user_name = decoder.decode_string()?;
+        let message = decoder.decode_string()?;
+        Ok(Self {
+            room_name: room_name,
+            user_name: user_name,
+            message: message,
+        })
+    }
+}
+
 /*==============*
  * ROOM MESSAGE *
  *==============*/
@@ -1280,6 +1309,15 @@ mod tests {
             owned_private_rooms: vec![("green".to_string(), 14), ("purple".to_string(), 15)],
             other_private_rooms: vec![("yellow".to_string(), 16), ("orange".to_string(), 17)],
             operated_private_room_names: vec!["brown".to_string(), "pink".to_string()],
+        }))
+    }
+
+    #[test]
+    fn roundtrip_room_message() {
+        roundtrip(ServerResponse::RoomMessageResponse(RoomMessageResponse {
+            room_name: "red".to_string(),
+            user_name: "alice".to_string(),
+            message: "hello world!".to_string(),
         }))
     }
 }
