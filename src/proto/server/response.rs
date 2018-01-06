@@ -137,6 +137,10 @@ impl ProtoEncode for ServerResponse {
                 encoder.encode_u32(CODE_ROOM_LEAVE)?;
                 response.encode(encoder)?;
             }
+            ServerResponse::RoomListResponse(ref response) => {
+                encoder.encode_u32(CODE_ROOM_LIST)?;
+                response.encode(encoder)?;
+            }
             _ => {
                 unimplemented!();
             }
@@ -184,6 +188,10 @@ impl ProtoDecode for ServerResponse {
             CODE_ROOM_LEAVE => {
                 let response = RoomLeaveResponse::decode(decoder)?;
                 ServerResponse::RoomLeaveResponse(response)
+            }
+            CODE_ROOM_LIST => {
+                let response = RoomListResponse::decode(decoder)?;
+                ServerResponse::RoomListResponse(response)
             }
             _ => {
                 return Err(DecodeError::UnknownCodeError(code));
@@ -861,6 +869,79 @@ impl RoomListResponse {
 
         Ok(rooms)
     }
+
+    fn build_rooms(mut room_names: Vec<String>, mut user_counts: Vec<u32>) -> Vec<(String, u32)> {
+        let mut rooms = vec![];
+
+        loop {
+            let room_name_opt = room_names.pop();
+            let user_count_opt = user_counts.pop();
+
+            match (room_name_opt, user_count_opt) {
+                (Some(room_name), Some(user_count)) => rooms.push((room_name, user_count)),
+                _ => break,
+            }
+        }
+
+        if !room_names.is_empty() {
+            warn!(
+                "Unmatched room names in room list response: {:?}",
+                room_names
+            )
+        }
+        if !user_counts.is_empty() {
+            warn!(
+                "Unmatched user counts in room list response: {:?}",
+                user_counts
+            )
+        }
+
+        rooms.reverse();
+        rooms
+    }
+
+    fn decode_rooms(decoder: &mut ProtoDecoder) -> Result<Vec<(String, u32)>, DecodeError> {
+        let room_names = decoder.decode_vec::<String>()?;
+        let user_counts = decoder.decode_vec::<u32>()?;
+        Ok(Self::build_rooms(room_names, user_counts))
+    }
+
+    fn encode_rooms(rooms: &[(String, u32)], encoder: &mut ProtoEncoder) -> io::Result<()> {
+        let mut room_names = vec![];
+        let mut user_counts = vec![];
+
+        for &(ref room_name, user_count) in rooms {
+            room_names.push(room_name);
+            user_counts.push(user_count);
+        }
+
+        encoder.encode_vec(&room_names)?;
+        encoder.encode_vec(&user_counts)
+    }
+}
+
+impl ProtoEncode for RoomListResponse {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        Self::encode_rooms(&self.rooms, encoder)?;
+        Self::encode_rooms(&self.owned_private_rooms, encoder)?;
+        Self::encode_rooms(&self.other_private_rooms, encoder)?;
+        encoder.encode_vec(&self.operated_private_room_names)
+    }
+}
+
+impl ProtoDecode for RoomListResponse {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let rooms = Self::decode_rooms(decoder)?;
+        let owned_private_rooms = Self::decode_rooms(decoder)?;
+        let other_private_rooms = Self::decode_rooms(decoder)?;
+        let operated_private_room_names = decoder.decode_vec::<String>()?;
+        Ok(Self {
+            rooms: rooms,
+            owned_private_rooms: owned_private_rooms,
+            other_private_rooms: other_private_rooms,
+            operated_private_room_names: operated_private_room_names,
+        })
+    }
 }
 
 /*==============*
@@ -1187,8 +1268,18 @@ mod tests {
 
     #[test]
     fn roundtrip_room_leave() {
-        roundtrip(ServerResponse::RoomLeaveResponse(RoomLeaveResponse {
-            room_name: "red".to_string(),
+        roundtrip(ServerResponse::RoomLeaveResponse(
+            RoomLeaveResponse { room_name: "red".to_string() },
+        ))
+    }
+
+    #[test]
+    fn roundtrip_room_list() {
+        roundtrip(ServerResponse::RoomListResponse(RoomListResponse {
+            rooms: vec![("red".to_string(), 12), ("blue".to_string(), 13)],
+            owned_private_rooms: vec![("green".to_string(), 14), ("purple".to_string(), 15)],
+            other_private_rooms: vec![("yellow".to_string(), 16), ("orange".to_string(), 17)],
+            operated_private_room_names: vec!["brown".to_string(), "pink".to_string()],
         }))
     }
 }
