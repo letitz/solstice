@@ -1,5 +1,5 @@
+use proto::User;
 use room;
-use user;
 
 /// This enumeration is the list of possible control responses from the client
 /// to the controller.
@@ -92,11 +92,11 @@ pub struct RoomUserLeftResponse {
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 pub struct UserInfoResponse {
     pub user_name: String,
-    pub user_info: user::User,
+    pub user_info: User,
 }
 
 /// This stuct contains the last known information about every user.
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 pub struct UserListResponse {
-    pub user_list: Vec<(String, user::User)>,
+    pub user_list: Vec<(String, User)>,
 }

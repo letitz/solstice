@@ -2,9 +2,8 @@ use std::io;
 use std::net;
 
 use proto::server::constants::*;
-use proto::{DecodeError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
+use proto::{DecodeError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder, User, UserStatus};
 use proto::packet::{Packet, PacketReadError, ReadFromPacket};
-use user;
 
 /*=================*
  * SERVER RESPONSE *
@@ -522,7 +521,7 @@ impl ProtoDecode for PrivilegedUsersResponse {
 #[derive(Debug, Eq, PartialEq)]
 pub struct RoomJoinResponse {
     pub room_name: String,
-    pub users: Vec<(String, user::User)>,
+    pub users: Vec<(String, User)>,
     pub owner: Option<String>,
     pub operators: Vec<String>,
 }
@@ -538,9 +537,9 @@ impl ReadFromPacket for RoomJoinResponse {
 
         let num_users: usize = try!(packet.read_value());
         for _ in 0..num_users {
-            let name = try!(packet.read_value());
-            let user = user::User {
-                status: user::Status::Offline,
+            let name : String = try!(packet.read_value());
+            let user = User {
+                status: UserStatus::Offline,
                 average_speed: 0,
                 num_downloads: 0,
                 unknown: 0,
@@ -631,8 +630,8 @@ struct UserInfo {
     num_folders: u32,
 }
 
-impl<'a> From<&'a user::User> for UserInfo {
-    fn from(user: &'a user::User) -> Self {
+impl UserInfo {
+    fn from_user(user: &User) -> Self {
         Self {
             average_speed: user.average_speed as u32,
             num_downloads: user.num_downloads as u32,
@@ -680,7 +679,7 @@ impl ProtoEncode for RoomJoinResponse {
         for &(ref user_name, ref user) in &self.users {
             user_names.push(user_name);
             user_statuses.push(user.status);
-            user_infos.push(UserInfo::from(user));
+            user_infos.push(UserInfo::from_user(user));
             user_free_slots.push(user.num_free_slots as u32);
             user_countries.push(&user.country);
         }
@@ -703,11 +702,11 @@ impl ProtoEncode for RoomJoinResponse {
 
 fn build_users(
     mut names: Vec<String>,
-    mut statuses: Vec<user::Status>,
+    mut statuses: Vec<UserStatus>,
     mut infos: Vec<UserInfo>,
     mut free_slots: Vec<u32>,
     mut countries: Vec<String>,
-) -> Vec<(String, user::User)> {
+) -> Vec<(String, User)> {
     let mut users = vec![];
 
     loop {
@@ -721,7 +720,7 @@ fn build_users(
             (Some(name), Some(status), Some(info), Some(slots), Some(country)) => {
                 users.push((
                     name,
-                    user::User {
+                    User {
                         status: status,
                         average_speed: info.average_speed as usize,
                         num_downloads: info.num_downloads as usize,
@@ -730,7 +729,7 @@ fn build_users(
                         num_folders: info.num_folders as usize,
                         num_free_slots: slots as usize,
                         country: country,
-                    },
+                    }
                 ))
             }
             _ => break,
@@ -745,7 +744,7 @@ impl ProtoDecode for RoomJoinResponse {
     fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
         let room_name = decoder.decode_string()?;
         let user_names = decoder.decode_vec::<String>()?;
-        let user_statuses = decoder.decode_vec::<user::Status>()?;
+        let user_statuses = decoder.decode_vec::<UserStatus>()?;
         let user_infos = decoder.decode_vec::<UserInfo>()?;
         let user_free_slots = decoder.decode_vec::<u32>()?;
         let user_countries = decoder.decode_vec::<String>()?;
@@ -905,13 +904,13 @@ impl ReadFromPacket for RoomTickersResponse {
 pub struct RoomUserJoinedResponse {
     pub room_name: String,
     pub user_name: String,
-    pub user: user::User,
+    pub user: User,
 }
 
 impl ReadFromPacket for RoomUserJoinedResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
         let room_name = try!(packet.read_value());
-        let user_name = try!(packet.read_value());
+        let user_name : String = try!(packet.read_value());
 
         let status = try!(packet.read_value());
 
@@ -927,7 +926,7 @@ impl ReadFromPacket for RoomUserJoinedResponse {
         Ok(RoomUserJoinedResponse {
             room_name: room_name,
             user_name: user_name,
-            user: user::User {
+            user: User {
                 status: status,
                 average_speed: average_speed,
                 num_downloads: num_downloads,
@@ -999,7 +998,7 @@ impl ReadFromPacket for UserInfoResponse {
 #[derive(Debug, Eq, PartialEq)]
 pub struct UserStatusResponse {
     pub user_name: String,
-    pub status: user::Status,
+    pub status: UserStatus,
     pub is_privileged: bool,
 }
 
@@ -1131,8 +1130,8 @@ mod tests {
             users: vec![
                 (
                     "alice".to_string(),
-                    user::User {
-                        status: user::Status::Online,
+                    User {
+                        status: UserStatus::Online,
                         average_speed: 1000,
                         num_downloads: 1001,
                         unknown: 1002,
@@ -1144,8 +1143,8 @@ mod tests {
                 ),
                 (
                     "barbara".to_string(),
-                    user::User {
-                        status: user::Status::Away,
+                    User {
+                        status: UserStatus::Away,
                         average_speed: 2000,
                         num_downloads: 2001,
                         unknown: 2002,

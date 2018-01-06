@@ -1,94 +1,8 @@
 use std::collections;
 use std::error;
 use std::fmt;
-use std::io;
 
-use proto;
-
-const STATUS_OFFLINE: u32 = 1;
-const STATUS_AWAY: u32 = 2;
-const STATUS_ONLINE: u32 = 3;
-
-/// This enumeration is the list of possible user statuses.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
-pub enum Status {
-    /// The user if offline.
-    Offline,
-    /// The user is connected, but AFK.
-    Away,
-    /// The user is present.
-    Online,
-}
-
-impl proto::ReadFromPacket for Status {
-    fn read_from_packet(packet: &mut proto::Packet) -> Result<Self, proto::PacketReadError> {
-        let n: u32 = try!(packet.read_value());
-        match n {
-            STATUS_OFFLINE => Ok(Status::Offline),
-            STATUS_AWAY => Ok(Status::Away),
-            STATUS_ONLINE => Ok(Status::Online),
-            _ => Err(proto::PacketReadError::InvalidUserStatusError(n)),
-        }
-    }
-}
-
-impl proto::WriteToPacket for Status {
-    fn write_to_packet(&self, packet: &mut proto::MutPacket) -> io::Result<()> {
-        let n = match *self {
-            Status::Offline => STATUS_OFFLINE,
-            Status::Away => STATUS_AWAY,
-            Status::Online => STATUS_ONLINE,
-        };
-        try!(packet.write_value(&n));
-        Ok(())
-    }
-}
-
-impl proto::ProtoEncode for Status {
-    fn encode(&self, encoder: &mut proto::ProtoEncoder) -> io::Result<()> {
-        let value = match *self {
-            Status::Offline => STATUS_OFFLINE,
-            Status::Away => STATUS_AWAY,
-            Status::Online => STATUS_ONLINE,
-        };
-        encoder.encode_u32(value)
-    }
-}
-
-impl proto::ProtoDecode for Status {
-    fn decode(decoder: &mut proto::ProtoDecoder) -> Result<Self, proto::DecodeError> {
-        let value = decoder.decode_u32()?;
-        match value {
-            STATUS_OFFLINE => Ok(Status::Offline),
-            STATUS_AWAY => Ok(Status::Away),
-            STATUS_ONLINE => Ok(Status::Online),
-            _ => Err(proto::DecodeError::InvalidUserStatusError(value)),
-        }
-    }
-}
-
-/// This structure contains the last known information about a fellow user.
-/// It does not store the name, as that is stored implicitly as the key in the
-/// user hash table.
-#[derive(Clone, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
-pub struct User {
-    /// The last known status of the user.
-    pub status: Status,
-    /// The average upload speed of the user.
-    pub average_speed: usize,
-    /// ??? Nicotine calls it downloadnum.
-    pub num_downloads: usize,
-    /// ??? Unknown field.
-    pub unknown: usize,
-    /// The number of files this user shares.
-    pub num_files: usize,
-    /// The number of folders this user shares.
-    pub num_folders: usize,
-    /// The number of free download slots of this user.
-    pub num_free_slots: usize,
-    /// The user's country code.
-    pub country: String,
-}
+use proto::{User, UserStatus};
 
 /// The error returned when a user name was not found in the user map.
 #[derive(Debug)]
@@ -150,13 +64,10 @@ impl UserMap {
     }
 
     /// Sets the given user's status to the given value, if such a user exists.
-    pub fn set_status(&mut self, user_name: &str, status: Status) -> Result<(), UserNotFoundError> {
-        if let Some(user) = self.map.get_mut(user_name) {
-            user.status = status;
-            Ok(())
-        } else {
-            Err(UserNotFoundError { user_name: user_name.to_string() })
-        }
+    pub fn set_status(&mut self, user_name: &str, status: UserStatus) -> Result<(), UserNotFoundError> {
+        let user = self.get_mut_strict(user_name)?;
+        user.status = status;
+        Ok(())
     }
 
     /// Returns the list of (user name, user data) representing all known users.

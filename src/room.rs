@@ -3,8 +3,7 @@ use std::error;
 use std::fmt;
 use std::mem;
 
-use proto::server;
-use user;
+use proto::{server, User};
 
 /// This enumeration is the list of possible membership states for a chat room.
 #[derive(Clone, Copy, Debug, RustcDecodable, RustcEncodable)]
@@ -237,7 +236,7 @@ impl RoomMap {
         room_name: &str,
         owner: Option<String>,
         mut operators: Vec<String>,
-        members: &Vec<(String, user::User)>,
+        members: &Vec<(String, User)>,
     ) -> Result<(), Error> {
         // First look up the room struct.
         let room = try!(self.get_mut_strict(room_name));
