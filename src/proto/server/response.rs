@@ -133,6 +133,10 @@ impl ProtoEncode for ServerResponse {
                 encoder.encode_u32(CODE_ROOM_JOIN)?;
                 response.encode(encoder)?;
             }
+            ServerResponse::RoomLeaveResponse(ref response) => {
+                encoder.encode_u32(CODE_ROOM_LEAVE)?;
+                response.encode(encoder)?;
+            }
             _ => {
                 unimplemented!();
             }
@@ -176,6 +180,10 @@ impl ProtoDecode for ServerResponse {
             CODE_ROOM_JOIN => {
                 let response = RoomJoinResponse::decode(decoder)?;
                 ServerResponse::RoomJoinResponse(response)
+            }
+            CODE_ROOM_LEAVE => {
+                let response = RoomLeaveResponse::decode(decoder)?;
+                ServerResponse::RoomLeaveResponse(response)
             }
             _ => {
                 return Err(DecodeError::UnknownCodeError(code));
@@ -787,6 +795,19 @@ impl ReadFromPacket for RoomLeaveResponse {
     }
 }
 
+impl ProtoEncode for RoomLeaveResponse {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        encoder.encode_string(&self.room_name)
+    }
+}
+
+impl ProtoDecode for RoomLeaveResponse {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let room_name = decoder.decode_string()?;
+        Ok(Self { room_name: room_name })
+    }
+}
+
 /*===========*
  * ROOM LIST *
  *===========*/
@@ -1161,6 +1182,13 @@ mod tests {
             users: vec![],
             owner: None,
             operators: vec![],
+        }))
+    }
+
+    #[test]
+    fn roundtrip_room_leave() {
+        roundtrip(ServerResponse::RoomLeaveResponse(RoomLeaveResponse {
+            room_name: "red".to_string(),
         }))
     }
 }
