@@ -100,6 +100,7 @@ fn unexpected_eof_error(value_type: &str) -> DecodeError {
 //   * IPv4 addresses are serialized as 32-bit integers.
 //   * Strings are serialized as 32-bit-length-prefixed arrays of Windows 1252
 //     encoded characters.
+//   * Pairs are serialized as two consecutive values.
 //   * Vectors are serialized as length-prefixed arrays of serialized values.
 
 /// This trait is implemented by types that can be decoded from messages with
@@ -183,6 +184,16 @@ impl<'a> ProtoDecoder<'a> {
         result
     }
 
+    pub fn decode_pair<T, U>(&mut self) -> Result<(T, U), DecodeError>
+    where
+        T: ProtoDecode,
+        U: ProtoDecode,
+    {
+        let first = T::decode(self)?;
+        let second = U::decode(self)?;
+        Ok((first, second))
+    }
+
     pub fn decode_vec<T: ProtoDecode>(&mut self) -> Result<Vec<T>, DecodeError> {
         let len = self.decode_u32()? as usize;
         let mut vec = Vec::with_capacity(len);
@@ -247,6 +258,15 @@ impl<'a> ProtoEncoder<'a> {
         self.encode_u32(bytes.len() as u32)?;
         self.inner.extend(bytes);
         Ok(())
+    }
+
+    pub fn encode_pair<T, U>(&mut self, pair: &(T, U)) -> io::Result<()>
+    where
+        T: ProtoEncode,
+        U: ProtoEncode,
+    {
+        pair.0.encode(self)?;
+        pair.1.encode(self)
     }
 
     pub fn encode_vec<T: ProtoEncode>(&mut self, vec: &[T]) -> io::Result<()> {
@@ -326,6 +346,12 @@ impl ProtoEncode for str {
     }
 }
 
+impl<'a> ProtoEncode for &'a str {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        encoder.encode_string(self)
+    }
+}
+
 impl ProtoEncode for String {
     fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
         encoder.encode_string(self)
@@ -335,6 +361,18 @@ impl ProtoEncode for String {
 impl<'a> ProtoEncode for &'a String {
     fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
         encoder.encode_string(*self)
+    }
+}
+
+impl<T: ProtoDecode, U: ProtoDecode> ProtoDecode for (T, U) {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        decoder.decode_pair::<T, U>()
+    }
+}
+
+impl<T: ProtoEncode, U: ProtoEncode> ProtoEncode for (T, U) {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        encoder.encode_pair(self)
     }
 }
 
@@ -584,6 +622,49 @@ pub mod tests {
         for &(string, _) in &STRING_ENCODINGS {
             roundtrip(string.to_string())
         }
+    }
+
+    #[test]
+    fn encode_pair_u32_string() {
+        let mut bytes = BytesMut::from(vec![13]);
+        let mut expected_bytes = BytesMut::from(vec![13]);
+
+        let (integer, ref expected_integer_bytes) = U32_ENCODINGS[0];
+        let (string, expected_string_bytes) = STRING_ENCODINGS[0];
+
+        expected_bytes.extend(expected_integer_bytes);
+        expected_bytes.extend(expected_string_bytes);
+
+        ProtoEncoder::new(&mut bytes)
+            .encode_pair(&(integer, string))
+            .unwrap();
+
+        assert_eq!(bytes, expected_bytes);
+    }
+
+    #[test]
+    fn decode_pair_u32_string() {
+        let mut bytes = vec![];
+
+        let (expected_integer, ref integer_bytes) = U32_ENCODINGS[0];
+        let (expected_string, string_bytes) = STRING_ENCODINGS[0];
+
+        bytes.extend(integer_bytes);
+        bytes.extend(string_bytes);
+
+        let mut cursor = new_cursor(bytes);
+
+        let pair = ProtoDecoder::new(&mut cursor)
+            .decode_pair::<u32, String>()
+            .unwrap();
+
+        assert_eq!(pair, (expected_integer, expected_string.to_string()));
+        assert_eq!(cursor.remaining(), 0);
+    }
+
+    #[test]
+    fn roundtrip_pair_u32_string() {
+        roundtrip((42u32, "hello world!".to_string()))
     }
 
     #[test]
