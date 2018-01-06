@@ -1,6 +1,7 @@
 use std::io;
 
-use proto::{DecodeError, MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder, ReadFromPacket, WriteToPacket};
+use proto::{DecodeError, MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecoder,
+            ProtoEncode, ProtoEncoder, ReadFromPacket, WriteToPacket};
 
 const STATUS_OFFLINE: u32 = 1;
 const STATUS_AWAY: u32 = 2;
@@ -67,6 +68,8 @@ impl ProtoDecode for UserStatus {
 /// This structure contains the last known information about a fellow user.
 #[derive(Clone, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
 pub struct User {
+    /// The name of the user.
+    pub name: String,
     /// The last known status of the user.
     pub status: UserStatus,
     /// The average upload speed of the user.

@@ -236,7 +236,7 @@ impl RoomMap {
         room_name: &str,
         owner: Option<String>,
         mut operators: Vec<String>,
-        members: &Vec<(String, User)>,
+        members: &[User],
     ) -> Result<(), Error> {
         // First look up the room struct.
         let room = try!(self.get_mut_strict(room_name));
@@ -263,8 +263,8 @@ impl RoomMap {
         }
 
         room.members.clear();
-        for &(ref user_name, _) in members.iter() {
-            room.members.insert(user_name.clone());
+        for user in members {
+            room.members.insert(user.name.clone());
         }
 
         Ok(())

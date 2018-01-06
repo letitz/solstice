@@ -577,8 +577,8 @@ impl Client {
         }
 
         // Then update the user structs based on the info we just got.
-        for (name, user) in response.users.drain(..) {
-            self.users.insert(name, user);
+        for user in response.users.drain(..) {
+            self.users.insert(user);
         }
 
         let control_response = control::RoomJoinResponse { room_name: response.room_name };
@@ -640,7 +640,7 @@ impl Client {
     fn handle_room_user_joined_response(&mut self, response: server::RoomUserJoinedResponse) {
         let result = self.rooms.insert_member(
             &response.room_name,
-            response.user_name.clone(),
+            response.user.name.clone(),
         );
         if let Err(err) = result {
             error!("RoomUserJoinedResponse: {}", err);
@@ -649,7 +649,7 @@ impl Client {
         self.send_to_controller(control::Response::RoomUserJoinedResponse(
             control::RoomUserJoinedResponse {
                 room_name: response.room_name,
-                user_name: response.user_name,
+                user_name: response.user.name,
             },
         ));
     }

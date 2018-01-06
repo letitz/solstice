@@ -59,12 +59,16 @@ impl UserMap {
 
     /// Inserts the given user info for the given user name in the mapping.
     /// If there is already data under that name, it is replaced.
-    pub fn insert(&mut self, user_name: String, user: User) {
-        self.map.insert(user_name, user);
+    pub fn insert(&mut self, user: User) {
+        self.map.insert(user.name.clone(), user);
     }
 
     /// Sets the given user's status to the given value, if such a user exists.
-    pub fn set_status(&mut self, user_name: &str, status: UserStatus) -> Result<(), UserNotFoundError> {
+    pub fn set_status(
+        &mut self,
+        user_name: &str,
+        status: UserStatus,
+    ) -> Result<(), UserNotFoundError> {
         let user = self.get_mut_strict(user_name)?;
         user.status = status;
         Ok(())

@@ -521,7 +521,7 @@ impl ProtoDecode for PrivilegedUsersResponse {
 #[derive(Debug, Eq, PartialEq)]
 pub struct RoomJoinResponse {
     pub room_name: String,
-    pub users: Vec<(String, User)>,
+    pub users: Vec<User>,
     pub owner: Option<String>,
     pub operators: Vec<String>,
 }
@@ -537,8 +537,9 @@ impl ReadFromPacket for RoomJoinResponse {
 
         let num_users: usize = try!(packet.read_value());
         for _ in 0..num_users {
-            let name : String = try!(packet.read_value());
+            let name: String = try!(packet.read_value());
             let user = User {
+                name: name,
                 status: UserStatus::Offline,
                 average_speed: 0,
                 num_downloads: 0,
@@ -548,7 +549,7 @@ impl ReadFromPacket for RoomJoinResponse {
                 num_free_slots: 0,
                 country: String::new(),
             };
-            response.users.push((name, user));
+            response.users.push(user);
         }
 
         try!(response.read_user_infos(packet));
@@ -570,14 +571,14 @@ impl RoomJoinResponse {
     fn read_user_infos(&mut self, packet: &mut Packet) -> Result<(), PacketReadError> {
         let num_statuses: usize = try!(packet.read_value());
         for i in 0..num_statuses {
-            if let Some(&mut (_, ref mut user)) = self.users.get_mut(i) {
+            if let Some(user) = self.users.get_mut(i) {
                 user.status = try!(packet.read_value());
             }
         }
 
         let num_infos: usize = try!(packet.read_value());
         for i in 0..num_infos {
-            if let Some(&mut (_, ref mut user)) = self.users.get_mut(i) {
+            if let Some(user) = self.users.get_mut(i) {
                 user.average_speed = try!(packet.read_value());
                 user.num_downloads = try!(packet.read_value());
                 user.unknown = try!(packet.read_value());
@@ -588,14 +589,14 @@ impl RoomJoinResponse {
 
         let num_free_slots: usize = try!(packet.read_value());
         for i in 0..num_free_slots {
-            if let Some(&mut (_, ref mut user)) = self.users.get_mut(i) {
+            if let Some(user) = self.users.get_mut(i) {
                 user.num_free_slots = try!(packet.read_value());
             }
         }
 
         let num_countries: usize = try!(packet.read_value());
         for i in 0..num_countries {
-            if let Some(&mut (_, ref mut user)) = self.users.get_mut(i) {
+            if let Some(user) = self.users.get_mut(i) {
                 user.country = try!(packet.read_value());
             }
         }
@@ -676,8 +677,8 @@ impl ProtoEncode for RoomJoinResponse {
         let mut user_infos = vec![];
         let mut user_free_slots = vec![];
         let mut user_countries = vec![];
-        for &(ref user_name, ref user) in &self.users {
-            user_names.push(user_name);
+        for user in &self.users {
+            user_names.push(&user.name);
             user_statuses.push(user.status);
             user_infos.push(UserInfo::from_user(user));
             user_free_slots.push(user.num_free_slots as u32);
@@ -706,7 +707,7 @@ fn build_users(
     mut infos: Vec<UserInfo>,
     mut free_slots: Vec<u32>,
     mut countries: Vec<String>,
-) -> Vec<(String, User)> {
+) -> Vec<User> {
     let mut users = vec![];
 
     loop {
@@ -718,19 +719,17 @@ fn build_users(
 
         match (name_opt, status_opt, info_opt, slots_opt, country_opt) {
             (Some(name), Some(status), Some(info), Some(slots), Some(country)) => {
-                users.push((
-                    name,
-                    User {
-                        status: status,
-                        average_speed: info.average_speed as usize,
-                        num_downloads: info.num_downloads as usize,
-                        unknown: info.unknown as usize,
-                        num_files: info.num_files as usize,
-                        num_folders: info.num_folders as usize,
-                        num_free_slots: slots as usize,
-                        country: country,
-                    }
-                ))
+                users.push(User {
+                    name: name,
+                    status: status,
+                    average_speed: info.average_speed as usize,
+                    num_downloads: info.num_downloads as usize,
+                    unknown: info.unknown as usize,
+                    num_files: info.num_files as usize,
+                    num_folders: info.num_folders as usize,
+                    num_free_slots: slots as usize,
+                    country: country,
+                })
             }
             _ => break,
         }
@@ -903,14 +902,13 @@ impl ReadFromPacket for RoomTickersResponse {
 #[derive(Debug, Eq, PartialEq)]
 pub struct RoomUserJoinedResponse {
     pub room_name: String,
-    pub user_name: String,
     pub user: User,
 }
 
 impl ReadFromPacket for RoomUserJoinedResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
         let room_name = try!(packet.read_value());
-        let user_name : String = try!(packet.read_value());
+        let user_name = try!(packet.read_value());
 
         let status = try!(packet.read_value());
 
@@ -925,8 +923,8 @@ impl ReadFromPacket for RoomUserJoinedResponse {
 
         Ok(RoomUserJoinedResponse {
             room_name: room_name,
-            user_name: user_name,
             user: User {
+                name: user_name,
                 status: status,
                 average_speed: average_speed,
                 num_downloads: num_downloads,
@@ -1128,32 +1126,28 @@ mod tests {
         roundtrip(ServerResponse::RoomJoinResponse(RoomJoinResponse {
             room_name: "red".to_string(),
             users: vec![
-                (
-                    "alice".to_string(),
-                    User {
-                        status: UserStatus::Online,
-                        average_speed: 1000,
-                        num_downloads: 1001,
-                        unknown: 1002,
-                        num_files: 1003,
-                        num_folders: 1004,
-                        num_free_slots: 1005,
-                        country: "US".to_string(),
-                    }
-                ),
-                (
-                    "barbara".to_string(),
-                    User {
-                        status: UserStatus::Away,
-                        average_speed: 2000,
-                        num_downloads: 2001,
-                        unknown: 2002,
-                        num_files: 2003,
-                        num_folders: 2004,
-                        num_free_slots: 2005,
-                        country: "DE".to_string(),
-                    }
-                ),
+                User {
+                    name: "alice".to_string(),
+                    status: UserStatus::Online,
+                    average_speed: 1000,
+                    num_downloads: 1001,
+                    unknown: 1002,
+                    num_files: 1003,
+                    num_folders: 1004,
+                    num_free_slots: 1005,
+                    country: "US".to_string(),
+                },
+                User {
+                    name: "barbara".to_string(),
+                    status: UserStatus::Away,
+                    average_speed: 2000,
+                    num_downloads: 2001,
+                    unknown: 2002,
+                    num_files: 2003,
+                    num_folders: 2004,
+                    num_free_slots: 2005,
+                    country: "DE".to_string(),
+                },
             ],
             owner: Some("carol".to_string()),
             operators: vec!["deirdre".to_string(), "erica".to_string()],
