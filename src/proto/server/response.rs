@@ -145,6 +145,10 @@ impl ProtoEncode for ServerResponse {
                 encoder.encode_u32(CODE_ROOM_MESSAGE)?;
                 response.encode(encoder)?;
             }
+            ServerResponse::RoomTickersResponse(ref response) => {
+                encoder.encode_u32(CODE_ROOM_TICKERS)?;
+                response.encode(encoder)?;
+            }
             _ => {
                 unimplemented!();
             }
@@ -200,6 +204,10 @@ impl ProtoDecode for ServerResponse {
             CODE_ROOM_MESSAGE => {
                 let response = RoomMessageResponse::decode(decoder)?;
                 ServerResponse::RoomMessageResponse(response)
+            }
+            CODE_ROOM_TICKERS => {
+                let response = RoomTickersResponse::decode(decoder)?;
+                ServerResponse::RoomTickersResponse(response)
             }
             _ => {
                 return Err(DecodeError::UnknownCodeError(code));
@@ -998,7 +1006,7 @@ impl ProtoDecode for RoomMessageResponse {
 }
 
 /*==============*
- * ROOM MESSAGE *
+ * ROOM TICKERS *
  *==============*/
 
 #[derive(Debug, Eq, PartialEq)]
@@ -1020,6 +1028,24 @@ impl ReadFromPacket for RoomTickersResponse {
         }
 
         Ok(RoomTickersResponse {
+            room_name: room_name,
+            tickers: tickers,
+        })
+    }
+}
+
+impl ProtoEncode for RoomTickersResponse {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        encoder.encode_string(&self.room_name)?;
+        encoder.encode_vec(&self.tickers)
+    }
+}
+
+impl ProtoDecode for RoomTickersResponse {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let room_name = decoder.decode_string()?;
+        let tickers = decoder.decode_vec::<(String, String)>()?;
+        Ok(Self {
             room_name: room_name,
             tickers: tickers,
         })
@@ -1318,6 +1344,17 @@ mod tests {
             room_name: "red".to_string(),
             user_name: "alice".to_string(),
             message: "hello world!".to_string(),
+        }))
+    }
+
+    #[test]
+    fn roundtrip_room_tickers() {
+        roundtrip(ServerResponse::RoomTickersResponse(RoomTickersResponse {
+            room_name: "red".to_string(),
+            tickers: vec![
+                ("alice".to_string(), "hello world!".to_string()),
+                ("bob".to_string(), "hi alice :)".to_string()),
+            ],
         }))
     }
 }
