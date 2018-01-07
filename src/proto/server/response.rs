@@ -165,6 +165,10 @@ impl ProtoEncode for ServerResponse {
                 encoder.encode_u32(CODE_USER_STATUS)?;
                 response.encode(encoder)?;
             }
+            ServerResponse::WishlistIntervalResponse(ref response) => {
+                encoder.encode_u32(CODE_WISHLIST_INTERVAL)?;
+                response.encode(encoder)?;
+            }
             _ => {
                 unimplemented!();
             }
@@ -240,6 +244,10 @@ impl ProtoDecode for ServerResponse {
             CODE_USER_STATUS => {
                 let response = UserStatusResponse::decode(decoder)?;
                 ServerResponse::UserStatusResponse(response)
+            }
+            CODE_WISHLIST_INTERVAL => {
+                let response = WishlistIntervalResponse::decode(decoder)?;
+                ServerResponse::WishlistIntervalResponse(response)
             }
             _ => {
                 return Err(DecodeError::UnknownCodeError(code));
@@ -1306,6 +1314,19 @@ impl ReadFromPacket for WishlistIntervalResponse {
     }
 }
 
+impl ProtoEncode for WishlistIntervalResponse {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        encoder.encode_u32(self.seconds)
+    }
+}
+
+impl ProtoDecode for WishlistIntervalResponse {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let seconds = decoder.decode_u32()?;
+        Ok(Self { seconds })
+    }
+}
+
 /*=======*
  * TESTS *
  *=======*/
@@ -1524,5 +1545,12 @@ mod tests {
             status: UserStatus::Offline,
             is_privileged: true,
         }))
+    }
+
+    #[test]
+    fn roundtrip_wishlist_interval() {
+        roundtrip(ServerResponse::WishlistIntervalResponse(
+            WishlistIntervalResponse { seconds: 1337 },
+        ))
     }
 }
