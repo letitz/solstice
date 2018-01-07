@@ -157,6 +157,10 @@ impl ProtoEncode for ServerResponse {
                 encoder.encode_u32(CODE_ROOM_USER_LEFT)?;
                 response.encode(encoder)?;
             }
+            ServerResponse::UserInfoResponse(ref response) => {
+                encoder.encode_u32(CODE_USER_INFO)?;
+                response.encode(encoder)?;
+            }
             _ => {
                 unimplemented!();
             }
@@ -224,6 +228,10 @@ impl ProtoDecode for ServerResponse {
             CODE_ROOM_USER_LEFT => {
                 let response = RoomUserLeftResponse::decode(decoder)?;
                 ServerResponse::RoomUserLeftResponse(response)
+            }
+            CODE_USER_INFO => {
+                let response = UserInfoResponse::decode(decoder)?;
+                ServerResponse::UserInfoResponse(response)
             }
             _ => {
                 return Err(DecodeError::UnknownCodeError(code));
@@ -1202,6 +1210,33 @@ impl ReadFromPacket for UserInfoResponse {
     }
 }
 
+impl ProtoEncode for UserInfoResponse {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        encoder.encode_string(&self.user_name)?;
+        encoder.encode_u32(self.average_speed as u32)?;
+        encoder.encode_u32(self.num_downloads as u32)?;
+        encoder.encode_u32(self.num_files as u32)?;
+        encoder.encode_u32(self.num_folders as u32)
+    }
+}
+
+impl ProtoDecode for UserInfoResponse {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let user_name = decoder.decode_string()?;
+        let average_speed = decoder.decode_u32()?;
+        let num_downloads = decoder.decode_u32()?;
+        let num_files = decoder.decode_u32()?;
+        let num_folders = decoder.decode_u32()?;
+        Ok(Self {
+            user_name,
+            average_speed: average_speed as usize,
+            num_downloads: num_downloads as usize,
+            num_files: num_files as usize,
+            num_folders: num_folders as usize,
+        })
+    }
+}
+
 /*=============*
  * USER STATUS *
  *=============*/
@@ -1439,6 +1474,17 @@ mod tests {
         roundtrip(ServerResponse::RoomUserLeftResponse(RoomUserLeftResponse {
             room_name: "red".to_string(),
             user_name: "alice".to_string(),
+        }))
+    }
+
+    #[test]
+    fn roundtrip_user_info() {
+        roundtrip(ServerResponse::UserInfoResponse(UserInfoResponse {
+            user_name: "alice".to_string(),
+            average_speed: 1000,
+            num_downloads: 1001,
+            num_files: 1002,
+            num_folders: 1003,
         }))
     }
 }
