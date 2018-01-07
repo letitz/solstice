@@ -153,6 +153,10 @@ impl ProtoEncode for ServerResponse {
                 encoder.encode_u32(CODE_ROOM_USER_JOINED)?;
                 response.encode(encoder)?;
             }
+            ServerResponse::RoomUserLeftResponse(ref response) => {
+                encoder.encode_u32(CODE_ROOM_USER_LEFT)?;
+                response.encode(encoder)?;
+            }
             _ => {
                 unimplemented!();
             }
@@ -216,6 +220,10 @@ impl ProtoDecode for ServerResponse {
             CODE_ROOM_USER_JOINED => {
                 let response = RoomUserJoinedResponse::decode(decoder)?;
                 ServerResponse::RoomUserJoinedResponse(response)
+            }
+            CODE_ROOM_USER_LEFT => {
+                let response = RoomUserLeftResponse::decode(decoder)?;
+                ServerResponse::RoomUserLeftResponse(response)
             }
             _ => {
                 return Err(DecodeError::UnknownCodeError(code));
@@ -1146,6 +1154,24 @@ impl ReadFromPacket for RoomUserLeftResponse {
     }
 }
 
+impl ProtoEncode for RoomUserLeftResponse {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        encoder.encode_string(&self.room_name)?;
+        encoder.encode_string(&self.user_name)
+    }
+}
+
+impl ProtoDecode for RoomUserLeftResponse {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let room_name = decoder.decode_string()?;
+        let user_name = decoder.decode_string()?;
+        Ok(Self {
+            room_name,
+            user_name,
+        })
+    }
+}
+
 /*===========*
  * USER INFO *
  *===========*/
@@ -1406,5 +1432,13 @@ mod tests {
                 },
             },
         ))
+    }
+
+    #[test]
+    fn roundtrip_room_user_left() {
+        roundtrip(ServerResponse::RoomUserLeftResponse(RoomUserLeftResponse {
+            room_name: "red".to_string(),
+            user_name: "alice".to_string(),
+        }))
     }
 }
