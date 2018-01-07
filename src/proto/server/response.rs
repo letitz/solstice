@@ -161,6 +161,10 @@ impl ProtoEncode for ServerResponse {
                 encoder.encode_u32(CODE_USER_INFO)?;
                 response.encode(encoder)?;
             }
+            ServerResponse::UserStatusResponse(ref response) => {
+                encoder.encode_u32(CODE_USER_STATUS)?;
+                response.encode(encoder)?;
+            }
             _ => {
                 unimplemented!();
             }
@@ -232,6 +236,10 @@ impl ProtoDecode for ServerResponse {
             CODE_USER_INFO => {
                 let response = UserInfoResponse::decode(decoder)?;
                 ServerResponse::UserInfoResponse(response)
+            }
+            CODE_USER_STATUS => {
+                let response = UserStatusResponse::decode(decoder)?;
+                ServerResponse::UserStatusResponse(response)
             }
             _ => {
                 return Err(DecodeError::UnknownCodeError(code));
@@ -1261,6 +1269,27 @@ impl ReadFromPacket for UserStatusResponse {
     }
 }
 
+impl ProtoEncode for UserStatusResponse {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        encoder.encode_string(&self.user_name)?;
+        self.status.encode(encoder)?;
+        encoder.encode_bool(self.is_privileged)
+    }
+}
+
+impl ProtoDecode for UserStatusResponse {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let user_name = decoder.decode_string()?;
+        let status = UserStatus::decode(decoder)?;
+        let is_privileged = decoder.decode_bool()?;
+        Ok(Self {
+            user_name,
+            status,
+            is_privileged,
+        })
+    }
+}
+
 /*===================*
  * WISHLIST INTERVAL *
  *===================*/
@@ -1485,6 +1514,15 @@ mod tests {
             num_downloads: 1001,
             num_files: 1002,
             num_folders: 1003,
+        }))
+    }
+
+    #[test]
+    fn roundtrip_user_status() {
+        roundtrip(ServerResponse::UserStatusResponse(UserStatusResponse {
+            user_name: "alice".to_string(),
+            status: UserStatus::Offline,
+            is_privileged: true,
         }))
     }
 }
