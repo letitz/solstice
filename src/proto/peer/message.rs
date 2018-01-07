@@ -109,9 +109,9 @@ impl ReadFromPacket for PeerInit {
         let connection_type = try!(packet.read_value());
         let token = try!(packet.read_value());
         Ok(PeerInit {
-            user_name: user_name,
-            connection_type: connection_type,
-            token: token,
+            user_name,
+            connection_type,
+            token,
         })
     }
 }
@@ -140,9 +140,9 @@ impl ProtoDecode for PeerInit {
         let connection_type = decoder.decode_string()?;
         let token = decoder.decode_u32()?;
         Ok(PeerInit {
-            user_name: user_name,
-            connection_type: connection_type,
-            token: token,
+            user_name,
+            connection_type,
+            token,
         })
     }
 }

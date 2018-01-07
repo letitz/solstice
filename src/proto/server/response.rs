@@ -249,12 +249,12 @@ impl ReadFromPacket for ConnectToPeerResponse {
         let is_privileged = try!(packet.read_value());
 
         Ok(ConnectToPeerResponse {
-            user_name: user_name,
-            connection_type: connection_type,
-            ip: ip,
-            port: port,
-            token: token,
-            is_privileged: is_privileged,
+            user_name,
+            connection_type,
+            ip,
+            port,
+            token,
+            is_privileged,
         })
     }
 }
@@ -280,12 +280,12 @@ impl ProtoDecode for ConnectToPeerResponse {
         let is_privileged = decoder.decode_bool()?;
 
         Ok(ConnectToPeerResponse {
-            user_name: user_name,
-            connection_type: connection_type,
-            ip: ip,
-            port: port,
-            token: token,
-            is_privileged: is_privileged,
+            user_name,
+            connection_type,
+            ip,
+            port,
+            token,
+            is_privileged,
         })
     }
 }
@@ -308,9 +308,9 @@ impl ReadFromPacket for FileSearchResponse {
         let query = try!(packet.read_value());
 
         Ok(FileSearchResponse {
-            user_name: user_name,
-            ticket: ticket,
-            query: query,
+            user_name,
+            ticket,
+            query,
         })
     }
 }
@@ -330,9 +330,9 @@ impl ProtoDecode for FileSearchResponse {
         let query = decoder.decode_string()?;
 
         Ok(FileSearchResponse {
-            user_name: user_name,
-            ticket: ticket,
-            query: query,
+            user_name,
+            ticket,
+            query,
         })
     }
 }
@@ -364,8 +364,8 @@ impl ReadFromPacket for LoginResponse {
             }
 
             Ok(LoginResponse::LoginOk {
-                motd: motd,
-                ip: ip,
+                motd,
+                ip,
                 password_md5_opt: None,
             })
         } else {
@@ -402,7 +402,7 @@ impl ProtoDecode for LoginResponse {
         let ok = decoder.decode_bool()?;
         if !ok {
             let reason = decoder.decode_string()?;
-            return Ok(LoginResponse::LoginFail { reason: reason });
+            return Ok(LoginResponse::LoginFail { reason });
         }
 
         let motd = decoder.decode_string()?;
@@ -414,8 +414,8 @@ impl ProtoDecode for LoginResponse {
         }
 
         Ok(LoginResponse::LoginOk {
-            motd: motd,
-            ip: ip,
+            motd,
+            ip,
             password_md5_opt: None,
         })
     }
@@ -433,7 +433,7 @@ pub struct ParentMinSpeedResponse {
 impl ReadFromPacket for ParentMinSpeedResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
         let value = try!(packet.read_value());
-        Ok(ParentMinSpeedResponse { value: value })
+        Ok(ParentMinSpeedResponse { value })
     }
 }
 
@@ -446,7 +446,7 @@ impl ProtoEncode for ParentMinSpeedResponse {
 impl ProtoDecode for ParentMinSpeedResponse {
     fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
         let value = decoder.decode_u32()?;
-        Ok(Self { value: value })
+        Ok(Self { value })
     }
 }
 
@@ -462,7 +462,7 @@ pub struct ParentSpeedRatioResponse {
 impl ReadFromPacket for ParentSpeedRatioResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
         let value = try!(packet.read_value());
-        Ok(ParentSpeedRatioResponse { value: value })
+        Ok(ParentSpeedRatioResponse { value })
     }
 }
 
@@ -475,7 +475,7 @@ impl ProtoEncode for ParentSpeedRatioResponse {
 impl ProtoDecode for ParentSpeedRatioResponse {
     fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
         let value = decoder.decode_u32()?;
-        Ok(Self { value: value })
+        Ok(Self { value })
     }
 }
 
@@ -496,11 +496,7 @@ impl ReadFromPacket for PeerAddressResponse {
         let ip = try!(packet.read_value());
         let port = try!(packet.read_value());
 
-        Ok(PeerAddressResponse {
-            username: username,
-            ip: ip,
-            port: port,
-        })
+        Ok(PeerAddressResponse { username, ip, port })
     }
 }
 
@@ -517,11 +513,7 @@ impl ProtoDecode for PeerAddressResponse {
         let username = decoder.decode_string()?;
         let ip = decoder.decode_ipv4_addr()?;
         let port = decoder.decode_u16()?;
-        Ok(Self {
-            username: username,
-            ip: ip,
-            port: port,
-        })
+        Ok(Self { username, ip, port })
     }
 }
 
@@ -537,7 +529,7 @@ pub struct PrivilegedUsersResponse {
 impl ReadFromPacket for PrivilegedUsersResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
         let users = try!(packet.read_value());
-        Ok(PrivilegedUsersResponse { users: users })
+        Ok(PrivilegedUsersResponse { users })
     }
 }
 
@@ -550,7 +542,7 @@ impl ProtoEncode for PrivilegedUsersResponse {
 impl ProtoDecode for PrivilegedUsersResponse {
     fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
         let users = decoder.decode_vec::<String>()?;
-        Ok(Self { users: users })
+        Ok(Self { users })
     }
 }
 
@@ -579,7 +571,7 @@ impl ReadFromPacket for RoomJoinResponse {
         for _ in 0..num_users {
             let name: String = try!(packet.read_value());
             let user = User {
-                name: name,
+                name,
                 status: UserStatus::Offline,
                 average_speed: 0,
                 num_downloads: 0,
@@ -721,11 +713,11 @@ impl ProtoDecode for UserInfo {
         let num_files = decoder.decode_u32()?;
         let num_folders = decoder.decode_u32()?;
         Ok(Self {
-            average_speed: average_speed,
-            num_downloads: num_downloads,
-            unknown: unknown,
-            num_files: num_files,
-            num_folders: num_folders,
+            average_speed,
+            num_downloads,
+            unknown,
+            num_files,
+            num_folders,
         })
     }
 }
@@ -814,10 +806,10 @@ impl ProtoDecode for RoomJoinResponse {
         );
 
         Ok(Self {
-            room_name: room_name,
-            users: users,
-            owner: owner,
-            operators: operators,
+            room_name,
+            users,
+            owner,
+            operators,
         })
     }
 }
@@ -846,7 +838,7 @@ impl ProtoEncode for RoomLeaveResponse {
 impl ProtoDecode for RoomLeaveResponse {
     fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
         let room_name = decoder.decode_string()?;
-        Ok(Self { room_name: room_name })
+        Ok(Self { room_name })
     }
 }
 
@@ -869,10 +861,10 @@ impl ReadFromPacket for RoomListResponse {
         let other_private_rooms = try!(Self::read_rooms(packet));
         let operated_private_room_names = try!(packet.read_value());
         Ok(RoomListResponse {
-            rooms: rooms,
-            owned_private_rooms: owned_private_rooms,
-            other_private_rooms: other_private_rooms,
-            operated_private_room_names: operated_private_room_names,
+            rooms,
+            owned_private_rooms,
+            other_private_rooms,
+            operated_private_room_names,
         })
     }
 }
@@ -970,10 +962,10 @@ impl ProtoDecode for RoomListResponse {
         let other_private_rooms = Self::decode_rooms(decoder)?;
         let operated_private_room_names = decoder.decode_vec::<String>()?;
         Ok(Self {
-            rooms: rooms,
-            owned_private_rooms: owned_private_rooms,
-            other_private_rooms: other_private_rooms,
-            operated_private_room_names: operated_private_room_names,
+            rooms,
+            owned_private_rooms,
+            other_private_rooms,
+            operated_private_room_names,
         })
     }
 }
@@ -995,9 +987,9 @@ impl ReadFromPacket for RoomMessageResponse {
         let user_name = try!(packet.read_value());
         let message = try!(packet.read_value());
         Ok(RoomMessageResponse {
-            room_name: room_name,
-            user_name: user_name,
-            message: message,
+            room_name,
+            user_name,
+            message,
         })
     }
 }
@@ -1016,9 +1008,9 @@ impl ProtoDecode for RoomMessageResponse {
         let user_name = decoder.decode_string()?;
         let message = decoder.decode_string()?;
         Ok(Self {
-            room_name: room_name,
-            user_name: user_name,
-            message: message,
+            room_name,
+            user_name,
+            message,
         })
     }
 }
@@ -1045,10 +1037,7 @@ impl ReadFromPacket for RoomTickersResponse {
             tickers.push((user_name, message))
         }
 
-        Ok(RoomTickersResponse {
-            room_name: room_name,
-            tickers: tickers,
-        })
+        Ok(RoomTickersResponse { room_name, tickers })
     }
 }
 
@@ -1063,10 +1052,7 @@ impl ProtoDecode for RoomTickersResponse {
     fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
         let room_name = decoder.decode_string()?;
         let tickers = decoder.decode_vec::<(String, String)>()?;
-        Ok(Self {
-            room_name: room_name,
-            tickers: tickers,
-        })
+        Ok(Self { room_name, tickers })
     }
 }
 
@@ -1097,17 +1083,17 @@ impl ReadFromPacket for RoomUserJoinedResponse {
         let country = try!(packet.read_value());
 
         Ok(RoomUserJoinedResponse {
-            room_name: room_name,
+            room_name,
             user: User {
                 name: user_name,
-                status: status,
-                average_speed: average_speed,
-                num_downloads: num_downloads,
-                unknown: unknown,
-                num_files: num_files,
-                num_folders: num_folders,
-                num_free_slots: num_free_slots,
-                country: country,
+                status,
+                average_speed,
+                num_downloads,
+                unknown,
+                num_files,
+                num_folders,
+                num_free_slots,
+                country,
             },
         })
     }
@@ -1133,7 +1119,7 @@ impl ProtoDecode for RoomUserJoinedResponse {
         let num_free_slots = decoder.decode_u32()?;
         let country = decoder.decode_string()?;
         Ok(Self {
-            room_name: room_name,
+            room_name,
             user: build_user(user_name, status, info, num_free_slots, country),
         })
     }
@@ -1154,8 +1140,8 @@ impl ReadFromPacket for RoomUserLeftResponse {
         let room_name = try!(packet.read_value());
         let user_name = try!(packet.read_value());
         Ok(RoomUserLeftResponse {
-            room_name: room_name,
-            user_name: user_name,
+            room_name,
+            user_name,
         })
     }
 }
@@ -1181,11 +1167,11 @@ impl ReadFromPacket for UserInfoResponse {
         let num_files = try!(packet.read_value());
         let num_folders = try!(packet.read_value());
         Ok(UserInfoResponse {
-            user_name: user_name,
-            average_speed: average_speed,
-            num_downloads: num_downloads,
-            num_files: num_files,
-            num_folders: num_folders,
+            user_name,
+            average_speed,
+            num_downloads,
+            num_files,
+            num_folders,
         })
     }
 }
@@ -1207,9 +1193,9 @@ impl ReadFromPacket for UserStatusResponse {
         let status = try!(packet.read_value());
         let is_privileged = try!(packet.read_value());
         Ok(UserStatusResponse {
-            user_name: user_name,
-            status: status,
-            is_privileged: is_privileged,
+            user_name,
+            status,
+            is_privileged,
         })
     }
 }
@@ -1226,7 +1212,7 @@ pub struct WishlistIntervalResponse {
 impl ReadFromPacket for WishlistIntervalResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
         let seconds = try!(packet.read_value());
-        Ok(WishlistIntervalResponse { seconds: seconds })
+        Ok(WishlistIntervalResponse { seconds })
     }
 }
 

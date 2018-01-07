@@ -230,10 +230,7 @@ impl ProtoDecode for CannotConnectRequest {
     fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
         let token = decoder.decode_u32()?;
         let user_name = decoder.decode_string()?;
-        Ok(Self {
-            token: token,
-            user_name: user_name,
-        })
+        Ok(Self { token, user_name })
     }
 }
 
@@ -271,9 +268,9 @@ impl ProtoDecode for ConnectToPeerRequest {
         let user_name = decoder.decode_string()?;
         let connection_type = decoder.decode_string()?;
         Ok(Self {
-            token: token,
-            user_name: user_name,
-            connection_type: connection_type,
+            token,
+            user_name,
+            connection_type,
         })
     }
 }
@@ -307,10 +304,7 @@ impl ProtoDecode for FileSearchRequest {
     fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
         let ticket = decoder.decode_u32()?;
         let query = decoder.decode_string()?;
-        Ok(Self {
-            ticket: ticket,
-            query: query,
-        })
+        Ok(Self { ticket, query })
     }
 }
 
@@ -344,8 +338,8 @@ impl LoginRequest {
                 username: username.to_string(),
                 password: password.to_string(),
                 digest: userpass_md5(username, password),
-                major: major,
-                minor: minor,
+                major,
+                minor,
             })
         } else {
             Err("Empty password")
@@ -386,11 +380,11 @@ impl ProtoDecode for LoginRequest {
         let digest = decoder.decode_string()?;
         let minor = decoder.decode_u32()?;
         Ok(Self {
-            username: username,
-            password: password,
-            digest: digest,
-            major: major,
-            minor: minor,
+            username,
+            password,
+            digest,
+            major,
+            minor,
         })
     }
 }
@@ -511,10 +505,7 @@ impl ProtoDecode for RoomMessageRequest {
     fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
         let room_name = decoder.decode_string()?;
         let message = decoder.decode_string()?;
-        Ok(Self {
-            room_name: room_name,
-            message: message,
-        })
+        Ok(Self { room_name, message })
     }
 }
 
