@@ -149,6 +149,10 @@ impl ProtoEncode for ServerResponse {
                 encoder.encode_u32(CODE_ROOM_TICKERS)?;
                 response.encode(encoder)?;
             }
+            ServerResponse::RoomUserJoinedResponse(ref response) => {
+                encoder.encode_u32(CODE_ROOM_USER_JOINED)?;
+                response.encode(encoder)?;
+            }
             _ => {
                 unimplemented!();
             }
@@ -208,6 +212,10 @@ impl ProtoDecode for ServerResponse {
             CODE_ROOM_TICKERS => {
                 let response = RoomTickersResponse::decode(decoder)?;
                 ServerResponse::RoomTickersResponse(response)
+            }
+            CODE_ROOM_USER_JOINED => {
+                let response = RoomUserJoinedResponse::decode(decoder)?;
+                ServerResponse::RoomUserJoinedResponse(response)
             }
             _ => {
                 return Err(DecodeError::UnknownCodeError(code));
@@ -675,6 +683,26 @@ impl UserInfo {
     }
 }
 
+fn build_user(
+    name: String,
+    status: UserStatus,
+    info: UserInfo,
+    num_free_slots: u32,
+    country: String,
+) -> User {
+    User {
+        name,
+        status,
+        average_speed: info.average_speed as usize,
+        num_downloads: info.num_downloads as usize,
+        unknown: info.unknown as usize,
+        num_files: info.num_files as usize,
+        num_folders: info.num_folders as usize,
+        num_free_slots: num_free_slots as usize,
+        country,
+    }
+}
+
 impl ProtoEncode for UserInfo {
     fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
         encoder.encode_u32(self.average_speed)?;
@@ -751,17 +779,7 @@ fn build_users(
 
         match (name_opt, status_opt, info_opt, slots_opt, country_opt) {
             (Some(name), Some(status), Some(info), Some(slots), Some(country)) => {
-                users.push(User {
-                    name: name,
-                    status: status,
-                    average_speed: info.average_speed as usize,
-                    num_downloads: info.num_downloads as usize,
-                    unknown: info.unknown as usize,
-                    num_files: info.num_files as usize,
-                    num_folders: info.num_folders as usize,
-                    num_free_slots: slots as usize,
-                    country: country,
-                })
+                users.push(build_user(name, status, info, slots, country))
             }
             _ => break,
         }
@@ -1095,6 +1113,32 @@ impl ReadFromPacket for RoomUserJoinedResponse {
     }
 }
 
+impl ProtoEncode for RoomUserJoinedResponse {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+        encoder.encode_string(&self.room_name)?;
+        encoder.encode_string(&self.user.name)?;
+        self.user.status.encode(encoder)?;
+        UserInfo::from_user(&self.user).encode(encoder)?;
+        encoder.encode_u32(self.user.num_free_slots as u32)?;
+        encoder.encode_string(&self.user.country)
+    }
+}
+
+impl ProtoDecode for RoomUserJoinedResponse {
+    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+        let room_name = decoder.decode_string()?;
+        let user_name = decoder.decode_string()?;
+        let status = UserStatus::decode(decoder)?;
+        let info = UserInfo::decode(decoder)?;
+        let num_free_slots = decoder.decode_u32()?;
+        let country = decoder.decode_string()?;
+        Ok(Self {
+            room_name: room_name,
+            user: build_user(user_name, status, info, num_free_slots, country),
+        })
+    }
+}
+
 /*================*
  * ROOM USER LEFT *
  *================*/
@@ -1356,5 +1400,25 @@ mod tests {
                 ("bob".to_string(), "hi alice :)".to_string()),
             ],
         }))
+    }
+
+    #[test]
+    fn roundtrip_room_user_joined() {
+        roundtrip(ServerResponse::RoomUserJoinedResponse(
+            RoomUserJoinedResponse {
+                room_name: "red".to_string(),
+                user: User {
+                    name: "alice".to_string(),
+                    status: UserStatus::Online,
+                    average_speed: 1000,
+                    num_downloads: 1001,
+                    unknown: 1002,
+                    num_files: 1003,
+                    num_folders: 1004,
+                    num_free_slots: 1005,
+                    country: "AR".to_string(),
+                },
+            },
+        ))
     }
 }
