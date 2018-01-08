@@ -6,8 +6,7 @@ use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_io::codec::length_delimited;
 
 use proto::peer;
-use proto::{DecodeError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder, ServerResponse,
-            ServerRequest};
+use proto::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder, ServerResponse, ServerRequest};
 
 /* ------- *
  * Helpers *
@@ -20,7 +19,7 @@ fn new_framed<T: AsyncRead + AsyncWrite>(io: T) -> length_delimited::Framed<T, B
         .new_framed(io)
 }
 
-fn decode_server_response(bytes: &mut BytesMut) -> Result<ServerResponse, DecodeError> {
+fn decode_server_response(bytes: &mut BytesMut) -> io::Result<ServerResponse> {
     unimplemented!();
 }
 
@@ -28,7 +27,7 @@ fn encode_server_request(request: &ServerRequest) -> Result<BytesMut, io::Error>
     unimplemented!();
 }
 
-fn decode_peer_message(bytes: BytesMut) -> Result<peer::Message, DecodeError> {
+fn decode_peer_message(bytes: BytesMut) -> io::Result<peer::Message> {
     let mut cursor = io::Cursor::new(bytes);
     let message = peer::Message::decode(&mut ProtoDecoder::new(&mut cursor))?;
     if cursor.has_remaining() {
@@ -56,14 +55,14 @@ pub struct ServerTransport<T> {
 }
 
 impl<T: AsyncRead + AsyncWrite> ServerTransport<T> {
-    fn new(io: T) -> ServerTransport<T> {
+    pub fn new(io: T) -> ServerTransport<T> {
         ServerTransport { framed: new_framed(io) }
     }
 }
 
 impl<T: AsyncRead> Stream for ServerTransport<T> {
     type Item = ServerResponse;
-    type Error = DecodeError;
+    type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         match self.framed.poll() {
@@ -73,7 +72,7 @@ impl<T: AsyncRead> Stream for ServerTransport<T> {
             }
             Ok(Async::Ready(None)) => Ok(Async::Ready(None)),
             Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(err) => Err(DecodeError::from(err)),
+            Err(err) => Err(err),
         }
     }
 }
@@ -112,7 +111,7 @@ impl<T: AsyncRead + AsyncWrite> PeerTransport<T> {
 
 impl<T: AsyncRead> Stream for PeerTransport<T> {
     type Item = peer::Message;
-    type Error = DecodeError;
+    type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         match self.framed.poll() {
@@ -122,7 +121,7 @@ impl<T: AsyncRead> Stream for PeerTransport<T> {
             }
             Ok(Async::Ready(None)) => Ok(Async::Ready(None)),
             Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(err) => Err(DecodeError::from(err)),
+            Err(err) => Err(err),
         }
     }
 }

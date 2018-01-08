@@ -1,7 +1,7 @@
 use std::io;
 
-use proto::{DecodeError, MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecoder,
-            ProtoEncode, ProtoEncoder, ReadFromPacket, WriteToPacket};
+use proto::{MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecoder, ProtoEncode,
+            ProtoEncoder, ReadFromPacket, WriteToPacket};
 use proto::peer::constants::*;
 
 /*=========*
@@ -41,7 +41,7 @@ impl ReadFromPacket for Message {
 }
 
 impl ProtoDecode for Message {
-    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
         let code = decoder.decode_u32()?;
         let message = match code {
             CODE_PIERCE_FIREWALL => {
@@ -53,7 +53,10 @@ impl ProtoDecode for Message {
                 Message::PeerInit(peer_init)
             }
             _ => {
-                return Err(DecodeError::UnknownCodeError(code));
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("unknown peer message code: {}", code),
+                ))
             }
         };
         Ok(message)
@@ -135,7 +138,7 @@ impl ProtoEncode for PeerInit {
 }
 
 impl ProtoDecode for PeerInit {
-    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
         let user_name = decoder.decode_string()?;
         let connection_type = decoder.decode_string()?;
         let token = decoder.decode_u32()?;
@@ -154,8 +157,8 @@ mod tests {
 
     use bytes::BytesMut;
 
-    use proto::{DecodeError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
-    use proto::codec::tests::roundtrip;
+    use proto::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
+    use proto::codec::tests::{expect_io_error, roundtrip};
 
     use super::*;
 
@@ -165,10 +168,12 @@ mod tests {
         ProtoEncoder::new(&mut bytes).encode_u32(1337).unwrap();
 
         let mut cursor = io::Cursor::new(bytes);
-        match Message::decode(&mut ProtoDecoder::new(&mut cursor)) {
-            Err(DecodeError::UnknownCodeError(1337)) => {}
-            result => panic!(result),
-        }
+        let result = Message::decode(&mut ProtoDecoder::new(&mut cursor));
+        expect_io_error(
+            result,
+            io::ErrorKind::InvalidData,
+            "unknown peer message code: 1337",
+        );
     }
 
     #[test]

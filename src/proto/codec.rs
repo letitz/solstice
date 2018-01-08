@@ -8,83 +8,11 @@ use bytes::{Buf, BufMut, BytesMut, LittleEndian};
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::WINDOWS_1252;
 
+// Constants
+// ---------
+
 /// Length of an encoded 32-bit integer in bytes.
 const U32_BYTE_LEN: usize = 4;
-
-/*==============*
- * DECODE ERROR *
- *==============*/
-
-/// An error that arose when decoding a protocol message.
-#[derive(Debug)]
-pub enum DecodeError {
-    /// Attempted to decode a boolean, but the value was neither 0 nor 1.
-    /// The invalid value is enclosed.
-    InvalidBoolError(u8),
-    /// Attempted to decode an unsigned 16-bit integer, but the value did not
-    /// fit in 16 bits. The invalid value is enclosed.
-    InvalidU16Error(u32),
-    /// Attempted to decode the enclosed bytes as an Windows 1252 encoded
-    /// string, but one of the bytes was not a valid character encoding.
-    InvalidStringError(Vec<u8>),
-    /// Attempted to decode a user::Status, but the value was not a valid
-    /// representation of an enum variant. The invalid value is enclosed.
-    InvalidUserStatusError(u32),
-    /// Encountered the enclosed I/O error while decoding.
-    IOError(io::Error),
-    /// Attempted to decode a message with the enclosed code, unknown to this
-    /// library.
-    UnknownCodeError(u32),
-}
-
-impl fmt::Display for DecodeError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            DecodeError::InvalidBoolError(n) => write!(fmt, "InvalidBoolError: {}", n),
-            DecodeError::InvalidU16Error(n) => write!(fmt, "InvalidU16Error: {}", n),
-            DecodeError::InvalidStringError(ref bytes) => {
-                write!(fmt, "InvalidStringError: {:?}", bytes)
-            }
-            DecodeError::InvalidUserStatusError(n) => write!(fmt, "InvalidUserStatusError: {}", n),
-            DecodeError::IOError(ref err) => write!(fmt, "IOError: {}", err),
-            DecodeError::UnknownCodeError(code) => write!(fmt, "UnknownCodeError: {}", code),
-        }
-    }
-}
-
-impl error::Error for DecodeError {
-    fn description(&self) -> &str {
-        match *self {
-            DecodeError::InvalidBoolError(_) => "InvalidBoolError",
-            DecodeError::InvalidU16Error(_) => "InvalidU16Error",
-            DecodeError::InvalidStringError(_) => "InvalidStringError",
-            DecodeError::InvalidUserStatusError(_) => "InvalidUserStatusError",
-            DecodeError::IOError(_) => "IOError",
-            DecodeError::UnknownCodeError(code) => "UnknownCodeError",
-        }
-    }
-
-    fn cause(&self) -> Option<&error::Error> {
-        match *self {
-            DecodeError::InvalidBoolError(_) => None,
-            DecodeError::InvalidU16Error(_) => None,
-            DecodeError::InvalidStringError(_) => None,
-            DecodeError::InvalidUserStatusError(_) => None,
-            DecodeError::IOError(ref err) => Some(err),
-            DecodeError::UnknownCodeError(_) => None,
-        }
-    }
-}
-
-impl From<io::Error> for DecodeError {
-    fn from(err: io::Error) -> Self {
-        DecodeError::IOError(err)
-    }
-}
-
-fn unexpected_eof_error(value_type: &str) -> DecodeError {
-    DecodeError::from(io::Error::new(io::ErrorKind::UnexpectedEof, value_type))
-}
 
 /*===================================*
  * BASIC TYPES ENCODING AND DECODING *
@@ -108,7 +36,7 @@ fn unexpected_eof_error(value_type: &str) -> DecodeError {
 /// Only here to enable `ProtoDecoder::decode_vec`.
 pub trait ProtoDecode: Sized {
     /// Attempts to decode an instance of `Self` using the given decoder.
-    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError>;
+    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self>;
 }
 
 /// This trait is implemented by types that can be encoded into messages with
@@ -132,59 +60,93 @@ impl<'a> ProtoDecoder<'a> {
         ProtoDecoder { inner: inner }
     }
 
+    // Private helper methods
+    // ----------------------
+
+    // Builds an EOF error encountered when reading a value of the given type.
+    fn unexpected_eof_error(type_name: &str) -> io::Error {
+        io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            format!("reading {}", type_name),
+        )
+    }
+
+    // Builds an InvalidData error for the given value of the given type.
+    fn invalid_data_error<T: fmt::Debug>(type_name: &str, value: T) -> io::Error {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("invalid {}: {:?}", type_name, value),
+        )
+    }
+
+    // Asserts that the underlying buffer contains at least `n` more bytes from
+    // which to read a value of the given type.
+    // Returns Ok(()) if there are that many bytes, an error otherwise.
+    fn expect_remaining(&mut self, type_name: &str, n: usize) -> io::Result<()> {
+        if self.inner.remaining() < n {
+            Err(Self::unexpected_eof_error(type_name))
+        } else {
+            Ok(())
+        }
+    }
+
+    // Decodes a u32 value as the first step in decoding a value of the given type.
+    fn decode_u32_generic(&mut self, type_name: &str) -> io::Result<u32> {
+        self.expect_remaining(type_name, U32_BYTE_LEN)?;
+        Ok(self.inner.get_u32::<LittleEndian>())
+    }
+
+    // Public methods
+    // --------------
+
     pub fn has_remaining(&self) -> bool {
         self.inner.has_remaining()
     }
 
-    pub fn decode_u32(&mut self) -> Result<u32, DecodeError> {
-        if self.inner.remaining() < U32_BYTE_LEN {
-            return Err(unexpected_eof_error("u32"));
-        }
-        Ok(self.inner.get_u32::<LittleEndian>())
+    pub fn decode_u32(&mut self) -> io::Result<u32> {
+        self.decode_u32_generic("u32")
     }
 
-    pub fn decode_u16(&mut self) -> Result<u16, DecodeError> {
-        let n = self.decode_u32()?;
+    pub fn decode_u16(&mut self) -> io::Result<u16> {
+        let n = self.decode_u32_generic("u16")?;
         if n > u16::MAX as u32 {
-            return Err(DecodeError::InvalidU16Error(n));
+            return Err(Self::invalid_data_error("u16", n));
         }
         Ok(n as u16)
     }
 
-    pub fn decode_bool(&mut self) -> Result<bool, DecodeError> {
-        if self.inner.remaining() < 1 {
-            return Err(unexpected_eof_error("bool"));
-        }
+    pub fn decode_bool(&mut self) -> io::Result<bool> {
+        self.expect_remaining("bool", 1)?;
         match self.inner.get_u8() {
             0 => Ok(false),
             1 => Ok(true),
-            n => Err(DecodeError::InvalidBoolError(n)),
+            n => Err(Self::invalid_data_error("bool", n)),
         }
     }
 
-    pub fn decode_ipv4_addr(&mut self) -> Result<net::Ipv4Addr, DecodeError> {
-        let ip = self.decode_u32()?;
+    pub fn decode_ipv4_addr(&mut self) -> io::Result<net::Ipv4Addr> {
+        let ip = self.decode_u32_generic("ipv4 address")?;
         Ok(net::Ipv4Addr::from(ip))
     }
 
-    pub fn decode_string(&mut self) -> Result<String, DecodeError> {
-        let len = self.decode_u32()? as usize;
-        if self.inner.remaining() < len {
-            return Err(unexpected_eof_error("string"));
-        }
+    pub fn decode_string(&mut self) -> io::Result<String> {
+        let len = self.decode_u32_generic("string length")? as usize;
+        self.expect_remaining("string", len)?;
+
         let result = {
             let bytes = &self.inner.bytes()[..len];
             WINDOWS_1252.decode(bytes, DecoderTrap::Strict).map_err(
-                |_| {
-                    DecodeError::InvalidStringError(bytes.to_vec())
+                |err| {
+                    Self::invalid_data_error("string", (err, bytes))
                 },
             )
         };
+
         self.inner.advance(len);
         result
     }
 
-    pub fn decode_pair<T, U>(&mut self) -> Result<(T, U), DecodeError>
+    pub fn decode_pair<T, U>(&mut self) -> io::Result<(T, U)>
     where
         T: ProtoDecode,
         U: ProtoDecode,
@@ -194,8 +156,8 @@ impl<'a> ProtoDecoder<'a> {
         Ok((first, second))
     }
 
-    pub fn decode_vec<T: ProtoDecode>(&mut self) -> Result<Vec<T>, DecodeError> {
-        let len = self.decode_u32()? as usize;
+    pub fn decode_vec<T: ProtoDecode>(&mut self) -> io::Result<Vec<T>> {
+        let len = self.decode_u32_generic("vector length")? as usize;
         let mut vec = Vec::with_capacity(len);
         for _ in 0..len {
             let val = T::decode(self)?;
@@ -279,7 +241,7 @@ impl<'a> ProtoEncoder<'a> {
 }
 
 impl ProtoDecode for u32 {
-    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
         decoder.decode_u32()
     }
 }
@@ -291,7 +253,7 @@ impl ProtoEncode for u32 {
 }
 
 impl ProtoDecode for bool {
-    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
         decoder.decode_bool()
     }
 }
@@ -303,7 +265,7 @@ impl ProtoEncode for bool {
 }
 
 impl ProtoDecode for u16 {
-    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
         decoder.decode_u16()
     }
 }
@@ -315,7 +277,7 @@ impl ProtoEncode for u16 {
 }
 
 impl ProtoDecode for net::Ipv4Addr {
-    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
         decoder.decode_ipv4_addr()
     }
 }
@@ -327,7 +289,7 @@ impl ProtoEncode for net::Ipv4Addr {
 }
 
 impl ProtoDecode for String {
-    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
         decoder.decode_string()
     }
 }
@@ -365,7 +327,7 @@ impl<'a> ProtoEncode for &'a String {
 }
 
 impl<T: ProtoDecode, U: ProtoDecode> ProtoDecode for (T, U) {
-    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
         decoder.decode_pair::<T, U>()
     }
 }
@@ -377,7 +339,7 @@ impl<T: ProtoEncode, U: ProtoEncode> ProtoEncode for (T, U) {
 }
 
 impl<T: ProtoDecode> ProtoDecode for Vec<T> {
-    fn decode(decoder: &mut ProtoDecoder) -> Result<Self, DecodeError> {
+    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
         decoder.decode_vec::<T>()
     }
 }
@@ -414,6 +376,28 @@ pub mod tests {
         assert_eq!(output, input);
     }
 
+    pub fn expect_io_error<T>(result: io::Result<T>, kind: io::ErrorKind, message: &str)
+    where
+        T: fmt::Debug + Send + 'static,
+    {
+        match result {
+            Err(e) => {
+                assert_eq!(e.kind(), kind);
+                let ok = match e.get_ref() {
+                    Some(e) => {
+                        assert_eq!(e.description(), message);
+                        true
+                    }
+                    None => false,
+                };
+                if !ok {
+                    panic!(e)
+                }
+            }
+            Ok(message) => panic!(message),
+        }
+    }
+
     // Helper for succinctness in tests below.
     fn new_cursor(vec: Vec<u8>) -> io::Cursor<BytesMut> {
         io::Cursor::new(BytesMut::from(vec))
@@ -430,6 +414,36 @@ pub mod tests {
         (16777216, [0, 0, 0, 1]),
         (u32::MAX, [255, 255, 255, 255]),
     ];
+
+    #[test]
+    fn expect_io_error_success() {
+        let kind = io::ErrorKind::InvalidInput;
+        let message = "some message";
+        let result: io::Result<()> = Err(io::Error::new(kind, message));
+        expect_io_error(result, kind, message);
+    }
+
+    #[test]
+    #[should_panic]
+    fn expect_io_error_not_err() {
+        expect_io_error(Ok(()), io::ErrorKind::InvalidInput, "some message");
+    }
+
+    #[test]
+    #[should_panic]
+    fn expect_io_error_wrong_kind() {
+        let result: io::Result<()> =
+            Err(io::Error::new(io::ErrorKind::UnexpectedEof, "some message"));
+        expect_io_error(result, io::ErrorKind::InvalidInput, "some message");
+    }
+
+    #[test]
+    #[should_panic]
+    fn expect_io_error_wrong_message() {
+        let result: io::Result<()> =
+            Err(io::Error::new(io::ErrorKind::InvalidInput, "some message"));
+        expect_io_error(result, io::ErrorKind::InvalidInput, "other message");
+    }
 
     #[test]
     fn encode_u32() {
@@ -461,6 +475,13 @@ pub mod tests {
     }
 
     #[test]
+    fn decode_u32_unexpected_eof() {
+        let mut cursor = new_cursor(vec![13]);
+        let result = ProtoDecoder::new(&mut cursor).decode_u32();
+        expect_io_error(result, io::ErrorKind::UnexpectedEof, "reading u32");
+    }
+
+    #[test]
     fn encode_bool() {
         let mut bytes = BytesMut::from(vec![13]);
         ProtoEncoder::new(&mut bytes).encode_bool(false).unwrap();
@@ -485,10 +506,17 @@ pub mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn decode_bool_invalid() {
         let mut cursor = new_cursor(vec![42]);
-        ProtoDecoder::new(&mut cursor).decode_bool().unwrap();
+        let result = ProtoDecoder::new(&mut cursor).decode_bool();
+        expect_io_error(result, io::ErrorKind::InvalidData, "invalid bool: 42");
+    }
+
+    #[test]
+    fn decode_bool_unexpected_eof() {
+        let mut cursor = new_cursor(vec![]);
+        let result = ProtoDecoder::new(&mut cursor).decode_bool();
+        expect_io_error(result, io::ErrorKind::UnexpectedEof, "reading bool");
     }
 
     #[test]
@@ -530,10 +558,17 @@ pub mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn decode_u16_invalid() {
         let mut cursor = new_cursor(vec![0, 0, 1, 0]);
-        ProtoDecoder::new(&mut cursor).decode_u16().unwrap();
+        let result = ProtoDecoder::new(&mut cursor).decode_u16();
+        expect_io_error(result, io::ErrorKind::InvalidData, "invalid u16: 65536");
+    }
+
+    #[test]
+    fn decode_u16_unexpected_eof() {
+        let mut cursor = new_cursor(vec![]);
+        let result = ProtoDecoder::new(&mut cursor).decode_u16();
+        expect_io_error(result, io::ErrorKind::UnexpectedEof, "reading u16");
     }
 
     #[test]

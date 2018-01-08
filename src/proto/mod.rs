@@ -8,7 +8,7 @@ mod stream;
 mod transport;
 mod user;
 
-pub use self::codec::{DecodeError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
+pub use self::codec::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
 pub use self::handler::*;
 pub use self::packet::*;
 pub use self::stream::*;
