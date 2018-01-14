@@ -577,12 +577,11 @@ impl<T: bytes::Buf> Decode<UserStatusRequest> for T {
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::Debug;
     use std::io;
 
     use bytes::BytesMut;
 
-    use proto::{Decode, ProtoEncode, ProtoEncoder};
+    use proto::{Decode, ProtoEncoder};
     use proto::codec::tests::{expect_io_error, roundtrip};
 
     use super::*;
@@ -593,7 +592,6 @@ mod tests {
         ProtoEncoder::new(&mut bytes).encode_u32(1337).unwrap();
 
         let result: io::Result<ServerRequest> = io::Cursor::new(bytes).decode();
-
         expect_io_error(
             result,
             io::ErrorKind::InvalidData,

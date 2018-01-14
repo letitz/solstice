@@ -1344,7 +1344,7 @@ mod tests {
 
     use bytes::BytesMut;
 
-    use proto::{Decode, ProtoEncode, ProtoEncoder};
+    use proto::{Decode, ProtoEncoder};
     use proto::codec::tests::{expect_io_error, roundtrip};
 
     use super::*;

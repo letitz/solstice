@@ -154,12 +154,11 @@ impl<T: bytes::Buf> Decode<PeerInit> for T {
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::Debug;
     use std::io;
 
     use bytes::BytesMut;
 
-    use proto::{Decode, ProtoEncode, ProtoEncoder};
+    use proto::{Decode, ProtoEncoder};
     use proto::codec::tests::{expect_io_error, roundtrip};
 
     use super::*;
