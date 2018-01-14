@@ -1,7 +1,9 @@
 use std::io;
 
-use proto::{MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecoder, ProtoEncode,
-            ProtoEncoder, ReadFromPacket, WriteToPacket};
+use bytes;
+
+use proto::{Decode, MutPacket, Packet, PacketReadError, ProtoEncode, ProtoEncoder, ReadFromPacket,
+            WriteToPacket};
 
 const STATUS_OFFLINE: u32 = 1;
 const STATUS_AWAY: u32 = 2;
@@ -53,9 +55,9 @@ impl ProtoEncode for UserStatus {
     }
 }
 
-impl ProtoDecode for UserStatus {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let value = decoder.decode_u32()?;
+impl<T: bytes::Buf> Decode<UserStatus> for T {
+    fn decode(&mut self) -> io::Result<UserStatus> {
+        let value: u32 = self.decode()?;
         match value {
             STATUS_OFFLINE => Ok(UserStatus::Offline),
             STATUS_AWAY => Ok(UserStatus::Away),

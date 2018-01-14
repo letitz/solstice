@@ -1,7 +1,9 @@
 use std::io;
 
-use proto::{MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecoder, ProtoEncode,
-            ProtoEncoder, ReadFromPacket, WriteToPacket};
+use bytes;
+
+use proto::{Decode, MutPacket, Packet, PacketReadError, ProtoEncode, ProtoEncoder, ReadFromPacket,
+            WriteToPacket};
 use proto::peer::constants::*;
 
 /*=========*
@@ -40,16 +42,16 @@ impl ReadFromPacket for Message {
     }
 }
 
-impl ProtoDecode for Message {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let code = decoder.decode_u32()?;
+impl<T: bytes::Buf> Decode<Message> for T {
+    fn decode(&mut self) -> io::Result<Message> {
+        let code: u32 = self.decode()?;
         let message = match code {
             CODE_PIERCE_FIREWALL => {
-                let val = decoder.decode_u32()?;
+                let val = self.decode()?;
                 Message::PierceFirewall(val)
             }
             CODE_PEER_INIT => {
-                let peer_init = PeerInit::decode(decoder)?;
+                let peer_init = self.decode()?;
                 Message::PeerInit(peer_init)
             }
             _ => {
@@ -137,11 +139,11 @@ impl ProtoEncode for PeerInit {
     }
 }
 
-impl ProtoDecode for PeerInit {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let user_name = decoder.decode_string()?;
-        let connection_type = decoder.decode_string()?;
-        let token = decoder.decode_u32()?;
+impl<T: bytes::Buf> Decode<PeerInit> for T {
+    fn decode(&mut self) -> io::Result<PeerInit> {
+        let user_name = self.decode()?;
+        let connection_type = self.decode()?;
+        let token = self.decode()?;
         Ok(PeerInit {
             user_name,
             connection_type,
@@ -157,7 +159,7 @@ mod tests {
 
     use bytes::BytesMut;
 
-    use proto::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
+    use proto::{Decode, ProtoEncode, ProtoEncoder};
     use proto::codec::tests::{expect_io_error, roundtrip};
 
     use super::*;
@@ -167,8 +169,8 @@ mod tests {
         let mut bytes = BytesMut::new();
         ProtoEncoder::new(&mut bytes).encode_u32(1337).unwrap();
 
-        let mut cursor = io::Cursor::new(bytes);
-        let result = Message::decode(&mut ProtoDecoder::new(&mut cursor));
+        let result: io::Result<Message> = io::Cursor::new(bytes).decode();
+
         expect_io_error(
             result,
             io::ErrorKind::InvalidData,

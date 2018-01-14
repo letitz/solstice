@@ -1,9 +1,10 @@
 use std::io;
 
+use bytes;
 use crypto::md5::Md5;
 use crypto::digest::Digest;
 
-use proto::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
+use proto::{Decode, ProtoEncode, ProtoEncoder};
 use proto::packet::{MutPacket, WriteToPacket};
 use proto::server::constants::*;
 
@@ -148,49 +149,49 @@ impl ProtoEncode for ServerRequest {
     }
 }
 
-impl ProtoDecode for ServerRequest {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let code = decoder.decode_u32()?;
+impl<T: bytes::Buf> Decode<ServerRequest> for T {
+    fn decode(&mut self) -> io::Result<ServerRequest> {
+        let code: u32 = self.decode()?;
         let request = match code {
             CODE_CANNOT_CONNECT => {
-                let request = CannotConnectRequest::decode(decoder)?;
+                let request = self.decode()?;
                 ServerRequest::CannotConnectRequest(request)
             }
             CODE_CONNECT_TO_PEER => {
-                let request = ConnectToPeerRequest::decode(decoder)?;
+                let request = self.decode()?;
                 ServerRequest::ConnectToPeerRequest(request)
             }
             CODE_FILE_SEARCH => {
-                let request = FileSearchRequest::decode(decoder)?;
+                let request = self.decode()?;
                 ServerRequest::FileSearchRequest(request)
             }
             CODE_LOGIN => {
-                let request = LoginRequest::decode(decoder)?;
+                let request = self.decode()?;
                 ServerRequest::LoginRequest(request)
             }
             CODE_PEER_ADDRESS => {
-                let request = PeerAddressRequest::decode(decoder)?;
+                let request = self.decode()?;
                 ServerRequest::PeerAddressRequest(request)
             }
             CODE_ROOM_JOIN => {
-                let request = RoomJoinRequest::decode(decoder)?;
+                let request = self.decode()?;
                 ServerRequest::RoomJoinRequest(request)
             }
             CODE_ROOM_LEAVE => {
-                let request = RoomLeaveRequest::decode(decoder)?;
+                let request = self.decode()?;
                 ServerRequest::RoomLeaveRequest(request)
             }
             CODE_ROOM_LIST => ServerRequest::RoomListRequest,
             CODE_ROOM_MESSAGE => {
-                let request = RoomMessageRequest::decode(decoder)?;
+                let request = self.decode()?;
                 ServerRequest::RoomMessageRequest(request)
             }
             CODE_SET_LISTEN_PORT => {
-                let request = SetListenPortRequest::decode(decoder)?;
+                let request = self.decode()?;
                 ServerRequest::SetListenPortRequest(request)
             }
             CODE_USER_STATUS => {
-                let request = UserStatusRequest::decode(decoder)?;
+                let request = self.decode()?;
                 ServerRequest::UserStatusRequest(request)
             }
             _ => {
@@ -229,11 +230,11 @@ impl ProtoEncode for CannotConnectRequest {
     }
 }
 
-impl ProtoDecode for CannotConnectRequest {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let token = decoder.decode_u32()?;
-        let user_name = decoder.decode_string()?;
-        Ok(Self { token, user_name })
+impl<T: bytes::Buf> Decode<CannotConnectRequest> for T {
+    fn decode(&mut self) -> io::Result<CannotConnectRequest> {
+        let token = self.decode()?;
+        let user_name = self.decode()?;
+        Ok(CannotConnectRequest { token, user_name })
     }
 }
 
@@ -265,12 +266,12 @@ impl ProtoEncode for ConnectToPeerRequest {
     }
 }
 
-impl ProtoDecode for ConnectToPeerRequest {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let token = decoder.decode_u32()?;
-        let user_name = decoder.decode_string()?;
-        let connection_type = decoder.decode_string()?;
-        Ok(Self {
+impl<T: bytes::Buf> Decode<ConnectToPeerRequest> for T {
+    fn decode(&mut self) -> io::Result<ConnectToPeerRequest> {
+        let token = self.decode()?;
+        let user_name = self.decode()?;
+        let connection_type = self.decode()?;
+        Ok(ConnectToPeerRequest {
             token,
             user_name,
             connection_type,
@@ -303,11 +304,11 @@ impl ProtoEncode for FileSearchRequest {
     }
 }
 
-impl ProtoDecode for FileSearchRequest {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let ticket = decoder.decode_u32()?;
-        let query = decoder.decode_string()?;
-        Ok(Self { ticket, query })
+impl<T: bytes::Buf> Decode<FileSearchRequest> for T {
+    fn decode(&mut self) -> io::Result<FileSearchRequest> {
+        let ticket = self.decode()?;
+        let query = self.decode()?;
+        Ok(FileSearchRequest { ticket, query })
     }
 }
 
@@ -375,14 +376,14 @@ impl ProtoEncode for LoginRequest {
     }
 }
 
-impl ProtoDecode for LoginRequest {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let username = decoder.decode_string()?;
-        let password = decoder.decode_string()?;
-        let major = decoder.decode_u32()?;
-        let digest = decoder.decode_string()?;
-        let minor = decoder.decode_u32()?;
-        Ok(Self {
+impl<T: bytes::Buf> Decode<LoginRequest> for T {
+    fn decode(&mut self) -> io::Result<LoginRequest> {
+        let username = self.decode()?;
+        let password = self.decode()?;
+        let major = self.decode()?;
+        let digest = self.decode()?;
+        let minor = self.decode()?;
+        Ok(LoginRequest {
             username,
             password,
             digest,
@@ -414,10 +415,10 @@ impl ProtoEncode for PeerAddressRequest {
     }
 }
 
-impl ProtoDecode for PeerAddressRequest {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let username = decoder.decode_string()?;
-        Ok(Self { username: username })
+impl<T: bytes::Buf> Decode<PeerAddressRequest> for T {
+    fn decode(&mut self) -> io::Result<PeerAddressRequest> {
+        let username = self.decode()?;
+        Ok(PeerAddressRequest { username: username })
     }
 }
 
@@ -443,10 +444,10 @@ impl ProtoEncode for RoomJoinRequest {
     }
 }
 
-impl ProtoDecode for RoomJoinRequest {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let room_name = decoder.decode_string()?;
-        Ok(Self { room_name: room_name })
+impl<T: bytes::Buf> Decode<RoomJoinRequest> for T {
+    fn decode(&mut self) -> io::Result<RoomJoinRequest> {
+        let room_name = self.decode()?;
+        Ok(RoomJoinRequest { room_name: room_name })
     }
 }
 
@@ -472,10 +473,10 @@ impl ProtoEncode for RoomLeaveRequest {
     }
 }
 
-impl ProtoDecode for RoomLeaveRequest {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let room_name = decoder.decode_string()?;
-        Ok(Self { room_name: room_name })
+impl<T: bytes::Buf> Decode<RoomLeaveRequest> for T {
+    fn decode(&mut self) -> io::Result<RoomLeaveRequest> {
+        let room_name = self.decode()?;
+        Ok(RoomLeaveRequest { room_name: room_name })
     }
 }
 
@@ -504,11 +505,11 @@ impl ProtoEncode for RoomMessageRequest {
     }
 }
 
-impl ProtoDecode for RoomMessageRequest {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let room_name = decoder.decode_string()?;
-        let message = decoder.decode_string()?;
-        Ok(Self { room_name, message })
+impl<T: bytes::Buf> Decode<RoomMessageRequest> for T {
+    fn decode(&mut self) -> io::Result<RoomMessageRequest> {
+        let room_name = self.decode()?;
+        let message = self.decode()?;
+        Ok(RoomMessageRequest { room_name, message })
     }
 }
 
@@ -534,10 +535,10 @@ impl ProtoEncode for SetListenPortRequest {
     }
 }
 
-impl ProtoDecode for SetListenPortRequest {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let port = decoder.decode_u16()?;
-        Ok(Self { port: port })
+impl<T: bytes::Buf> Decode<SetListenPortRequest> for T {
+    fn decode(&mut self) -> io::Result<SetListenPortRequest> {
+        let port = self.decode()?;
+        Ok(SetListenPortRequest { port: port })
     }
 }
 
@@ -563,10 +564,10 @@ impl ProtoEncode for UserStatusRequest {
     }
 }
 
-impl ProtoDecode for UserStatusRequest {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let user_name = decoder.decode_string()?;
-        Ok(Self { user_name: user_name })
+impl<T: bytes::Buf> Decode<UserStatusRequest> for T {
+    fn decode(&mut self) -> io::Result<UserStatusRequest> {
+        let user_name = self.decode()?;
+        Ok(UserStatusRequest { user_name: user_name })
     }
 }
 
@@ -581,7 +582,7 @@ mod tests {
 
     use bytes::BytesMut;
 
-    use proto::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
+    use proto::{Decode, ProtoEncode, ProtoEncoder};
     use proto::codec::tests::{expect_io_error, roundtrip};
 
     use super::*;
@@ -591,8 +592,8 @@ mod tests {
         let mut bytes = BytesMut::new();
         ProtoEncoder::new(&mut bytes).encode_u32(1337).unwrap();
 
-        let mut cursor = io::Cursor::new(bytes);
-        let result = ServerRequest::decode(&mut ProtoDecoder::new(&mut cursor));
+        let result: io::Result<ServerRequest> = io::Cursor::new(bytes).decode();
+
         expect_io_error(
             result,
             io::ErrorKind::InvalidData,

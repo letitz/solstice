@@ -1,8 +1,10 @@
 use std::io;
 use std::net;
 
+use bytes;
+
 use proto::server::constants::*;
-use proto::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder, User, UserStatus};
+use proto::{Decode, ProtoEncode, ProtoEncoder, User, UserStatus};
 use proto::packet::{Packet, PacketReadError, ReadFromPacket};
 
 /*=================*
@@ -177,76 +179,76 @@ impl ProtoEncode for ServerResponse {
     }
 }
 
-impl ProtoDecode for ServerResponse {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let code = decoder.decode_u32()?;
+impl<T: bytes::Buf> Decode<ServerResponse> for T {
+    fn decode(&mut self) -> io::Result<ServerResponse> {
+        let code: u32 = self.decode()?;
         let response = match code {
             CODE_CONNECT_TO_PEER => {
-                let response = ConnectToPeerResponse::decode(decoder)?;
+                let response = self.decode()?;
                 ServerResponse::ConnectToPeerResponse(response)
             }
             CODE_FILE_SEARCH => {
-                let response = FileSearchResponse::decode(decoder)?;
+                let response = self.decode()?;
                 ServerResponse::FileSearchResponse(response)
             }
             CODE_LOGIN => {
-                let response = LoginResponse::decode(decoder)?;
+                let response = self.decode()?;
                 ServerResponse::LoginResponse(response)
             }
             CODE_PARENT_MIN_SPEED => {
-                let response = ParentMinSpeedResponse::decode(decoder)?;
+                let response = self.decode()?;
                 ServerResponse::ParentMinSpeedResponse(response)
             }
             CODE_PARENT_SPEED_RATIO => {
-                let response = ParentSpeedRatioResponse::decode(decoder)?;
+                let response = self.decode()?;
                 ServerResponse::ParentSpeedRatioResponse(response)
             }
             CODE_PEER_ADDRESS => {
-                let response = PeerAddressResponse::decode(decoder)?;
+                let response = self.decode()?;
                 ServerResponse::PeerAddressResponse(response)
             }
             CODE_PRIVILEGED_USERS => {
-                let response = PrivilegedUsersResponse::decode(decoder)?;
+                let response = self.decode()?;
                 ServerResponse::PrivilegedUsersResponse(response)
             }
             CODE_ROOM_JOIN => {
-                let response = RoomJoinResponse::decode(decoder)?;
+                let response = self.decode()?;
                 ServerResponse::RoomJoinResponse(response)
             }
             CODE_ROOM_LEAVE => {
-                let response = RoomLeaveResponse::decode(decoder)?;
+                let response = self.decode()?;
                 ServerResponse::RoomLeaveResponse(response)
             }
             CODE_ROOM_LIST => {
-                let response = RoomListResponse::decode(decoder)?;
+                let response = self.decode()?;
                 ServerResponse::RoomListResponse(response)
             }
             CODE_ROOM_MESSAGE => {
-                let response = RoomMessageResponse::decode(decoder)?;
+                let response = self.decode()?;
                 ServerResponse::RoomMessageResponse(response)
             }
             CODE_ROOM_TICKERS => {
-                let response = RoomTickersResponse::decode(decoder)?;
+                let response = self.decode()?;
                 ServerResponse::RoomTickersResponse(response)
             }
             CODE_ROOM_USER_JOINED => {
-                let response = RoomUserJoinedResponse::decode(decoder)?;
+                let response = self.decode()?;
                 ServerResponse::RoomUserJoinedResponse(response)
             }
             CODE_ROOM_USER_LEFT => {
-                let response = RoomUserLeftResponse::decode(decoder)?;
+                let response = self.decode()?;
                 ServerResponse::RoomUserLeftResponse(response)
             }
             CODE_USER_INFO => {
-                let response = UserInfoResponse::decode(decoder)?;
+                let response = self.decode()?;
                 ServerResponse::UserInfoResponse(response)
             }
             CODE_USER_STATUS => {
-                let response = UserStatusResponse::decode(decoder)?;
+                let response = self.decode()?;
                 ServerResponse::UserStatusResponse(response)
             }
             CODE_WISHLIST_INTERVAL => {
-                let response = WishlistIntervalResponse::decode(decoder)?;
+                let response = self.decode()?;
                 ServerResponse::WishlistIntervalResponse(response)
             }
             _ => {
@@ -305,14 +307,14 @@ impl ProtoEncode for ConnectToPeerResponse {
     }
 }
 
-impl ProtoDecode for ConnectToPeerResponse {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let user_name = decoder.decode_string()?;
-        let connection_type = decoder.decode_string()?;
-        let ip = decoder.decode_ipv4_addr()?;
-        let port = decoder.decode_u16()?;
-        let token = decoder.decode_u32()?;
-        let is_privileged = decoder.decode_bool()?;
+impl<T: bytes::Buf> Decode<ConnectToPeerResponse> for T {
+    fn decode(&mut self) -> io::Result<ConnectToPeerResponse> {
+        let user_name = self.decode()?;
+        let connection_type = self.decode()?;
+        let ip = self.decode()?;
+        let port = self.decode()?;
+        let token = self.decode()?;
+        let is_privileged = self.decode()?;
 
         Ok(ConnectToPeerResponse {
             user_name,
@@ -358,11 +360,11 @@ impl ProtoEncode for FileSearchResponse {
     }
 }
 
-impl ProtoDecode for FileSearchResponse {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let user_name = decoder.decode_string()?;
-        let ticket = decoder.decode_u32()?;
-        let query = decoder.decode_string()?;
+impl<T: bytes::Buf> Decode<FileSearchResponse> for T {
+    fn decode(&mut self) -> io::Result<FileSearchResponse> {
+        let user_name = self.decode()?;
+        let ticket = self.decode()?;
+        let query = self.decode()?;
 
         Ok(FileSearchResponse {
             user_name,
@@ -432,18 +434,19 @@ impl ProtoEncode for LoginResponse {
     }
 }
 
-impl ProtoDecode for LoginResponse {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let ok = decoder.decode_bool()?;
+impl<T: bytes::Buf> Decode<LoginResponse> for T {
+    fn decode(&mut self) -> io::Result<LoginResponse> {
+        let ok: bool = self.decode()?;
         if !ok {
-            let reason = decoder.decode_string()?;
+            let reason = self.decode()?;
             return Ok(LoginResponse::LoginFail { reason });
         }
 
-        let motd = decoder.decode_string()?;
-        let ip = decoder.decode_ipv4_addr()?;
+        let motd = self.decode()?;
+        let ip = self.decode()?;
 
-        match decoder.decode_bool() {
+        let result: io::Result<bool> = self.decode();
+        match result {
             Ok(value) => debug!("LoginResponse last field: {}", value),
             Err(e) => debug!("Error reading LoginResponse field: {:?}", e),
         }
@@ -478,10 +481,10 @@ impl ProtoEncode for ParentMinSpeedResponse {
     }
 }
 
-impl ProtoDecode for ParentMinSpeedResponse {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let value = decoder.decode_u32()?;
-        Ok(Self { value })
+impl<T: bytes::Buf> Decode<ParentMinSpeedResponse> for T {
+    fn decode(&mut self) -> io::Result<ParentMinSpeedResponse> {
+        let value = self.decode()?;
+        Ok(ParentMinSpeedResponse { value })
     }
 }
 
@@ -507,10 +510,10 @@ impl ProtoEncode for ParentSpeedRatioResponse {
     }
 }
 
-impl ProtoDecode for ParentSpeedRatioResponse {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let value = decoder.decode_u32()?;
-        Ok(Self { value })
+impl<T: bytes::Buf> Decode<ParentSpeedRatioResponse> for T {
+    fn decode(&mut self) -> io::Result<ParentSpeedRatioResponse> {
+        let value = self.decode()?;
+        Ok(ParentSpeedRatioResponse { value })
     }
 }
 
@@ -543,12 +546,12 @@ impl ProtoEncode for PeerAddressResponse {
     }
 }
 
-impl ProtoDecode for PeerAddressResponse {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let username = decoder.decode_string()?;
-        let ip = decoder.decode_ipv4_addr()?;
-        let port = decoder.decode_u16()?;
-        Ok(Self { username, ip, port })
+impl<T: bytes::Buf> Decode<PeerAddressResponse> for T {
+    fn decode(&mut self) -> io::Result<PeerAddressResponse> {
+        let username = self.decode()?;
+        let ip = self.decode()?;
+        let port = self.decode()?;
+        Ok(PeerAddressResponse { username, ip, port })
     }
 }
 
@@ -574,10 +577,10 @@ impl ProtoEncode for PrivilegedUsersResponse {
     }
 }
 
-impl ProtoDecode for PrivilegedUsersResponse {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let users = decoder.decode_vec::<String>()?;
-        Ok(Self { users })
+impl<T: bytes::Buf> Decode<PrivilegedUsersResponse> for T {
+    fn decode(&mut self) -> io::Result<PrivilegedUsersResponse> {
+        let users = self.decode()?;
+        Ok(PrivilegedUsersResponse { users })
     }
 }
 
@@ -740,14 +743,14 @@ impl ProtoEncode for UserInfo {
     }
 }
 
-impl ProtoDecode for UserInfo {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let average_speed = decoder.decode_u32()?;
-        let num_downloads = decoder.decode_u32()?;
-        let unknown = decoder.decode_u32()?;
-        let num_files = decoder.decode_u32()?;
-        let num_folders = decoder.decode_u32()?;
-        Ok(Self {
+impl<T: bytes::Buf> Decode<UserInfo> for T {
+    fn decode(&mut self) -> io::Result<UserInfo> {
+        let average_speed = self.decode()?;
+        let num_downloads = self.decode()?;
+        let unknown = self.decode()?;
+        let num_files = self.decode()?;
+        let num_folders = self.decode()?;
+        Ok(UserInfo {
             average_speed,
             num_downloads,
             unknown,
@@ -816,20 +819,20 @@ fn build_users(
     users
 }
 
-impl ProtoDecode for RoomJoinResponse {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let room_name = decoder.decode_string()?;
-        let user_names = decoder.decode_vec::<String>()?;
-        let user_statuses = decoder.decode_vec::<UserStatus>()?;
-        let user_infos = decoder.decode_vec::<UserInfo>()?;
-        let user_free_slots = decoder.decode_vec::<u32>()?;
-        let user_countries = decoder.decode_vec::<String>()?;
+impl<T: bytes::Buf> Decode<RoomJoinResponse> for T {
+    fn decode(&mut self) -> io::Result<RoomJoinResponse> {
+        let room_name = self.decode()?;
+        let user_names = self.decode()?;
+        let user_statuses = self.decode()?;
+        let user_infos = self.decode()?;
+        let user_free_slots = self.decode()?;
+        let user_countries = self.decode()?;
 
         let mut owner = None;
         let mut operators = vec![];
-        if decoder.has_remaining() {
-            owner = Some(decoder.decode_string()?);
-            operators = decoder.decode_vec::<String>()?;
+        if self.has_remaining() {
+            owner = Some(self.decode()?);
+            operators = self.decode()?;
         }
 
         let users = build_users(
@@ -840,7 +843,7 @@ impl ProtoDecode for RoomJoinResponse {
             user_countries,
         );
 
-        Ok(Self {
+        Ok(RoomJoinResponse {
             room_name,
             users,
             owner,
@@ -870,10 +873,10 @@ impl ProtoEncode for RoomLeaveResponse {
     }
 }
 
-impl ProtoDecode for RoomLeaveResponse {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let room_name = decoder.decode_string()?;
-        Ok(Self { room_name })
+impl<T: bytes::Buf> Decode<RoomLeaveResponse> for T {
+    fn decode(&mut self) -> io::Result<RoomLeaveResponse> {
+        let room_name = self.decode()?;
+        Ok(RoomLeaveResponse { room_name })
     }
 }
 
@@ -961,9 +964,9 @@ impl RoomListResponse {
         rooms
     }
 
-    fn decode_rooms(decoder: &mut ProtoDecoder) -> io::Result<Vec<(String, u32)>> {
-        let room_names = decoder.decode_vec::<String>()?;
-        let user_counts = decoder.decode_vec::<u32>()?;
+    fn decode_rooms<T: bytes::Buf>(buf: &mut T) -> io::Result<Vec<(String, u32)>> {
+        let room_names = buf.decode()?;
+        let user_counts = buf.decode()?;
         Ok(Self::build_rooms(room_names, user_counts))
     }
 
@@ -990,13 +993,13 @@ impl ProtoEncode for RoomListResponse {
     }
 }
 
-impl ProtoDecode for RoomListResponse {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let rooms = Self::decode_rooms(decoder)?;
-        let owned_private_rooms = Self::decode_rooms(decoder)?;
-        let other_private_rooms = Self::decode_rooms(decoder)?;
-        let operated_private_room_names = decoder.decode_vec::<String>()?;
-        Ok(Self {
+impl<T: bytes::Buf> Decode<RoomListResponse> for T {
+    fn decode(&mut self) -> io::Result<RoomListResponse> {
+        let rooms = RoomListResponse::decode_rooms(self)?;
+        let owned_private_rooms = RoomListResponse::decode_rooms(self)?;
+        let other_private_rooms = RoomListResponse::decode_rooms(self)?;
+        let operated_private_room_names = self.decode()?;
+        Ok(RoomListResponse {
             rooms,
             owned_private_rooms,
             other_private_rooms,
@@ -1037,12 +1040,12 @@ impl ProtoEncode for RoomMessageResponse {
     }
 }
 
-impl ProtoDecode for RoomMessageResponse {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let room_name = decoder.decode_string()?;
-        let user_name = decoder.decode_string()?;
-        let message = decoder.decode_string()?;
-        Ok(Self {
+impl<T: bytes::Buf> Decode<RoomMessageResponse> for T {
+    fn decode(&mut self) -> io::Result<RoomMessageResponse> {
+        let room_name = self.decode()?;
+        let user_name = self.decode()?;
+        let message = self.decode()?;
+        Ok(RoomMessageResponse {
             room_name,
             user_name,
             message,
@@ -1083,11 +1086,11 @@ impl ProtoEncode for RoomTickersResponse {
     }
 }
 
-impl ProtoDecode for RoomTickersResponse {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let room_name = decoder.decode_string()?;
-        let tickers = decoder.decode_vec::<(String, String)>()?;
-        Ok(Self { room_name, tickers })
+impl<T: bytes::Buf> Decode<RoomTickersResponse> for T {
+    fn decode(&mut self) -> io::Result<RoomTickersResponse> {
+        let room_name = self.decode()?;
+        let tickers = self.decode()?;
+        Ok(RoomTickersResponse { room_name, tickers })
     }
 }
 
@@ -1145,15 +1148,15 @@ impl ProtoEncode for RoomUserJoinedResponse {
     }
 }
 
-impl ProtoDecode for RoomUserJoinedResponse {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let room_name = decoder.decode_string()?;
-        let user_name = decoder.decode_string()?;
-        let status = UserStatus::decode(decoder)?;
-        let info = UserInfo::decode(decoder)?;
-        let num_free_slots = decoder.decode_u32()?;
-        let country = decoder.decode_string()?;
-        Ok(Self {
+impl<T: bytes::Buf> Decode<RoomUserJoinedResponse> for T {
+    fn decode(&mut self) -> io::Result<RoomUserJoinedResponse> {
+        let room_name = self.decode()?;
+        let user_name = self.decode()?;
+        let status = self.decode()?;
+        let info = self.decode()?;
+        let num_free_slots = self.decode()?;
+        let country = self.decode()?;
+        Ok(RoomUserJoinedResponse {
             room_name,
             user: build_user(user_name, status, info, num_free_slots, country),
         })
@@ -1188,11 +1191,11 @@ impl ProtoEncode for RoomUserLeftResponse {
     }
 }
 
-impl ProtoDecode for RoomUserLeftResponse {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let room_name = decoder.decode_string()?;
-        let user_name = decoder.decode_string()?;
-        Ok(Self {
+impl<T: bytes::Buf> Decode<RoomUserLeftResponse> for T {
+    fn decode(&mut self) -> io::Result<RoomUserLeftResponse> {
+        let room_name = self.decode()?;
+        let user_name = self.decode()?;
+        Ok(RoomUserLeftResponse {
             room_name,
             user_name,
         })
@@ -1239,14 +1242,14 @@ impl ProtoEncode for UserInfoResponse {
     }
 }
 
-impl ProtoDecode for UserInfoResponse {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let user_name = decoder.decode_string()?;
-        let average_speed = decoder.decode_u32()?;
-        let num_downloads = decoder.decode_u32()?;
-        let num_files = decoder.decode_u32()?;
-        let num_folders = decoder.decode_u32()?;
-        Ok(Self {
+impl<T: bytes::Buf> Decode<UserInfoResponse> for T {
+    fn decode(&mut self) -> io::Result<UserInfoResponse> {
+        let user_name = self.decode()?;
+        let average_speed: u32 = self.decode()?;
+        let num_downloads: u32 = self.decode()?;
+        let num_files: u32 = self.decode()?;
+        let num_folders: u32 = self.decode()?;
+        Ok(UserInfoResponse {
             user_name,
             average_speed: average_speed as usize,
             num_downloads: num_downloads as usize,
@@ -1288,12 +1291,12 @@ impl ProtoEncode for UserStatusResponse {
     }
 }
 
-impl ProtoDecode for UserStatusResponse {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let user_name = decoder.decode_string()?;
-        let status = UserStatus::decode(decoder)?;
-        let is_privileged = decoder.decode_bool()?;
-        Ok(Self {
+impl<T: bytes::Buf> Decode<UserStatusResponse> for T {
+    fn decode(&mut self) -> io::Result<UserStatusResponse> {
+        let user_name = self.decode()?;
+        let status = self.decode()?;
+        let is_privileged = self.decode()?;
+        Ok(UserStatusResponse {
             user_name,
             status,
             is_privileged,
@@ -1323,10 +1326,10 @@ impl ProtoEncode for WishlistIntervalResponse {
     }
 }
 
-impl ProtoDecode for WishlistIntervalResponse {
-    fn decode(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let seconds = decoder.decode_u32()?;
-        Ok(Self { seconds })
+impl<T: bytes::Buf> Decode<WishlistIntervalResponse> for T {
+    fn decode(&mut self) -> io::Result<WishlistIntervalResponse> {
+        let seconds = self.decode()?;
+        Ok(WishlistIntervalResponse { seconds })
     }
 }
 
@@ -1341,7 +1344,7 @@ mod tests {
 
     use bytes::BytesMut;
 
-    use proto::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
+    use proto::{Decode, ProtoEncode, ProtoEncoder};
     use proto::codec::tests::{expect_io_error, roundtrip};
 
     use super::*;
@@ -1351,8 +1354,8 @@ mod tests {
         let mut bytes = BytesMut::new();
         ProtoEncoder::new(&mut bytes).encode_u32(1337).unwrap();
 
-        let mut cursor = io::Cursor::new(bytes);
-        let result = ServerResponse::decode(&mut ProtoDecoder::new(&mut cursor));
+        let result: io::Result<ServerResponse> = io::Cursor::new(bytes).decode();
+
         expect_io_error(
             result,
             io::ErrorKind::InvalidData,

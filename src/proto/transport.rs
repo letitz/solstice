@@ -6,7 +6,7 @@ use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_io::codec::length_delimited;
 
 use proto::peer;
-use proto::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder, ServerResponse, ServerRequest};
+use proto::{Decode, ProtoEncode, ProtoEncoder, ServerResponse, ServerRequest};
 
 /* ------- *
  * Helpers *
@@ -29,7 +29,7 @@ fn encode_server_request(request: &ServerRequest) -> Result<BytesMut, io::Error>
 
 fn decode_peer_message(bytes: BytesMut) -> io::Result<peer::Message> {
     let mut cursor = io::Cursor::new(bytes);
-    let message = peer::Message::decode(&mut ProtoDecoder::new(&mut cursor))?;
+    let message = cursor.decode()?;
     if cursor.has_remaining() {
         warn!(
             "Received peer message with trailing bytes. Message:\n{:?}Bytes:{:?}",
