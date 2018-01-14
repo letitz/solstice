@@ -13,5 +13,4 @@ pub use self::handler::*;
 pub use self::packet::*;
 pub use self::stream::*;
 pub use self::server::{ServerResponse, ServerRequest};
-pub use self::transport::{PeerTransport, ServerTransport};
 pub use self::user::{User, UserStatus};
