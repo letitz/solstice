@@ -2,7 +2,7 @@ use std::fmt;
 use std::io;
 
 use bytes::{Buf, BytesMut};
-use tokio_io::codec::length_delimited;
+use tokio_io::codec::length_delimited::{Builder, Framed};
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use proto::peer;
@@ -37,8 +37,8 @@ fn encode_frame<T: ProtoEncode>(frame: &T) -> io::Result<BytesMut> {
 /// The returned stream and sink of frames is intended to be combined (using
 /// `Stream::and_then` and `Sink::with`) with the following decoding and
 /// encoding functions to create a stream/sink of decoded messages.
-pub fn new_framed<T: AsyncRead + AsyncWrite>(io: T) -> length_delimited::Framed<T, BytesMut> {
-    length_delimited::Builder::new()
+pub fn new_framed<T: AsyncRead + AsyncWrite>(io: T) -> Framed<T, BytesMut> {
+    Builder::new()
         .length_field_length(4)
         .little_endian()
         .new_framed(io)
