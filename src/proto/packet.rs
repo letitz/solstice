@@ -1,13 +1,13 @@
 use std::error;
 use std::fmt;
 use std::io;
+use std::io::{Read, Write};
 use std::mem;
 use std::net;
-use std::io::{Read, Write};
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
-use encoding::{Encoding, DecoderTrap, EncoderTrap};
 use encoding::all::ISO_8859_1;
+use encoding::{DecoderTrap, EncoderTrap, Encoding};
 use mio::deprecated::TryRead;
 
 use super::constants::*;
@@ -73,7 +73,9 @@ impl MutPacket {
     /// Returns an empty packet with the given packet code.
     pub fn new() -> Self {
         // Leave space for the eventual size of the packet.
-        MutPacket { bytes: vec![0; U32_SIZE] }
+        MutPacket {
+            bytes: vec![0; U32_SIZE],
+        }
     }
 
     /// Provides the main way to write data into a binary packet.

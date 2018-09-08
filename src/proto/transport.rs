@@ -2,11 +2,11 @@ use std::fmt;
 use std::io;
 
 use bytes::{Buf, BytesMut};
-use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_io::codec::length_delimited;
+use tokio_io::{AsyncRead, AsyncWrite};
 
 use proto::peer;
-use proto::{Decode, ProtoEncode, ProtoEncoder, ServerResponse, ServerRequest};
+use proto::{Decode, ProtoEncode, ProtoEncoder, ServerRequest, ServerResponse};
 
 fn decode_frame<'a, T>(frame_type: &str, bytes: &'a mut BytesMut) -> io::Result<T>
 where

@@ -12,7 +12,6 @@ use proto::server;
 use room;
 use user;
 
-
 #[derive(Debug)]
 enum IncomingMessage {
     Proto(proto::Response),
@@ -101,7 +100,9 @@ impl Client {
         ));
 
         self.send_to_server(server::ServerRequest::SetListenPortRequest(
-            server::SetListenPortRequest { port: config::LISTEN_PORT },
+            server::SetListenPortRequest {
+                port: config::LISTEN_PORT,
+            },
         ));
 
         loop {
@@ -202,7 +203,6 @@ impl Client {
             }
 
             control::Request::UserListRequest => self.handle_user_list_request(),
-
             /*
             _ =>{
                 error!("Unhandled control request: {:?}", request);
@@ -236,8 +236,8 @@ impl Client {
                 info!("Requesting to join room {:?}", room_name);
                 self.send_to_server(server::ServerRequest::RoomJoinRequest(
                     server::RoomJoinRequest {
-                        room_name: room_name
-                    }
+                        room_name: room_name,
+                    },
                 ));
             }
 
@@ -251,8 +251,8 @@ impl Client {
                 info!("Requesting to leave room {:?}", room_name);
                 self.send_to_server(server::ServerRequest::RoomLeaveRequest(
                     server::RoomLeaveRequest {
-                        room_name: room_name
-                    }
+                        room_name: room_name,
+                    },
                 ));
             }
 
@@ -284,7 +284,9 @@ impl Client {
         // Send the controller client what we have in memory.
         let user_list = self.users.get_list();
         self.send_to_controller(control::Response::UserListResponse(
-            control::UserListResponse { user_list: user_list },
+            control::UserListResponse {
+                user_list: user_list,
+            },
         ));
     }
 
@@ -314,8 +316,7 @@ impl Client {
 
     fn handle_peer_connection_closed(&mut self, peer_id: usize) {
         let mut occupied_entry = match self.peers.entry(peer_id) {
-            None |
-            Some(slab::Entry::Vacant(_)) => {
+            None | Some(slab::Entry::Vacant(_)) => {
                 error!("Unknown peer connection {} has closed", peer_id);
                 return;
             }
@@ -348,13 +349,11 @@ impl Client {
 
                 self.proto_tx
                     .send(proto::Request::ServerRequest(
-                        server::ServerRequest::ConnectToPeerRequest(
-                            server::ConnectToPeerRequest {
-                                token: peer.token,
-                                user_name: peer.user_name.clone(),
-                                connection_type: peer.connection_type.clone(),
-                            },
-                        ),
+                        server::ServerRequest::ConnectToPeerRequest(server::ConnectToPeerRequest {
+                            token: peer.token,
+                            user_name: peer.user_name.clone(),
+                            connection_type: peer.connection_type.clone(),
+                        }),
                     ))
                     .unwrap();
             }
@@ -368,12 +367,10 @@ impl Client {
                 let (peer, _) = occupied_entry.remove();
                 self.proto_tx
                     .send(proto::Request::ServerRequest(
-                        server::ServerRequest::CannotConnectRequest(
-                            server::CannotConnectRequest {
-                                token: peer.token,
-                                user_name: peer.user_name,
-                            },
-                        ),
+                        server::ServerRequest::CannotConnectRequest(server::CannotConnectRequest {
+                            token: peer.token,
+                            user_name: peer.user_name,
+                        }),
                     ))
                     .unwrap();
             }
@@ -387,17 +384,32 @@ impl Client {
                 return;
             }
 
-            Some(peer @ &mut Peer { state: PeerState::Open, .. }) => {
+            Some(
+                peer @ &mut Peer {
+                    state: PeerState::Open,
+                    ..
+                },
+            ) => {
                 error!("Peer connection {} was already open: {:?}", peer_id, peer);
                 return;
             }
 
-            Some(peer @ &mut Peer { state: PeerState::WaitingFirewalled, .. }) => {
+            Some(
+                peer @ &mut Peer {
+                    state: PeerState::WaitingFirewalled,
+                    ..
+                },
+            ) => {
                 error!("Peer connection {} was waiting: {:?}", peer_id, peer);
                 return;
             }
 
-            Some(peer @ &mut Peer { state: PeerState::Opening, .. }) => {
+            Some(
+                peer @ &mut Peer {
+                    state: PeerState::Opening,
+                    ..
+                },
+            ) => {
                 info!("Peer connection {} is now open: {:?}", peer_id, peer);
                 // Mark it as open.
                 peer.state = PeerState::Open;
@@ -409,7 +421,12 @@ impl Client {
                 })
             }
 
-            Some(peer @ &mut Peer { state: PeerState::OpeningFirewalled, .. }) => {
+            Some(
+                peer @ &mut Peer {
+                    state: PeerState::OpeningFirewalled,
+                    ..
+                },
+            ) => {
                 info!("Peer connection {} is now open: {:?}", peer_id, peer);
                 // Mark it as open.
                 peer.state = PeerState::Open;
@@ -495,9 +512,7 @@ impl Client {
             Ok(peer_id) => {
                 info!(
                     "Opening peer connection {} to {}:{} to pierce firewall",
-                    peer_id,
-                    response.ip,
-                    response.port
+                    peer_id, response.ip, response.port
                 );
                 self.proto_tx
                     .send(proto::Request::PeerConnect(
@@ -536,12 +551,10 @@ impl Client {
                                 "as official client"
                             ));
                         }
-                        None => {
-                            info!(concat!(
-                                "Connected to official server ",
-                                "as unofficial client"
-                            ))
-                        }
+                        None => info!(concat!(
+                            "Connected to official server ",
+                            "as unofficial client"
+                        )),
                     }
                     self.login_status = LoginStatus::Success(motd);
                 }
@@ -581,7 +594,9 @@ impl Client {
             self.users.insert(user);
         }
 
-        let control_response = control::RoomJoinResponse { room_name: response.room_name };
+        let control_response = control::RoomJoinResponse {
+            room_name: response.room_name,
+        };
         self.send_to_controller(control::Response::RoomJoinResponse(control_response));
     }
 
@@ -591,7 +606,9 @@ impl Client {
         }
 
         self.send_to_controller(control::Response::RoomLeaveResponse(
-            control::RoomLeaveResponse { room_name: response.room_name },
+            control::RoomLeaveResponse {
+                room_name: response.room_name,
+            },
         ));
     }
 
@@ -628,20 +645,18 @@ impl Client {
     }
 
     fn handle_room_tickers_response(&mut self, response: server::RoomTickersResponse) {
-        let result = self.rooms.set_tickers(
-            &response.room_name,
-            response.tickers,
-        );
+        let result = self
+            .rooms
+            .set_tickers(&response.room_name, response.tickers);
         if let Err(e) = result {
             error!("RoomTickersResponse: {}", e);
         }
     }
 
     fn handle_room_user_joined_response(&mut self, response: server::RoomUserJoinedResponse) {
-        let result = self.rooms.insert_member(
-            &response.room_name,
-            response.user.name.clone(),
-        );
+        let result = self
+            .rooms
+            .insert_member(&response.room_name, response.user.name.clone());
         if let Err(err) = result {
             error!("RoomUserJoinedResponse: {}", err);
             return;
@@ -655,10 +670,9 @@ impl Client {
     }
 
     fn handle_room_user_left_response(&mut self, response: server::RoomUserLeftResponse) {
-        let result = self.rooms.remove_member(
-            &response.room_name,
-            &response.user_name,
-        );
+        let result = self
+            .rooms
+            .remove_member(&response.room_name, &response.user_name);
         if let Err(err) = result {
             error!("RoomUserLeftResponse: {}", err);
             return;

@@ -2,8 +2,10 @@ use std::io;
 
 use bytes;
 
-use proto::{Decode, MutPacket, Packet, PacketReadError, ProtoEncode, ProtoEncoder, ReadFromPacket,
-            WriteToPacket};
+use proto::{
+    Decode, MutPacket, Packet, PacketReadError, ProtoEncode, ProtoEncoder, ReadFromPacket,
+    WriteToPacket,
+};
 
 const STATUS_OFFLINE: u32 = 1;
 const STATUS_AWAY: u32 = 2;

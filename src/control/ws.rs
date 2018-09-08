@@ -112,16 +112,15 @@ impl Handler {
 impl ws::Handler for Handler {
     fn on_open(&mut self, _: ws::Handshake) -> ws::Result<()> {
         info!("Websocket open");
-        self.send_to_client(Notification::Connected(
-            Sender { sender: self.socket_tx.clone() },
-        ))
+        self.send_to_client(Notification::Connected(Sender {
+            sender: self.socket_tx.clone(),
+        }))
     }
 
     fn on_close(&mut self, code: ws::CloseCode, reason: &str) {
         info!("Websocket closed: code: {:?}, reason: {:?}", code, reason);
-        self.send_to_client(Notification::Disconnected).unwrap_or(
-            (),
-        )
+        self.send_to_client(Notification::Disconnected)
+            .unwrap_or(())
     }
 
     fn on_message(&mut self, msg: ws::Message) -> ws::Result<()> {
@@ -161,11 +160,9 @@ pub fn listen(client_tx: mpsc::Sender<Notification>) {
             max_connections: 1,
             ..ws::Settings::default()
         })
-        .build(|socket_tx| {
-            Handler {
-                client_tx: client_tx.clone(),
-                socket_tx: socket_tx,
-            }
+        .build(|socket_tx| Handler {
+            client_tx: client_tx.clone(),
+            socket_tx: socket_tx,
         });
 
     let websocket = match websocket_result {
@@ -173,9 +170,10 @@ pub fn listen(client_tx: mpsc::Sender<Notification>) {
         Err(e) => {
             error!("Unable to build websocket: {}", e);
             client_tx
-                .send(Notification::Error(
-                    format!("Unable to build websocket: {}", e),
-                ))
+                .send(Notification::Error(format!(
+                    "Unable to build websocket: {}",
+                    e
+                )))
                 .unwrap();
             return;
         }
@@ -188,9 +186,10 @@ pub fn listen(client_tx: mpsc::Sender<Notification>) {
         Err(e) => {
             error!("Unable to listen on websocket: {}", e);
             client_tx
-                .send(Notification::Error(
-                    format!("Unable to listen on websocket: {}", e),
-                ))
+                .send(Notification::Error(format!(
+                    "Unable to listen on websocket: {}",
+                    e
+                )))
                 .unwrap();
         }
     }

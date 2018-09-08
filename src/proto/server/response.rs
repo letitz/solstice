@@ -3,9 +3,9 @@ use std::net;
 
 use bytes;
 
+use proto::packet::{Packet, PacketReadError, ReadFromPacket};
 use proto::server::constants::*;
 use proto::{Decode, ProtoEncode, ProtoEncoder, User, UserStatus};
-use proto::packet::{Packet, PacketReadError, ReadFromPacket};
 
 /*=================*
  * SERVER RESPONSE *
@@ -40,9 +40,9 @@ impl ReadFromPacket for ServerResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
         let code: u32 = try!(packet.read_value());
         let resp = match code {
-            CODE_CONNECT_TO_PEER => ServerResponse::ConnectToPeerResponse(
-                try!(packet.read_value()),
-            ),
+            CODE_CONNECT_TO_PEER => {
+                ServerResponse::ConnectToPeerResponse(try!(packet.read_value()))
+            }
 
             CODE_FILE_SEARCH => ServerResponse::FileSearchResponse(try!(packet.read_value())),
 
@@ -50,9 +50,9 @@ impl ReadFromPacket for ServerResponse {
 
             CODE_PEER_ADDRESS => ServerResponse::PeerAddressResponse(try!(packet.read_value())),
 
-            CODE_PRIVILEGED_USERS => ServerResponse::PrivilegedUsersResponse(
-                try!(packet.read_value()),
-            ),
+            CODE_PRIVILEGED_USERS => {
+                ServerResponse::PrivilegedUsersResponse(try!(packet.read_value()))
+            }
 
             CODE_ROOM_JOIN => ServerResponse::RoomJoinResponse(try!(packet.read_value())),
 
@@ -64,9 +64,9 @@ impl ReadFromPacket for ServerResponse {
 
             CODE_ROOM_TICKERS => ServerResponse::RoomTickersResponse(try!(packet.read_value())),
 
-            CODE_ROOM_USER_JOINED => ServerResponse::RoomUserJoinedResponse(
-                try!(packet.read_value()),
-            ),
+            CODE_ROOM_USER_JOINED => {
+                ServerResponse::RoomUserJoinedResponse(try!(packet.read_value()))
+            }
 
             CODE_ROOM_USER_LEFT => ServerResponse::RoomUserLeftResponse(try!(packet.read_value())),
 
@@ -74,17 +74,17 @@ impl ReadFromPacket for ServerResponse {
 
             CODE_USER_STATUS => ServerResponse::UserStatusResponse(try!(packet.read_value())),
 
-            CODE_WISHLIST_INTERVAL => ServerResponse::WishlistIntervalResponse(
-                try!(packet.read_value()),
-            ),
+            CODE_WISHLIST_INTERVAL => {
+                ServerResponse::WishlistIntervalResponse(try!(packet.read_value()))
+            }
 
-            CODE_PARENT_MIN_SPEED => ServerResponse::ParentMinSpeedResponse(
-                try!(packet.read_value()),
-            ),
+            CODE_PARENT_MIN_SPEED => {
+                ServerResponse::ParentMinSpeedResponse(try!(packet.read_value()))
+            }
 
-            CODE_PARENT_SPEED_RATIO => ServerResponse::ParentSpeedRatioResponse(
-                try!(packet.read_value()),
-            ),
+            CODE_PARENT_SPEED_RATIO => {
+                ServerResponse::ParentSpeedRatioResponse(try!(packet.read_value()))
+            }
 
             code => ServerResponse::UnknownResponse(code),
         };
@@ -92,8 +92,7 @@ impl ReadFromPacket for ServerResponse {
         if bytes_remaining > 0 {
             warn!(
                 "Packet with code {} contains {} extra bytes",
-                code,
-                bytes_remaining
+                code, bytes_remaining
             )
         }
         Ok(resp)
@@ -385,7 +384,9 @@ pub enum LoginResponse {
         ip: net::Ipv4Addr,
         password_md5_opt: Option<String>,
     },
-    LoginFail { reason: String },
+    LoginFail {
+        reason: String,
+    },
 }
 
 impl ReadFromPacket for LoginResponse {
@@ -672,16 +673,14 @@ impl RoomJoinResponse {
         }
 
         let num_users = self.users.len();
-        if num_users != num_statuses || num_users != num_infos || num_users != num_free_slots ||
-            num_users != num_countries
+        if num_users != num_statuses
+            || num_users != num_infos
+            || num_users != num_free_slots
+            || num_users != num_countries
         {
             warn!(
                 "RoomJoinResponse: mismatched vector sizes {}, {}, {}, {}, {}",
-                num_users,
-                num_statuses,
-                num_infos,
-                num_free_slots,
-                num_countries
+                num_users, num_statuses, num_infos, num_free_slots, num_countries
             );
         }
 
@@ -863,7 +862,9 @@ pub struct RoomLeaveResponse {
 
 impl ReadFromPacket for RoomLeaveResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        Ok(RoomLeaveResponse { room_name: try!(packet.read_value()) })
+        Ok(RoomLeaveResponse {
+            room_name: try!(packet.read_value()),
+        })
     }
 }
 
@@ -926,8 +927,7 @@ impl RoomListResponse {
         if num_rooms != num_user_counts {
             warn!(
                 "Numbers of rooms and user counts do not match: {} != {}",
-                num_rooms,
-                num_user_counts
+                num_rooms, num_user_counts
             );
         }
 
@@ -1344,8 +1344,8 @@ mod tests {
 
     use bytes::BytesMut;
 
-    use proto::{Decode, ProtoEncoder};
     use proto::codec::tests::{expect_io_error, roundtrip};
+    use proto::{Decode, ProtoEncoder};
 
     use super::*;
 
@@ -1484,9 +1484,9 @@ mod tests {
 
     #[test]
     fn roundtrip_room_leave() {
-        roundtrip(ServerResponse::RoomLeaveResponse(
-            RoomLeaveResponse { room_name: "red".to_string() },
-        ))
+        roundtrip(ServerResponse::RoomLeaveResponse(RoomLeaveResponse {
+            room_name: "red".to_string(),
+        }))
     }
 
     #[test]

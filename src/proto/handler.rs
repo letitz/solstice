@@ -9,9 +9,9 @@ use slab;
 
 use config;
 
-use super::{Intent, Stream, SendPacket};
-use super::server::*;
 use super::peer;
+use super::server::*;
+use super::{Intent, SendPacket, Stream};
 
 /*===========*
  * CONSTANTS *
@@ -315,10 +315,7 @@ impl mio::deprecated::Handler for Handler {
                 if let Err(err) = self.connect_to_peer(peer_id, ip, port, event_loop) {
                     error!(
                         "Cannot open peer connection {} to {}:{}: {}",
-                        peer_id,
-                        ip,
-                        port,
-                        err
+                        peer_id, ip, port, err
                     );
                     self.client_tx
                         .send(Response::PeerConnectionClosed(peer_id))
@@ -332,8 +329,7 @@ impl mio::deprecated::Handler for Handler {
                     None => {
                         error!(
                             "Cannot send peer message {:?}: unknown id {}",
-                            message,
-                            peer_id
+                            message, peer_id
                         );
                         return;
                     }

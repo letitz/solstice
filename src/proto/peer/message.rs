@@ -2,9 +2,11 @@ use std::io;
 
 use bytes;
 
-use proto::{Decode, MutPacket, Packet, PacketReadError, ProtoEncode, ProtoEncoder, ReadFromPacket,
-            WriteToPacket};
 use proto::peer::constants::*;
+use proto::{
+    Decode, MutPacket, Packet, PacketReadError, ProtoEncode, ProtoEncoder, ReadFromPacket,
+    WriteToPacket,
+};
 
 /*=========*
  * MESSAGE *
@@ -33,8 +35,7 @@ impl ReadFromPacket for Message {
         if bytes_remaining > 0 {
             warn!(
                 "Peer message with code {} contains {} extra bytes",
-                code,
-                bytes_remaining
+                code, bytes_remaining
             )
         }
 
@@ -158,8 +159,8 @@ mod tests {
 
     use bytes::BytesMut;
 
-    use proto::{Decode, ProtoEncoder};
     use proto::codec::tests::{expect_io_error, roundtrip};
+    use proto::{Decode, ProtoEncoder};
 
     use super::*;
 

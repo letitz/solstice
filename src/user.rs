@@ -53,7 +53,9 @@ impl UserMap {
     pub fn get_mut_strict(&mut self, user_name: &str) -> Result<&mut User, UserNotFoundError> {
         match self.map.get_mut(user_name) {
             Some(user) => Ok(user),
-            None => Err(UserNotFoundError { user_name: user_name.to_string() }),
+            None => Err(UserNotFoundError {
+                user_name: user_name.to_string(),
+            }),
         }
     }
 

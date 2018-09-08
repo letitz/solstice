@@ -11,6 +11,6 @@ mod user;
 pub use self::codec::{Decode, ProtoEncode, ProtoEncoder};
 pub use self::handler::*;
 pub use self::packet::*;
+pub use self::server::{ServerRequest, ServerResponse};
 pub use self::stream::*;
-pub use self::server::{ServerResponse, ServerRequest};
 pub use self::user::{User, UserStatus};

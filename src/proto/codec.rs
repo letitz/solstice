@@ -4,8 +4,8 @@ use std::net;
 use std::u16;
 
 use bytes::{Buf, BufMut, BytesMut, LittleEndian};
-use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::WINDOWS_1252;
+use encoding::{DecoderTrap, EncoderTrap, Encoding};
 
 // Constants
 // ---------
@@ -123,11 +123,9 @@ impl<T: Buf> Decode<String> for T {
 
         let result = {
             let bytes = &self.bytes()[..len];
-            WINDOWS_1252.decode(bytes, DecoderTrap::Strict).map_err(
-                |err| {
-                    invalid_data_error("string", (err, bytes))
-                },
-            )
+            WINDOWS_1252
+                .decode(bytes, DecoderTrap::Strict)
+                .map_err(|err| invalid_data_error("string", (err, bytes)))
         };
 
         self.advance(len);
@@ -324,7 +322,7 @@ pub mod tests {
 
     use bytes::{Buf, BytesMut};
 
-    use super::{Decode, ProtoEncoder, ProtoEncode};
+    use super::{Decode, ProtoEncode, ProtoEncoder};
 
     pub fn roundtrip<T>(input: T)
     where
@@ -570,13 +568,12 @@ pub mod tests {
     }
 
     // A few strings and their corresponding encodings.
-    const STRING_ENCODINGS: [(&'static str, &'static [u8]); 3] =
-        [
-            ("", &[0, 0, 0, 0]),
-            ("hey!", &[4, 0, 0, 0, 104, 101, 121, 33]),
-            // Windows 1252 specific codepoints.
-            ("‘’“”€", &[5, 0, 0, 0, 145, 146, 147, 148, 128]),
-        ];
+    const STRING_ENCODINGS: [(&'static str, &'static [u8]); 3] = [
+        ("", &[0, 0, 0, 0]),
+        ("hey!", &[4, 0, 0, 0, 104, 101, 121, 33]),
+        // Windows 1252 specific codepoints.
+        ("‘’“”€", &[5, 0, 0, 0, 145, 146, 147, 148, 128]),
+    ];
 
     #[test]
     fn encode_string() {

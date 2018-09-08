@@ -94,14 +94,11 @@ impl fmt::Display for Error {
         match *self {
             Error::RoomNotFound(ref room_name) => write!(f, "room {:?} not found", room_name),
 
-            Error::MembershipChangeInvalid(old_membership, new_membership) => {
-                write!(
-                    f,
-                    "cannot change membership from {:?} to {:?}",
-                    old_membership,
-                    new_membership
-                )
-            }
+            Error::MembershipChangeInvalid(old_membership, new_membership) => write!(
+                f,
+                "cannot change membership from {:?} to {:?}",
+                old_membership, new_membership
+            ),
         }
     }
 }
@@ -126,7 +123,9 @@ pub struct RoomMap {
 impl RoomMap {
     /// Creates an empty mapping.
     pub fn new() -> Self {
-        RoomMap { map: collections::HashMap::new() }
+        RoomMap {
+            map: collections::HashMap::new(),
+        }
     }
 
     /// Looks up the given room name in the map, returning an immutable
@@ -220,12 +219,10 @@ impl RoomMap {
                 Ok(())
             }
 
-            membership => {
-                Err(Error::MembershipChangeInvalid(
-                    membership,
-                    Membership::Joining,
-                ))
-            }
+            membership => Err(Error::MembershipChangeInvalid(
+                membership,
+                Membership::Joining,
+            )),
         }
     }
 
@@ -247,8 +244,7 @@ impl RoomMap {
         } else {
             warn!(
                 "Joined room {:?} but membership was already {:?}",
-                room_name,
-                room.membership
+                room_name, room.membership
             );
         }
 
@@ -282,12 +278,10 @@ impl RoomMap {
                 Ok(())
             }
 
-            membership => {
-                Err(Error::MembershipChangeInvalid(
-                    membership,
-                    Membership::Leaving,
-                ))
-            }
+            membership => Err(Error::MembershipChangeInvalid(
+                membership,
+                Membership::Leaving,
+            )),
         }
     }
 
@@ -298,13 +292,10 @@ impl RoomMap {
         match room.membership {
             Membership::Leaving => info!("Left room {:?}", room_name),
 
-            membership => {
-                warn!(
-                    "Left room {:?} with wrong membership: {:?}",
-                    room_name,
-                    membership
-                )
-            }
+            membership => warn!(
+                "Left room {:?} with wrong membership: {:?}",
+                room_name, membership
+            ),
         }
 
         room.membership = Membership::NonMember;

@@ -1,12 +1,12 @@
 use std::io;
 
 use bytes;
-use crypto::md5::Md5;
 use crypto::digest::Digest;
+use crypto::md5::Md5;
 
-use proto::{Decode, ProtoEncode, ProtoEncoder};
 use proto::packet::{MutPacket, WriteToPacket};
 use proto::server::constants::*;
+use proto::{Decode, ProtoEncode, ProtoEncoder};
 
 /* ------- *
  * Helpers *
@@ -447,7 +447,9 @@ impl ProtoEncode for RoomJoinRequest {
 impl<T: bytes::Buf> Decode<RoomJoinRequest> for T {
     fn decode(&mut self) -> io::Result<RoomJoinRequest> {
         let room_name = self.decode()?;
-        Ok(RoomJoinRequest { room_name: room_name })
+        Ok(RoomJoinRequest {
+            room_name: room_name,
+        })
     }
 }
 
@@ -476,7 +478,9 @@ impl ProtoEncode for RoomLeaveRequest {
 impl<T: bytes::Buf> Decode<RoomLeaveRequest> for T {
     fn decode(&mut self) -> io::Result<RoomLeaveRequest> {
         let room_name = self.decode()?;
-        Ok(RoomLeaveRequest { room_name: room_name })
+        Ok(RoomLeaveRequest {
+            room_name: room_name,
+        })
     }
 }
 
@@ -567,7 +571,9 @@ impl ProtoEncode for UserStatusRequest {
 impl<T: bytes::Buf> Decode<UserStatusRequest> for T {
     fn decode(&mut self) -> io::Result<UserStatusRequest> {
         let user_name = self.decode()?;
-        Ok(UserStatusRequest { user_name: user_name })
+        Ok(UserStatusRequest {
+            user_name: user_name,
+        })
     }
 }
 
@@ -581,8 +587,8 @@ mod tests {
 
     use bytes::BytesMut;
 
-    use proto::{Decode, ProtoEncoder};
     use proto::codec::tests::{expect_io_error, roundtrip};
+    use proto::{Decode, ProtoEncoder};
 
     use super::*;
 
@@ -639,30 +645,29 @@ mod tests {
     #[test]
     fn roundtrip_login_request() {
         roundtrip(ServerRequest::LoginRequest(
-            LoginRequest::new("alice", "password1234", 1337, 42)
-                .unwrap(),
+            LoginRequest::new("alice", "password1234", 1337, 42).unwrap(),
         ))
     }
 
     #[test]
     fn roundtrip_peer_address_request() {
-        roundtrip(ServerRequest::PeerAddressRequest(
-            PeerAddressRequest { username: "alice".to_string() },
-        ))
+        roundtrip(ServerRequest::PeerAddressRequest(PeerAddressRequest {
+            username: "alice".to_string(),
+        }))
     }
 
     #[test]
     fn roundtrip_room_join_request() {
-        roundtrip(ServerRequest::RoomJoinRequest(
-            RoomJoinRequest { room_name: "best room ever".to_string() },
-        ))
+        roundtrip(ServerRequest::RoomJoinRequest(RoomJoinRequest {
+            room_name: "best room ever".to_string(),
+        }))
     }
 
     #[test]
     fn roundtrip_room_leave_request() {
-        roundtrip(ServerRequest::RoomLeaveRequest(
-            RoomLeaveRequest { room_name: "best room ever".to_string() },
-        ))
+        roundtrip(ServerRequest::RoomLeaveRequest(RoomLeaveRequest {
+            room_name: "best room ever".to_string(),
+        }))
     }
 
     #[test]
@@ -680,15 +685,15 @@ mod tests {
 
     #[test]
     fn roundtrip_set_listen_port_request() {
-        roundtrip(ServerRequest::SetListenPortRequest(
-            SetListenPortRequest { port: 1337 },
-        ))
+        roundtrip(ServerRequest::SetListenPortRequest(SetListenPortRequest {
+            port: 1337,
+        }))
     }
 
     #[test]
     fn roundtrip_user_status_request() {
-        roundtrip(ServerRequest::UserStatusRequest(
-            UserStatusRequest { user_name: "alice".to_string() },
-        ))
+        roundtrip(ServerRequest::UserStatusRequest(UserStatusRequest {
+            user_name: "alice".to_string(),
+        }))
     }
 }
