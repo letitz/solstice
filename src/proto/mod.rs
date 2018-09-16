@@ -1,4 +1,4 @@
-mod codec;
+mod base_codec;
 mod constants;
 mod handler;
 mod packet;
@@ -8,7 +8,7 @@ mod stream;
 mod transport;
 mod user;
 
-pub use self::codec::{Decode, ProtoEncode, ProtoEncoder};
+pub use self::base_codec::{Decode, ProtoEncode, ProtoEncoder};
 pub use self::handler::*;
 pub use self::packet::*;
 pub use self::server::{ServerRequest, ServerResponse};
