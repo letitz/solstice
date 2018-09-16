@@ -17,6 +17,7 @@ extern crate env_logger;
 extern crate mio;
 extern crate rustc_serialize;
 extern crate slab;
+extern crate tokio_codec;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate ws;
