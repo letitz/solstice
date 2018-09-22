@@ -4,7 +4,7 @@ use std::marker;
 use tokio_codec;
 use bytes::BytesMut;
 
-use super::base_codec::{ProtoEncode, ProtoEncoder};
+use super::base_codec::{Decode, ProtoEncode, ProtoEncoder};
 use super::server::{ServerRequest,ServerResponse};
 use super::peer::Message;
 
@@ -30,3 +30,21 @@ impl<T: ProtoEncode> tokio_codec::Encoder for Encoder<T> {
 pub type ServerRequestEncoder = Encoder<ServerRequest>;
 pub type ServerResponseEncoder = Encoder<ServerResponse>;
 pub type PeerMessageEncoder = Encoder<Message>;
+
+struct Decoder<T> {
+    data: marker::PhantomData<T>
+}
+
+impl<T> tokio_codec::Decoder for Decoder<T>
+where BytesMut: Decode<T> {
+    type Item = T;
+    type Error = io::Error;
+
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        Ok(Some(src.decode()?))
+    }
+}
+
+pub type ServerRequestDecoder = Decoder<ServerRequest>;
+pub type ServerResponseDecoder = Decoder<ServerResponse>;
+pub type PeerMessageDecoder = Decoder<Message>;
