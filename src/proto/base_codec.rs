@@ -162,6 +162,8 @@ where
 /// This trait is implemented by types that can be encoded into messages with
 /// a `ProtoEncoder`.
 /// Only here to enable `ProtoEncoder::encode_vec`.
+/// Attempting to implement Encode for Vec<T> otherwise fails because none of
+/// the types involved are defined in this crate.
 pub trait ProtoEncode {
     /// Attempts to encode `self` with the given encoder.
     fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()>;
@@ -305,6 +307,12 @@ impl<T: ProtoEncode, U: ProtoEncode> ProtoEncode for (T, U) {
 impl<T: ProtoEncode> ProtoEncode for Vec<T> {
     fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
         encoder.encode_vec(self)
+    }
+}
+
+impl<'a, T: ProtoEncode> Encode<&'a T> for BytesMut {
+    fn encode(&mut self, value: &'a T) -> io::Result<()> {
+        value.encode(&mut ProtoEncoder::new(self))
     }
 }
 
