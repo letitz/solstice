@@ -146,7 +146,7 @@ where
 
 impl<T, U> Decode<Vec<U>> for T
 where
-    T: Buf + Decode<U>,
+    T: BootstrapDecode + Decode<U>,
 {
     fn decode(&mut self) -> io::Result<Vec<U>> {
         let len = self.decode_u32_generic("vector length")? as usize;
