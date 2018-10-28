@@ -3,7 +3,7 @@ use std::io;
 use std::net;
 use std::u16;
 
-use bytes::{Buf, BufMut, BytesMut, LittleEndian};
+use bytes::{Buf, BufMut, BytesMut};
 use encoding::all::WINDOWS_1252;
 use encoding::{DecoderTrap, EncoderTrap, Encoding};
 
@@ -78,7 +78,7 @@ impl<T: Buf> BootstrapDecode for T {
 
     fn decode_u32_generic(&mut self, type_name: &str) -> io::Result<u32> {
         self.expect_remaining(type_name, U32_BYTE_LEN)?;
-        Ok(self.get_u32::<LittleEndian>())
+        Ok(self.get_u32_le())
     }
 }
 
@@ -173,8 +173,7 @@ pub trait ProtoEncode {
 // messages.
 pub struct ProtoEncoder<'a> {
     // We would like to store an &'a BufMut instead, but not only is it not
-    // object-safe yet, it does not grow the buffer on writes either... So we
-    // don't want to template this struct like ProtoDecoder either.
+    // object-safe yet, it does not grow the buffer on writes either...
     inner: &'a mut BytesMut,
 }
 
@@ -187,7 +186,7 @@ impl<'a> ProtoEncoder<'a> {
         if self.inner.remaining_mut() < U32_BYTE_LEN {
             self.inner.reserve(U32_BYTE_LEN);
         }
-        self.inner.put_u32::<LittleEndian>(val);
+        self.inner.put_u32_le(val);
         Ok(())
     }
 
