@@ -11,7 +11,7 @@ use encoding::{DecoderTrap, EncoderTrap, Encoding};
 // ---------
 
 /// Length of an encoded 32-bit integer in bytes.
-const U32_BYTE_LEN: usize = 4;
+pub const U32_BYTE_LEN: usize = 4;
 
 /*===================================*
  * BASIC TYPES ENCODING AND DECODING *
