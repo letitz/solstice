@@ -183,9 +183,7 @@ impl<'a> ProtoEncoder<'a> {
     }
 
     pub fn encode_u32(&mut self, val: u32) -> io::Result<()> {
-        if self.inner.remaining_mut() < U32_BYTE_LEN {
-            self.inner.reserve(U32_BYTE_LEN);
-        }
+        self.inner.reserve(U32_BYTE_LEN);
         self.inner.put_u32_le(val);
         Ok(())
     }
