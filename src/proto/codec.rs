@@ -13,11 +13,11 @@ use super::server::{ServerRequest, ServerResponse};
  *===================================*/
 
 // Encodes types that implement ProtoEncode with a length prefix.
-pub struct Encoder<T> {
+pub struct LengthPrefixedEncoder<T> {
     phantom: marker::PhantomData<T>,
 }
 
-impl<T> Encoder<T> {
+impl<T> LengthPrefixedEncoder<T> {
     pub fn new() -> Self {
         Self {
             phantom: marker::PhantomData,
@@ -25,7 +25,7 @@ impl<T> Encoder<T> {
     }
 }
 
-impl<T: ProtoEncode> tokio_codec::Encoder for Encoder<T> {
+impl<T: ProtoEncode> tokio_codec::Encoder for LengthPrefixedEncoder<T> {
     type Item = T;
     type Error = io::Error;
 
@@ -47,7 +47,7 @@ impl<T: ProtoEncode> tokio_codec::Encoder for Encoder<T> {
 }
 
 // Decodes length-prefixed values from byte buffers.
-pub struct Decoder<T> {
+pub struct LengthPrefixedDecoder<T> {
     // The length, as a number of bytes, of the next item to decode.
     // None if we have not read the length prefix yet.
     // Some(n) if we read the length prefix, and are now waiting for `n` bytes
@@ -58,7 +58,7 @@ pub struct Decoder<T> {
     phantom: marker::PhantomData<T>,
 }
 
-impl<T> Decoder<T> {
+impl<T> LengthPrefixedDecoder<T> {
     pub fn new() -> Self {
         Self {
             length: None,
@@ -92,7 +92,7 @@ impl<T> Decoder<T> {
     }
 }
 
-impl<T: ProtoDecode> tokio_codec::Decoder for Decoder<T> {
+impl<T: ProtoDecode> tokio_codec::Decoder for LengthPrefixedDecoder<T> {
     type Item = T;
     type Error = io::Error;
 
@@ -125,9 +125,7 @@ mod tests {
 
     use proto::ProtoEncode;
 
-    // Avoid name conflict with tokio_codec traits.
-    use super::Decoder as MyDecoder;
-    use super::Encoder as MyEncoder;
+    use super::{LengthPrefixedDecoder, LengthPrefixedEncoder};
 
     // Test value: [1, 3, 3, 7] in little-endian.
     const U32_1337: u32 = 1 + (3 << 8) + (3 << 16) + (7 << 24);
@@ -135,7 +133,7 @@ mod tests {
     #[test]
     fn encode_u32() {
         let mut bytes = BytesMut::new();
-        MyEncoder::new().encode(U32_1337, &mut bytes).unwrap();
+        LengthPrefixedEncoder::new().encode(U32_1337, &mut bytes).unwrap();
 
         assert_eq!(
             bytes,
@@ -151,7 +149,7 @@ mod tests {
         let v: Vec<u32> = vec![1, 3, 3, 7];
 
         let mut bytes = BytesMut::new();
-        MyEncoder::new().encode(v, &mut bytes).unwrap();
+        LengthPrefixedEncoder::new().encode(v, &mut bytes).unwrap();
 
         assert_eq!(
             bytes,
@@ -172,7 +170,7 @@ mod tests {
             4, 0, 0, // Incomplete 32-bit length prefix.
         ]);
 
-        let value: Option<u32> = MyDecoder::new().decode(&mut bytes).unwrap();
+        let value: Option<u32> = LengthPrefixedDecoder::new().decode(&mut bytes).unwrap();
 
         assert_eq!(value, None);
         assert_eq!(bytes, vec![4, 0, 0]); // Untouched.
@@ -186,7 +184,7 @@ mod tests {
             4, 2, // Trailing bytes.
         ]);
 
-        let value = MyDecoder::new().decode(&mut bytes).unwrap();
+        let value = LengthPrefixedDecoder::new().decode(&mut bytes).unwrap();
 
         assert_eq!(value, Some(U32_1337));
         assert_eq!(bytes, vec![4, 2]); // Decoded bytes were split off.
@@ -204,7 +202,7 @@ mod tests {
             4, 2, // Trailing bytes.
         ]);
 
-        let value = MyDecoder::new().decode(&mut bytes).unwrap();
+        let value = LengthPrefixedDecoder::new().decode(&mut bytes).unwrap();
 
         let expected_value: Vec<u32> = vec![1, 3, 3, 7];
         assert_eq!(value, Some(expected_value));
@@ -213,7 +211,7 @@ mod tests {
 
     #[test]
     fn decode_stateful() {
-        let mut decoder = MyDecoder::new();
+        let mut decoder = LengthPrefixedDecoder::new();
 
         let mut bytes = BytesMut::from(vec![
             4, 0, 0, 0, // 32-bit integer = 4 bytes.
@@ -256,8 +254,8 @@ mod tests {
 
         let mut buffer = BytesMut::new();
 
-        MyEncoder::new().encode(value.clone(), &mut buffer).unwrap();
-        let decoded = MyDecoder::new().decode(&mut buffer).unwrap();
+        LengthPrefixedEncoder::new().encode(value.clone(), &mut buffer).unwrap();
+        let decoded = LengthPrefixedDecoder::new().decode(&mut buffer).unwrap();
 
         assert_eq!(decoded, Some(value));
         assert_eq!(buffer, vec![]);
