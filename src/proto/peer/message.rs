@@ -1,10 +1,8 @@
 use std::io;
 
-use bytes;
-
 use proto::peer::constants::*;
 use proto::{
-    Decode, MutPacket, Packet, PacketReadError, ProtoEncode, ProtoEncoder, ReadFromPacket,
+    MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder, ReadFromPacket,
     WriteToPacket,
 };
 
@@ -43,16 +41,16 @@ impl ReadFromPacket for Message {
     }
 }
 
-impl<T: bytes::Buf> Decode<Message> for T {
-    fn decode(&mut self) -> io::Result<Message> {
-        let code: u32 = self.decode()?;
+impl ProtoDecode for Message {
+    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+        let code: u32 = decoder.decode()?;
         let message = match code {
             CODE_PIERCE_FIREWALL => {
-                let val = self.decode()?;
+                let val = decoder.decode()?;
                 Message::PierceFirewall(val)
             }
             CODE_PEER_INIT => {
-                let peer_init = self.decode()?;
+                let peer_init = decoder.decode()?;
                 Message::PeerInit(peer_init)
             }
             _ => {
@@ -140,11 +138,11 @@ impl ProtoEncode for PeerInit {
     }
 }
 
-impl<T: bytes::Buf> Decode<PeerInit> for T {
-    fn decode(&mut self) -> io::Result<PeerInit> {
-        let user_name = self.decode()?;
-        let connection_type = self.decode()?;
-        let token = self.decode()?;
+impl ProtoDecode for PeerInit {
+    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+        let user_name = decoder.decode()?;
+        let connection_type = decoder.decode()?;
+        let token = decoder.decode()?;
         Ok(PeerInit {
             user_name,
             connection_type,
@@ -160,16 +158,15 @@ mod tests {
     use bytes::BytesMut;
 
     use proto::base_codec::tests::{expect_io_error, roundtrip};
-    use proto::{Decode, ProtoEncoder};
+    use proto::ProtoDecoder;
 
     use super::*;
 
     #[test]
     fn invalid_code() {
-        let mut bytes = BytesMut::new();
-        ProtoEncoder::new(&mut bytes).encode_u32(1337).unwrap();
+        let bytes = BytesMut::from(vec![57, 5, 0, 0]);
 
-        let result: io::Result<Message> = io::Cursor::new(bytes).decode();
+        let result = ProtoDecoder::new(&bytes).decode::<Message>();
 
         expect_io_error(
             result,

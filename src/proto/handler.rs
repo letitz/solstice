@@ -197,8 +197,7 @@ impl Handler {
                 mio::Token(peer_id),
                 mio::Ready::all(),
                 mio::PollOpt::edge() | mio::PollOpt::oneshot(),
-            )
-            .unwrap();
+            ).unwrap();
 
         vacant_entry.insert(peer_stream);
 
@@ -222,8 +221,7 @@ impl Handler {
                         mio::Token(SERVER_TOKEN),
                         event_set,
                         mio::PollOpt::edge() | mio::PollOpt::oneshot(),
-                    )
-                    .unwrap();
+                    ).unwrap();
             }
         }
     }
@@ -250,8 +248,7 @@ impl Handler {
                             token,
                             event_set,
                             mio::PollOpt::edge() | mio::PollOpt::oneshot(),
-                        )
-                        .unwrap();
+                        ).unwrap();
                 }
             }
         }
@@ -289,8 +286,7 @@ impl mio::deprecated::Handler for Handler {
                         token,
                         mio::Ready::all(),
                         mio::PollOpt::edge() | mio::PollOpt::oneshot(),
-                    )
-                    .unwrap();
+                    ).unwrap();
             }
 
             mio::Token(SERVER_TOKEN) => {

@@ -1,26 +1,25 @@
 use std::fmt;
 use std::io;
 
-use bytes::{Buf, BytesMut};
+use bytes::BytesMut;
 use tokio_io::codec::length_delimited::{Builder, Framed};
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use proto::peer;
-use proto::{Decode, ProtoEncode, ProtoEncoder, ServerRequest, ServerResponse};
+use proto::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder, ServerRequest, ServerResponse};
 
 fn decode_frame<'a, T>(frame_type: &str, bytes: &'a mut BytesMut) -> io::Result<T>
 where
-    T: fmt::Debug,
-    io::Cursor<&'a mut BytesMut>: Decode<T>,
+    T: ProtoDecode + fmt::Debug,
 {
-    let mut cursor = io::Cursor::new(bytes);
-    let frame = cursor.decode()?;
-    if cursor.has_remaining() {
+    let mut decoder = ProtoDecoder::new(&*bytes);
+    let frame = decoder.decode()?;
+    if decoder.has_remaining() {
         warn!(
             "Received {} with trailing bytes. Frame:\n{:?}Bytes:{:?}",
             frame_type,
             frame,
-            cursor.bytes()
+            decoder.bytes()
         );
     }
     Ok(frame)

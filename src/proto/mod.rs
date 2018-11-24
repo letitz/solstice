@@ -9,7 +9,7 @@ mod stream;
 mod transport;
 mod user;
 
-pub use self::base_codec::{Decode, ProtoEncode, ProtoEncoder};
+pub use self::base_codec::{Decode, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
 pub use self::codec::*;
 pub use self::handler::*;
 pub use self::packet::*;
