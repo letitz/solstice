@@ -159,8 +159,7 @@ pub fn listen(client_tx: mpsc::Sender<Notification>) {
         .with_settings(ws::Settings {
             max_connections: 1,
             ..ws::Settings::default()
-        })
-        .build(|socket_tx| Handler {
+        }).build(|socket_tx| Handler {
             client_tx: client_tx.clone(),
             socket_tx: socket_tx,
         });
@@ -173,8 +172,7 @@ pub fn listen(client_tx: mpsc::Sender<Notification>) {
                 .send(Notification::Error(format!(
                     "Unable to build websocket: {}",
                     e
-                )))
-                .unwrap();
+                ))).unwrap();
             return;
         }
     };
@@ -189,8 +187,7 @@ pub fn listen(client_tx: mpsc::Sender<Notification>) {
                 .send(Notification::Error(format!(
                     "Unable to listen on websocket: {}",
                     e
-                )))
-                .unwrap();
+                ))).unwrap();
         }
     }
 }
