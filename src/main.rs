@@ -5,25 +5,14 @@ mod proto;
 mod room;
 mod user;
 
-extern crate byteorder;
-extern crate bytes;
-extern crate core;
-extern crate crypto;
-extern crate encoding;
-extern crate futures;
+// Still no 2018 way of using the log crate without `use log::*` everywhere.
 #[macro_use]
 extern crate log;
-extern crate env_logger;
-extern crate mio;
-extern crate rustc_serialize;
-extern crate slab;
-extern crate tokio_codec;
-extern crate tokio_core;
-extern crate tokio_io;
-extern crate ws;
 
 use std::sync::mpsc;
 use std::thread;
+
+use env_logger;
 
 fn main() {
     match env_logger::init() {
