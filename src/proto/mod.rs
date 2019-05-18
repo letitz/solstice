@@ -6,7 +6,6 @@ mod packet;
 pub mod peer;
 pub mod server;
 mod stream;
-mod transport;
 mod user;
 
 pub use self::base_codec::{Decode, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
