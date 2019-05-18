@@ -1,3 +1,18 @@
+//! This module provides encoding and decoding functionality for basic types.
+//!
+//! The protocol is pretty basic, though quirky. Base types are serialized in
+//! the following way:
+//!
+//!   * 32-bit integers are serialized in 4 bytes, little-endian.
+//!   * 16-bit integers are serialized as 32-bit integers with upper bytes set
+//!     to 0.
+//!   * Booleans are serialized as single bytes, containing either 0 or 1.
+//!   * IPv4 addresses are serialized as 32-bit integers.
+//!   * Strings are serialized as 32-bit-length-prefixed arrays of Windows 1252
+//!     encoded characters.
+//!   * Pairs are serialized as two consecutive values.
+//!   * Vectors are serialized as length-prefixed arrays of serialized values.
+
 use std::fmt;
 use std::io;
 use std::net;
@@ -13,23 +28,6 @@ use encoding::{DecoderTrap, EncoderTrap, Encoding};
 /// Length of an encoded 32-bit integer in bytes.
 pub const U32_BYTE_LEN: usize = 4;
 
-/*===================================*
- * BASIC TYPES ENCODING AND DECODING *
- *===================================*/
-
-// The protocol is pretty basic, though quirky. Base types are serialized in
-// the following way:
-//
-//   * 32-bit integers are serialized in 4 bytes, little-endian.
-//   * 16-bit integers are serialized as 32-bit integers with upper bytes set
-//     to 0.
-//   * Booleans are serialized as single bytes, containing either 0 or 1.
-//   * IPv4 addresses are serialized as 32-bit integers.
-//   * Strings are serialized as 32-bit-length-prefixed arrays of Windows 1252
-//     encoded characters.
-//   * Pairs are serialized as two consecutive values.
-//   * Vectors are serialized as length-prefixed arrays of serialized values.
-
 pub trait Decode<T> {
     /// Attempts to decode an istance of `T` from `self`.
     fn decode(&mut self) -> io::Result<T>;
@@ -40,7 +38,7 @@ pub trait Encode<T> {
     fn encode(&mut self, value: T) -> io::Result<()>;
 }
 
-// Builds an EOF error encountered when reading a value of the given type.
+/// Builds an EOF error encountered when reading a value of the given type.
 fn unexpected_eof_error(type_name: &str) -> io::Error {
     io::Error::new(
         io::ErrorKind::UnexpectedEof,
@@ -48,7 +46,7 @@ fn unexpected_eof_error(type_name: &str) -> io::Error {
     )
 }
 
-// Builds an InvalidData error for the given value of the given type.
+/// Builds an InvalidData error for the given value of the given type.
 fn invalid_data_error<T: fmt::Debug>(type_name: &str, value: T) -> io::Error {
     io::Error::new(
         io::ErrorKind::InvalidData,
@@ -56,37 +54,40 @@ fn invalid_data_error<T: fmt::Debug>(type_name: &str, value: T) -> io::Error {
     )
 }
 
-// A ProtoDecoder knows how to decode various types of values from protocol
-// messages.
+/// A type for decoding various types of values from protocol messages.
 pub struct ProtoDecoder<'a> {
     inner: io::Cursor<&'a BytesMut>,
 }
 
-/// This trait is implemented by types that can be decoded from messages with
+/// This trait is implemented by types that can be decoded from messages using
 /// a `ProtoDecoder`.
 pub trait ProtoDecode: Sized {
-    /// Attempts to decode `self` with the given decoder.
+    /// Attempts to decode a value of this type with the given decoder.
     fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self>;
 }
 
 impl<'a> ProtoDecoder<'a> {
+    /// Wraps the given byte buffer.
     pub fn new(bytes: &'a BytesMut) -> Self {
         Self{
             inner: io::Cursor::new(bytes),
         }
     }
 
+    /// Returns whether the underlying buffer has remaining bytes to decode.
     pub fn has_remaining(&self) -> bool {
         self.inner.has_remaining()
     }
 
+    /// Returns a read-only view of the remaining bytes to decode.
     pub fn bytes(&self) -> &[u8] {
         self.inner.bytes()
     }
 
-    // Asserts that the buffer contains at least `n` more bytes from which to
-    // read a value of the given type.
-    // Returns Ok(()) if there are that many bytes, an error otherwise.
+    /// Asserts that the buffer contains at least `n` more bytes from which to
+    /// read a value of the named type.
+    /// Returns Ok(()) if there are that many bytes, otherwise returns a
+    /// descriptive error.
     fn expect_remaining(&self, type_name: &str, n: usize) -> io::Result<()> {
         if self.inner.remaining() < n {
             Err(unexpected_eof_error(type_name))
@@ -95,12 +96,14 @@ impl<'a> ProtoDecoder<'a> {
         }
     }
 
-    // Decodes a u32 value as the first step in decoding a value of the given type.
+    /// Attempts to decode a u32 value in the context of decoding a value of
+    /// the named type.
     fn decode_u32_generic(&mut self, type_name: &str) -> io::Result<u32> {
         self.expect_remaining(type_name, U32_BYTE_LEN)?;
         Ok(self.inner.get_u32_le())
     }
 
+    /// Attempts to decode a boolean value.
     fn decode_bool(&mut self) -> io::Result<bool> {
         self.expect_remaining("bool", 1)?;
         match self.inner.get_u8() {
@@ -110,6 +113,7 @@ impl<'a> ProtoDecoder<'a> {
         }
     }
 
+    /// Attempts to decode a string value.
     fn decode_string(&mut self) -> io::Result<String> {
         let len = self.decode_u32_generic("string length")? as usize;
         self.expect_remaining("string", len)?;
@@ -125,6 +129,13 @@ impl<'a> ProtoDecoder<'a> {
         result
     }
 
+    /// Attempts to decode a value of the given type.
+    ///
+    /// Allows easy decoding of complex values using type inference:
+    ///
+    /// ```
+    /// let val : Foo = decoder.decode()?;
+    /// ```
     pub fn decode<T: ProtoDecode>(&mut self) -> io::Result<T> {
         T::decode_from(self)
     }
@@ -187,13 +198,12 @@ impl<T: ProtoDecode> ProtoDecode for Vec<T>
     }
 }
 
-// A `ProtoEncoder` knows how to encode various types of values into protocol
-// messages.
+/// A type for encoding various types of values into protocol messages.
 pub struct ProtoEncoder<'a> {
     inner: &'a mut BytesMut,
 }
 
-/// This trait is implemented by types that can be encoded into messages with
+/// This trait is implemented by types that can be encoded into messages using
 /// a `ProtoEncoder`.
 pub trait ProtoEncode {
     /// Attempts to encode `self` with the given encoder.
@@ -201,22 +211,28 @@ pub trait ProtoEncode {
 }
 
 impl<'a> ProtoEncoder<'a> {
+    /// Wraps the given buffer for encoding values into.
+    ///
+    /// The buffer is grown as required.
     pub fn new(inner: &'a mut BytesMut) -> Self {
         ProtoEncoder { inner: inner }
     }
 
+    /// Attempts to encode the given u32 value.
     pub fn encode_u32(&mut self, val: u32) -> io::Result<()> {
         self.inner.reserve(U32_BYTE_LEN);
         self.inner.put_u32_le(val);
         Ok(())
     }
 
+    /// Attempts to encode the given boolean value.
     pub fn encode_bool(&mut self, val: bool) -> io::Result<()> {
         self.inner.reserve(1);
         self.inner.put_u8(val as u8);
         Ok(())
     }
 
+    /// Attempts to encode the given IPv4 address.
     pub fn encode_ipv4_addr(&mut self, addr: net::Ipv4Addr) -> io::Result<()> {
         let mut octets = addr.octets();
         octets.reverse(); // Little endian.
@@ -224,6 +240,7 @@ impl<'a> ProtoEncoder<'a> {
         Ok(())
     }
 
+    /// Attempts to encode the given string.
     pub fn encode_string(&mut self, val: &str) -> io::Result<()> {
         // Encode the string.
         let bytes = match WINDOWS_1252.encode(val, EncoderTrap::Strict) {
@@ -238,6 +255,13 @@ impl<'a> ProtoEncoder<'a> {
         Ok(())
     }
 
+    /// Attempts to encode the given value.
+    ///
+    /// Allows for easy encoding with type inference:
+    /// ```
+    /// let val : Foo = Foo::new(bar);
+    /// encoder.encode(&val)?;
+    /// ```
     pub fn encode<T: ProtoEncode>(&mut self, val: &T) -> io::Result<()> {
         val.encode(self)
     }
