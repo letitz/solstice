@@ -1,7 +1,7 @@
 use std::error;
 use std::fmt;
-use std::sync::mpsc;
 
+use crossbeam_channel;
 use rustc_serialize::json;
 use ws;
 
@@ -92,7 +92,7 @@ impl Sender {
 #[derive(Debug)]
 struct Handler {
     /// The channel on which to send notifications to the client.
-    client_tx: mpsc::Sender<Notification>,
+    client_tx: crossbeam_channel::Sender<Notification>,
     /// The channel on which to send messages to the controller.
     socket_tx: ws::Sender,
 }
@@ -154,7 +154,7 @@ impl ws::Handler for Handler {
 
 /// Start listening on the socket address stored in configuration, and send
 /// control notifications to the client through the given channel.
-pub fn listen(client_tx: mpsc::Sender<Notification>) {
+pub fn listen(client_tx: crossbeam_channel::Sender<Notification>) {
     let websocket_result = ws::Builder::new()
         .with_settings(ws::Settings {
             max_connections: 1,

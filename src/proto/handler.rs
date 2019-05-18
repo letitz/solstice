@@ -2,10 +2,10 @@ use std::fmt;
 use std::io;
 use std::net;
 use std::net::ToSocketAddrs;
-use std::sync::mpsc;
 
 use mio;
 use slab;
+use crossbeam_channel;
 
 use crate::config;
 
@@ -47,11 +47,11 @@ pub enum Response {
  * SERVER RESPONSE SENDER *
  *========================*/
 
-pub struct ServerResponseSender(mpsc::Sender<Response>);
+pub struct ServerResponseSender(crossbeam_channel::Sender<Response>);
 
 impl SendPacket for ServerResponseSender {
     type Value = ServerResponse;
-    type Error = mpsc::SendError<Response>;
+    type Error = crossbeam_channel::SendError<Response>;
 
     fn send_packet(&mut self, value: Self::Value) -> Result<(), Self::Error> {
         self.0.send(Response::ServerResponse(value))
@@ -67,13 +67,13 @@ impl SendPacket for ServerResponseSender {
  *======================*/
 
 pub struct PeerResponseSender {
-    sender: mpsc::Sender<Response>,
+    sender: crossbeam_channel::Sender<Response>,
     peer_id: usize,
 }
 
 impl SendPacket for PeerResponseSender {
     type Value = peer::Message;
-    type Error = mpsc::SendError<Response>;
+    type Error = crossbeam_channel::SendError<Response>;
 
     fn send_packet(&mut self, value: Self::Value) -> Result<(), Self::Error> {
         self.sender.send(Response::PeerMessage(self.peer_id, value))
@@ -97,7 +97,7 @@ struct Handler {
 
     listener: mio::tcp::TcpListener,
 
-    client_tx: mpsc::Sender<Response>,
+    client_tx: crossbeam_channel::Sender<Response>,
 }
 
 fn listener_bind<U>(addr_spec: U) -> io::Result<mio::tcp::TcpListener>
@@ -117,7 +117,7 @@ where
 
 impl Handler {
     fn new(
-        client_tx: mpsc::Sender<Response>,
+        client_tx: crossbeam_channel::Sender<Response>,
         event_loop: &mut mio::deprecated::EventLoop<Self>,
     ) -> io::Result<Self> {
         let host = config::SERVER_HOST;
@@ -349,7 +349,7 @@ pub struct Agent {
 }
 
 impl Agent {
-    pub fn new(client_tx: mpsc::Sender<Response>) -> io::Result<Self> {
+    pub fn new(client_tx: crossbeam_channel::Sender<Response>) -> io::Result<Self> {
         // Create the event loop.
         let mut event_loop = mio::deprecated::EventLoop::new()?;
         // Create the handler for the event loop and register the handler's

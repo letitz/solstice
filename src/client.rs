@@ -1,6 +1,6 @@
 use std::net;
-use std::sync::mpsc;
 
+use crossbeam_channel;
 use mio;
 use slab;
 
@@ -49,10 +49,10 @@ struct Peer {
 
 pub struct Client {
     proto_tx: mio::deprecated::Sender<proto::Request>,
-    proto_rx: mpsc::Receiver<proto::Response>,
+    proto_rx: crossbeam_channel::Receiver<proto::Response>,
 
     control_tx: Option<control::Sender>,
-    control_rx: mpsc::Receiver<control::Notification>,
+    control_rx: crossbeam_channel::Receiver<control::Notification>,
 
     login_status: LoginStatus,
 
@@ -68,8 +68,8 @@ impl Client {
     /// through `control_rx`.
     pub fn new(
         proto_tx: mio::deprecated::Sender<proto::Request>,
-        proto_rx: mpsc::Receiver<proto::Response>,
-        control_rx: mpsc::Receiver<control::Notification>,
+        proto_rx: crossbeam_channel::Receiver<proto::Response>,
+        control_rx: crossbeam_channel::Receiver<control::Notification>,
     ) -> Self {
         Client {
             proto_tx: proto_tx,
