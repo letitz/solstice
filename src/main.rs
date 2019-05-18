@@ -1,10 +1,3 @@
-mod client;
-mod config;
-mod control;
-mod proto;
-mod room;
-mod user;
-
 // Still no 2018 way of using the log crate without `use log::*` everywhere.
 #[macro_use]
 extern crate log;
@@ -13,6 +6,17 @@ use std::thread;
 
 use crossbeam_channel;
 use env_logger;
+
+mod client;
+mod config;
+mod context;
+mod control;
+mod dispatcher;
+mod executor;
+mod message_handler;
+mod proto;
+mod room;
+mod user;
 
 fn main() {
     match env_logger::init() {
