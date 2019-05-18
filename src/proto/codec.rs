@@ -1,3 +1,14 @@
+//! This module provides tokio Codec implementations for protocol messages.
+//!
+//! Specifically, the following types:
+//!
+//!  * proto::peer::Message
+//!  * proto::server::ServerRequest
+//!  * proto::server::ServerResponse
+//!
+//! This enables wrapping AsyncRead and AsyncWrite objects into Stream and Sink
+//! objects using tokio_codec's FramedRead and FramedWrite adapters.
+
 use std::io;
 use std::marker;
 
@@ -8,11 +19,7 @@ use super::base_codec::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder, U3
 use super::peer::Message;
 use super::server::{ServerRequest, ServerResponse};
 
-/*===================================*
- * TOKIO CODEC TRAIT IMPLEMENTATIONS *
- *===================================*/
-
-// Encodes types that implement ProtoEncode with a length prefix.
+/// Implements tokio's Encoder trait for types that implement ProtoEncode.
 pub struct LengthPrefixedEncoder<T> {
     phantom: marker::PhantomData<T>,
 }
@@ -46,7 +53,7 @@ impl<T: ProtoEncode> tokio_codec::Encoder for LengthPrefixedEncoder<T> {
     }
 }
 
-// Decodes length-prefixed values from byte buffers.
+/// Implements tokio's Decoder trait for types that implement ProtoDecode.
 pub struct LengthPrefixedDecoder<T> {
     // The length, as a number of bytes, of the next item to decode.
     // None if we have not read the length prefix yet.
