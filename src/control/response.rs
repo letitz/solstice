@@ -1,5 +1,5 @@
-use proto::User;
-use room;
+use crate::proto::User;
+use crate::room;
 
 /// This enumeration is the list of possible control responses from the client
 /// to the controller.

@@ -3,9 +3,9 @@ use std::io;
 use crypto::digest::Digest;
 use crypto::md5::Md5;
 
-use proto::packet::{MutPacket, WriteToPacket};
-use proto::server::constants::*;
-use proto::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
+use crate::proto::packet::{MutPacket, WriteToPacket};
+use crate::proto::server::constants::*;
+use crate::proto::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
 
 /* ------- *
  * Helpers *
@@ -40,57 +40,57 @@ impl WriteToPacket for ServerRequest {
     fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
         match *self {
             ServerRequest::CannotConnectRequest(ref request) => {
-                try!(packet.write_value(&CODE_CANNOT_CONNECT));
-                try!(packet.write_value(request));
+                packet.write_value(&CODE_CANNOT_CONNECT)?;
+                packet.write_value(request)?;
             }
 
             ServerRequest::ConnectToPeerRequest(ref request) => {
-                try!(packet.write_value(&CODE_CONNECT_TO_PEER));
-                try!(packet.write_value(request));
+                packet.write_value(&CODE_CONNECT_TO_PEER)?;
+                packet.write_value(request)?;
             }
 
             ServerRequest::FileSearchRequest(ref request) => {
-                try!(packet.write_value(&CODE_FILE_SEARCH));
-                try!(packet.write_value(request));
+                packet.write_value(&CODE_FILE_SEARCH)?;
+                packet.write_value(request)?;
             }
 
             ServerRequest::LoginRequest(ref request) => {
-                try!(packet.write_value(&CODE_LOGIN));
-                try!(packet.write_value(request));
+                packet.write_value(&CODE_LOGIN)?;
+                packet.write_value(request)?;
             }
 
             ServerRequest::PeerAddressRequest(ref request) => {
-                try!(packet.write_value(&CODE_PEER_ADDRESS));
-                try!(packet.write_value(request));
+                packet.write_value(&CODE_PEER_ADDRESS)?;
+                packet.write_value(request)?;
             }
 
             ServerRequest::RoomJoinRequest(ref request) => {
-                try!(packet.write_value(&CODE_ROOM_JOIN));
-                try!(packet.write_value(request));
+                packet.write_value(&CODE_ROOM_JOIN)?;
+                packet.write_value(request)?;
             }
 
             ServerRequest::RoomLeaveRequest(ref request) => {
-                try!(packet.write_value(&CODE_ROOM_LEAVE));
-                try!(packet.write_value(request));
+                packet.write_value(&CODE_ROOM_LEAVE)?;
+                packet.write_value(request)?;
             }
 
             ServerRequest::RoomListRequest => {
-                try!(packet.write_value(&CODE_ROOM_LIST));
+                packet.write_value(&CODE_ROOM_LIST)?;
             }
 
             ServerRequest::RoomMessageRequest(ref request) => {
-                try!(packet.write_value(&CODE_ROOM_MESSAGE));
-                try!(packet.write_value(request));
+                packet.write_value(&CODE_ROOM_MESSAGE)?;
+                packet.write_value(request)?;
             }
 
             ServerRequest::SetListenPortRequest(ref request) => {
-                try!(packet.write_value(&CODE_SET_LISTEN_PORT));
-                try!(packet.write_value(request));
+                packet.write_value(&CODE_SET_LISTEN_PORT)?;
+                packet.write_value(request)?;
             }
 
             ServerRequest::UserStatusRequest(ref request) => {
-                try!(packet.write_value(&CODE_USER_STATUS));
-                try!(packet.write_value(request));
+                packet.write_value(&CODE_USER_STATUS)?;
+                packet.write_value(request)?;
             }
         }
         Ok(())
@@ -216,8 +216,8 @@ pub struct CannotConnectRequest {
 
 impl WriteToPacket for CannotConnectRequest {
     fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
-        try!(packet.write_value(&self.token));
-        try!(packet.write_value(&self.user_name));
+        packet.write_value(&self.token)?;
+        packet.write_value(&self.user_name)?;
         Ok(())
     }
 }
@@ -250,9 +250,9 @@ pub struct ConnectToPeerRequest {
 
 impl WriteToPacket for ConnectToPeerRequest {
     fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
-        try!(packet.write_value(&self.token));
-        try!(packet.write_value(&self.user_name));
-        try!(packet.write_value(&self.connection_type));
+        packet.write_value(&self.token)?;
+        packet.write_value(&self.user_name)?;
+        packet.write_value(&self.connection_type)?;
         Ok(())
     }
 }
@@ -290,8 +290,8 @@ pub struct FileSearchRequest {
 
 impl WriteToPacket for FileSearchRequest {
     fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
-        try!(packet.write_value(&self.ticket));
-        try!(packet.write_value(&self.query));
+        packet.write_value(&self.ticket)?;
+        packet.write_value(&self.query)?;
         Ok(())
     }
 }
@@ -356,11 +356,11 @@ impl LoginRequest {
 
 impl WriteToPacket for LoginRequest {
     fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
-        try!(packet.write_value(&self.username));
-        try!(packet.write_value(&self.password));
-        try!(packet.write_value(&self.major));
-        try!(packet.write_value(&self.digest));
-        try!(packet.write_value(&self.minor));
+        packet.write_value(&self.username)?;
+        packet.write_value(&self.password)?;
+        packet.write_value(&self.major)?;
+        packet.write_value(&self.digest)?;
+        packet.write_value(&self.minor)?;
         Ok(())
     }
 }
@@ -403,7 +403,7 @@ pub struct PeerAddressRequest {
 
 impl WriteToPacket for PeerAddressRequest {
     fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
-        try!(packet.write_value(&self.username));
+        packet.write_value(&self.username)?;
         Ok(())
     }
 }
@@ -432,7 +432,7 @@ pub struct RoomJoinRequest {
 
 impl WriteToPacket for RoomJoinRequest {
     fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
-        try!(packet.write_value(&self.room_name));
+        packet.write_value(&self.room_name)?;
         Ok(())
     }
 }
@@ -463,7 +463,7 @@ pub struct RoomLeaveRequest {
 
 impl WriteToPacket for RoomLeaveRequest {
     fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
-        try!(packet.write_value(&self.room_name));
+        packet.write_value(&self.room_name)?;
         Ok(())
     }
 }
@@ -495,8 +495,8 @@ pub struct RoomMessageRequest {
 
 impl WriteToPacket for RoomMessageRequest {
     fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
-        try!(packet.write_value(&self.room_name));
-        try!(packet.write_value(&self.message));
+        packet.write_value(&self.room_name)?;
+        packet.write_value(&self.message)?;
         Ok(())
     }
 }
@@ -527,7 +527,7 @@ pub struct SetListenPortRequest {
 
 impl WriteToPacket for SetListenPortRequest {
     fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
-        try!(packet.write_value(&self.port));
+        packet.write_value(&self.port)?;
         Ok(())
     }
 }
@@ -556,7 +556,7 @@ pub struct UserStatusRequest {
 
 impl WriteToPacket for UserStatusRequest {
     fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
-        try!(packet.write_value(&self.user_name));
+        packet.write_value(&self.user_name)?;
         Ok(())
     }
 }
@@ -586,8 +586,8 @@ mod tests {
 
     use bytes::BytesMut;
 
-    use proto::base_codec::tests::{expect_io_error, roundtrip};
-    use proto::ProtoDecoder;
+    use crate::proto::base_codec::tests::{expect_io_error, roundtrip};
+    use crate::proto::ProtoDecoder;
 
     use super::*;
 

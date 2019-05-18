@@ -123,7 +123,7 @@ mod tests {
     use bytes::BytesMut;
     use tokio_codec::{Decoder, Encoder};
 
-    use proto::ProtoEncode;
+    use crate::proto::ProtoEncode;
 
     use super::{LengthPrefixedDecoder, LengthPrefixedEncoder};
 

@@ -1,7 +1,7 @@
 use std::io;
 
-use proto::peer::constants::*;
-use proto::{
+use crate::proto::peer::constants::*;
+use crate::proto::{
     MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder, ReadFromPacket,
     WriteToPacket,
 };
@@ -20,11 +20,11 @@ pub enum Message {
 
 impl ReadFromPacket for Message {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let code: u32 = try!(packet.read_value());
+        let code: u32 = packet.read_value()?;
         let message = match code {
-            CODE_PIERCE_FIREWALL => Message::PierceFirewall(try!(packet.read_value())),
+            CODE_PIERCE_FIREWALL => Message::PierceFirewall(packet.read_value()?),
 
-            CODE_PEER_INIT => Message::PeerInit(try!(packet.read_value())),
+            CODE_PEER_INIT => Message::PeerInit(packet.read_value()?),
 
             code => Message::Unknown(code),
         };
@@ -85,13 +85,13 @@ impl WriteToPacket for Message {
     fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
         match *self {
             Message::PierceFirewall(ref token) => {
-                try!(packet.write_value(&CODE_PIERCE_FIREWALL));
-                try!(packet.write_value(token));
+                packet.write_value(&CODE_PIERCE_FIREWALL)?;
+                packet.write_value(token)?;
             }
 
             Message::PeerInit(ref request) => {
-                try!(packet.write_value(&CODE_PEER_INIT));
-                try!(packet.write_value(request));
+                packet.write_value(&CODE_PEER_INIT)?;
+                packet.write_value(request)?;
             }
 
             Message::Unknown(_) => unreachable!(),
@@ -109,9 +109,9 @@ pub struct PeerInit {
 
 impl ReadFromPacket for PeerInit {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let user_name = try!(packet.read_value());
-        let connection_type = try!(packet.read_value());
-        let token = try!(packet.read_value());
+        let user_name = packet.read_value()?;
+        let connection_type = packet.read_value()?;
+        let token = packet.read_value()?;
         Ok(PeerInit {
             user_name,
             connection_type,
@@ -122,9 +122,9 @@ impl ReadFromPacket for PeerInit {
 
 impl WriteToPacket for PeerInit {
     fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
-        try!(packet.write_value(&self.user_name));
-        try!(packet.write_value(&self.connection_type));
-        try!(packet.write_value(&self.token));
+        packet.write_value(&self.user_name)?;
+        packet.write_value(&self.connection_type)?;
+        packet.write_value(&self.token)?;
         Ok(())
     }
 }
@@ -157,8 +157,8 @@ mod tests {
 
     use bytes::BytesMut;
 
-    use proto::base_codec::tests::{expect_io_error, roundtrip};
-    use proto::ProtoDecoder;
+    use crate::proto::base_codec::tests::{expect_io_error, roundtrip};
+    use crate::proto::ProtoDecoder;
 
     use super::*;
 

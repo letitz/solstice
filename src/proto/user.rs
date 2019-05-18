@@ -1,6 +1,6 @@
 use std::io;
 
-use proto::{
+use crate::proto::{
     MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder, ReadFromPacket,
     WriteToPacket,
 };
@@ -22,7 +22,7 @@ pub enum UserStatus {
 
 impl ReadFromPacket for UserStatus {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let n: u32 = try!(packet.read_value());
+        let n: u32 = packet.read_value()?;
         match n {
             STATUS_OFFLINE => Ok(UserStatus::Offline),
             STATUS_AWAY => Ok(UserStatus::Away),
@@ -39,7 +39,7 @@ impl WriteToPacket for UserStatus {
             UserStatus::Away => STATUS_AWAY,
             UserStatus::Online => STATUS_ONLINE,
         };
-        try!(packet.write_value(&n));
+        packet.write_value(&n)?;
         Ok(())
     }
 }

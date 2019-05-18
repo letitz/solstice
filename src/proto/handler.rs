@@ -7,7 +7,7 @@ use std::sync::mpsc;
 use mio;
 use slab;
 
-use config;
+use crate::config;
 
 use super::peer;
 use super::server::*;
@@ -104,7 +104,7 @@ fn listener_bind<U>(addr_spec: U) -> io::Result<mio::tcp::TcpListener>
 where
     U: ToSocketAddrs + fmt::Debug,
 {
-    for socket_addr in try!(addr_spec.to_socket_addrs()) {
+    for socket_addr in addr_spec.to_socket_addrs()? {
         if let Ok(listener) = mio::tcp::TcpListener::bind(&socket_addr) {
             return Ok(listener);
         }
@@ -122,33 +122,33 @@ impl Handler {
     ) -> io::Result<Self> {
         let host = config::SERVER_HOST;
         let port = config::SERVER_PORT;
-        let server_stream = try!(Stream::new(
+        let server_stream = Stream::new(
             (host, port),
             ServerResponseSender(client_tx.clone()),
-        ));
+        )?;
 
         info!("Connected to server at {}:{}", host, port);
 
-        let listener = try!(listener_bind((config::LISTEN_HOST, config::LISTEN_PORT)));
+        let listener = listener_bind((config::LISTEN_HOST, config::LISTEN_PORT))?;
         info!(
             "Listening for connections on {}:{}",
             config::LISTEN_HOST,
             config::LISTEN_PORT
         );
 
-        try!(event_loop.register(
+        event_loop.register(
             server_stream.evented(),
             mio::Token(SERVER_TOKEN),
             mio::Ready::all(),
             mio::PollOpt::edge() | mio::PollOpt::oneshot(),
-        ));
+        )?;
 
-        try!(event_loop.register(
+        event_loop.register(
             &listener,
             mio::Token(LISTEN_TOKEN),
             mio::Ready::all(),
             mio::PollOpt::edge() | mio::PollOpt::oneshot(),
-        ));
+        )?;
 
         Ok(Handler {
             server_stream: server_stream,
@@ -171,7 +171,7 @@ impl Handler {
         let vacant_entry = match self.peer_streams.entry(peer_id) {
             None => return Err("id out of range".to_string()),
 
-            Some(slab::Entry::Occupied(occupied_entry)) => {
+            Some(slab::Entry::Occupied(_occupied_entry)) => {
                 return Err("id already taken".to_string())
             }
 
@@ -270,7 +270,7 @@ impl mio::deprecated::Handler for Handler {
                 if event_set.is_readable() {
                     // A peer wants to connect to us.
                     match self.listener.accept() {
-                        Ok((sock, addr)) => {
+                        Ok((_sock, addr)) => {
                             // TODO add it to peer streams
                             info!("Peer connection accepted from {}", addr);
                         }
@@ -351,10 +351,10 @@ pub struct Agent {
 impl Agent {
     pub fn new(client_tx: mpsc::Sender<Response>) -> io::Result<Self> {
         // Create the event loop.
-        let mut event_loop = try!(mio::deprecated::EventLoop::new());
+        let mut event_loop = mio::deprecated::EventLoop::new()?;
         // Create the handler for the event loop and register the handler's
         // sockets with the event loop.
-        let handler = try!(Handler::new(client_tx, &mut event_loop));
+        let handler = Handler::new(client_tx, &mut event_loop)?;
 
         Ok(Agent {
             event_loop: event_loop,

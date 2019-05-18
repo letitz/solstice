@@ -61,7 +61,7 @@ pub trait SendPacket {
     type Value: ReadFromPacket;
     type Error: error::Error;
 
-    fn send_packet(&mut self, Self::Value) -> Result<(), Self::Error>;
+    fn send_packet(&mut self, _: Self::Value) -> Result<(), Self::Error>;
 
     fn notify_open(&mut self) -> Result<(), Self::Error>;
 }
@@ -97,7 +97,7 @@ impl<T: SendPacket> Stream<T> {
     where
         U: ToSocketAddrs + fmt::Debug,
     {
-        for sock_addr in try!(addr_spec.to_socket_addrs()) {
+        for sock_addr in addr_spec.to_socket_addrs()? {
             if let Ok(stream) = mio::tcp::TcpStream::connect(&sock_addr) {
                 return Ok(Stream {
                     parser: Parser::new(),
@@ -148,7 +148,7 @@ impl<T: SendPacket> Stream<T> {
                 None => break,
             };
 
-            let option = try!(outbuf.try_write_to(&mut self.stream));
+            let option = outbuf.try_write_to(&mut self.stream)?;
             match option {
                 Some(_) => {
                     if outbuf.has_remaining() {

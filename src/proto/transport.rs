@@ -5,8 +5,8 @@ use bytes::BytesMut;
 use tokio_io::codec::length_delimited::{Builder, Framed};
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use proto::peer;
-use proto::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder, ServerRequest, ServerResponse};
+use crate::proto::peer;
+use crate::proto::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder, ServerRequest, ServerResponse};
 
 fn decode_frame<'a, T>(frame_type: &str, bytes: &'a mut BytesMut) -> io::Result<T>
 where

@@ -1,9 +1,9 @@
 use std::io;
 use std::net;
 
-use proto::packet::{Packet, PacketReadError, ReadFromPacket};
-use proto::server::constants::*;
-use proto::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder, User, UserStatus};
+use crate::proto::packet::{Packet, PacketReadError, ReadFromPacket};
+use crate::proto::server::constants::*;
+use crate::proto::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder, User, UserStatus};
 
 /*=================*
  * SERVER RESPONSE *
@@ -36,52 +36,52 @@ pub enum ServerResponse {
 
 impl ReadFromPacket for ServerResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let code: u32 = try!(packet.read_value());
+        let code: u32 = packet.read_value()?;
         let resp = match code {
             CODE_CONNECT_TO_PEER => {
-                ServerResponse::ConnectToPeerResponse(try!(packet.read_value()))
+                ServerResponse::ConnectToPeerResponse(packet.read_value()?)
             }
 
-            CODE_FILE_SEARCH => ServerResponse::FileSearchResponse(try!(packet.read_value())),
+            CODE_FILE_SEARCH => ServerResponse::FileSearchResponse(packet.read_value()?),
 
-            CODE_LOGIN => ServerResponse::LoginResponse(try!(packet.read_value())),
+            CODE_LOGIN => ServerResponse::LoginResponse(packet.read_value()?),
 
-            CODE_PEER_ADDRESS => ServerResponse::PeerAddressResponse(try!(packet.read_value())),
+            CODE_PEER_ADDRESS => ServerResponse::PeerAddressResponse(packet.read_value()?),
 
             CODE_PRIVILEGED_USERS => {
-                ServerResponse::PrivilegedUsersResponse(try!(packet.read_value()))
+                ServerResponse::PrivilegedUsersResponse(packet.read_value()?)
             }
 
-            CODE_ROOM_JOIN => ServerResponse::RoomJoinResponse(try!(packet.read_value())),
+            CODE_ROOM_JOIN => ServerResponse::RoomJoinResponse(packet.read_value()?),
 
-            CODE_ROOM_LEAVE => ServerResponse::RoomLeaveResponse(try!(packet.read_value())),
+            CODE_ROOM_LEAVE => ServerResponse::RoomLeaveResponse(packet.read_value()?),
 
-            CODE_ROOM_LIST => ServerResponse::RoomListResponse(try!(packet.read_value())),
+            CODE_ROOM_LIST => ServerResponse::RoomListResponse(packet.read_value()?),
 
-            CODE_ROOM_MESSAGE => ServerResponse::RoomMessageResponse(try!(packet.read_value())),
+            CODE_ROOM_MESSAGE => ServerResponse::RoomMessageResponse(packet.read_value()?),
 
-            CODE_ROOM_TICKERS => ServerResponse::RoomTickersResponse(try!(packet.read_value())),
+            CODE_ROOM_TICKERS => ServerResponse::RoomTickersResponse(packet.read_value()?),
 
             CODE_ROOM_USER_JOINED => {
-                ServerResponse::RoomUserJoinedResponse(try!(packet.read_value()))
+                ServerResponse::RoomUserJoinedResponse(packet.read_value()?)
             }
 
-            CODE_ROOM_USER_LEFT => ServerResponse::RoomUserLeftResponse(try!(packet.read_value())),
+            CODE_ROOM_USER_LEFT => ServerResponse::RoomUserLeftResponse(packet.read_value()?),
 
-            CODE_USER_INFO => ServerResponse::UserInfoResponse(try!(packet.read_value())),
+            CODE_USER_INFO => ServerResponse::UserInfoResponse(packet.read_value()?),
 
-            CODE_USER_STATUS => ServerResponse::UserStatusResponse(try!(packet.read_value())),
+            CODE_USER_STATUS => ServerResponse::UserStatusResponse(packet.read_value()?),
 
             CODE_WISHLIST_INTERVAL => {
-                ServerResponse::WishlistIntervalResponse(try!(packet.read_value()))
+                ServerResponse::WishlistIntervalResponse(packet.read_value()?)
             }
 
             CODE_PARENT_MIN_SPEED => {
-                ServerResponse::ParentMinSpeedResponse(try!(packet.read_value()))
+                ServerResponse::ParentMinSpeedResponse(packet.read_value()?)
             }
 
             CODE_PARENT_SPEED_RATIO => {
-                ServerResponse::ParentSpeedRatioResponse(try!(packet.read_value()))
+                ServerResponse::ParentSpeedRatioResponse(packet.read_value()?)
             }
 
             code => ServerResponse::UnknownResponse(code),
@@ -275,12 +275,12 @@ pub struct ConnectToPeerResponse {
 
 impl ReadFromPacket for ConnectToPeerResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let user_name = try!(packet.read_value());
-        let connection_type = try!(packet.read_value());
-        let ip = try!(packet.read_value());
-        let port = try!(packet.read_value());
-        let token = try!(packet.read_value());
-        let is_privileged = try!(packet.read_value());
+        let user_name = packet.read_value()?;
+        let connection_type = packet.read_value()?;
+        let ip = packet.read_value()?;
+        let port = packet.read_value()?;
+        let token = packet.read_value()?;
+        let is_privileged = packet.read_value()?;
 
         Ok(ConnectToPeerResponse {
             user_name,
@@ -337,9 +337,9 @@ pub struct FileSearchResponse {
 
 impl ReadFromPacket for FileSearchResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let user_name = try!(packet.read_value());
-        let ticket = try!(packet.read_value());
-        let query = try!(packet.read_value());
+        let user_name = packet.read_value()?;
+        let ticket = packet.read_value()?;
+        let query = packet.read_value()?;
 
         Ok(FileSearchResponse {
             user_name,
@@ -389,10 +389,10 @@ pub enum LoginResponse {
 
 impl ReadFromPacket for LoginResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let ok = try!(packet.read_value());
+        let ok = packet.read_value()?;
         if ok {
-            let motd = try!(packet.read_value());
-            let ip = try!(packet.read_value());
+            let motd = packet.read_value()?;
+            let ip = packet.read_value()?;
 
             match packet.read_value::<bool>() {
                 Ok(value) => debug!("LoginResponse last field: {}", value),
@@ -406,7 +406,7 @@ impl ReadFromPacket for LoginResponse {
             })
         } else {
             Ok(LoginResponse::LoginFail {
-                reason: try!(packet.read_value()),
+                reason: packet.read_value()?,
             })
         }
     }
@@ -469,7 +469,7 @@ pub struct ParentMinSpeedResponse {
 
 impl ReadFromPacket for ParentMinSpeedResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let value = try!(packet.read_value());
+        let value = packet.read_value()?;
         Ok(ParentMinSpeedResponse { value })
     }
 }
@@ -498,7 +498,7 @@ pub struct ParentSpeedRatioResponse {
 
 impl ReadFromPacket for ParentSpeedRatioResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let value = try!(packet.read_value());
+        let value = packet.read_value()?;
         Ok(ParentSpeedRatioResponse { value })
     }
 }
@@ -529,9 +529,9 @@ pub struct PeerAddressResponse {
 
 impl ReadFromPacket for PeerAddressResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let username = try!(packet.read_value());
-        let ip = try!(packet.read_value());
-        let port = try!(packet.read_value());
+        let username = packet.read_value()?;
+        let ip = packet.read_value()?;
+        let port = packet.read_value()?;
 
         Ok(PeerAddressResponse { username, ip, port })
     }
@@ -565,7 +565,7 @@ pub struct PrivilegedUsersResponse {
 
 impl ReadFromPacket for PrivilegedUsersResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let users = try!(packet.read_value());
+        let users = packet.read_value()?;
         Ok(PrivilegedUsersResponse { users })
     }
 }
@@ -598,15 +598,15 @@ pub struct RoomJoinResponse {
 impl ReadFromPacket for RoomJoinResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
         let mut response = RoomJoinResponse {
-            room_name: try!(packet.read_value()),
+            room_name: packet.read_value()?,
             users: Vec::new(),
             owner: None,
             operators: Vec::new(),
         };
 
-        let num_users: usize = try!(packet.read_value());
+        let num_users: usize = packet.read_value()?;
         for _ in 0..num_users {
-            let name: String = try!(packet.read_value());
+            let name: String = packet.read_value()?;
             let user = User {
                 name,
                 status: UserStatus::Offline,
@@ -621,14 +621,14 @@ impl ReadFromPacket for RoomJoinResponse {
             response.users.push(user);
         }
 
-        try!(response.read_user_infos(packet));
+        response.read_user_infos(packet)?;
 
         if packet.bytes_remaining() > 0 {
-            response.owner = Some(try!(packet.read_value()));
+            response.owner = Some(packet.read_value()?);
 
-            let num_operators: usize = try!(packet.read_value());
+            let num_operators: usize = packet.read_value()?;
             for _ in 0..num_operators {
-                response.operators.push(try!(packet.read_value()));
+                response.operators.push(packet.read_value()?);
             }
         }
 
@@ -638,35 +638,35 @@ impl ReadFromPacket for RoomJoinResponse {
 
 impl RoomJoinResponse {
     fn read_user_infos(&mut self, packet: &mut Packet) -> Result<(), PacketReadError> {
-        let num_statuses: usize = try!(packet.read_value());
+        let num_statuses: usize = packet.read_value()?;
         for i in 0..num_statuses {
             if let Some(user) = self.users.get_mut(i) {
-                user.status = try!(packet.read_value());
+                user.status = packet.read_value()?;
             }
         }
 
-        let num_infos: usize = try!(packet.read_value());
+        let num_infos: usize = packet.read_value()?;
         for i in 0..num_infos {
             if let Some(user) = self.users.get_mut(i) {
-                user.average_speed = try!(packet.read_value());
-                user.num_downloads = try!(packet.read_value());
-                user.unknown = try!(packet.read_value());
-                user.num_files = try!(packet.read_value());
-                user.num_folders = try!(packet.read_value());
+                user.average_speed = packet.read_value()?;
+                user.num_downloads = packet.read_value()?;
+                user.unknown = packet.read_value()?;
+                user.num_files = packet.read_value()?;
+                user.num_folders = packet.read_value()?;
             }
         }
 
-        let num_free_slots: usize = try!(packet.read_value());
+        let num_free_slots: usize = packet.read_value()?;
         for i in 0..num_free_slots {
             if let Some(user) = self.users.get_mut(i) {
-                user.num_free_slots = try!(packet.read_value());
+                user.num_free_slots = packet.read_value()?;
             }
         }
 
-        let num_countries: usize = try!(packet.read_value());
+        let num_countries: usize = packet.read_value()?;
         for i in 0..num_countries {
             if let Some(user) = self.users.get_mut(i) {
-                user.country = try!(packet.read_value());
+                user.country = packet.read_value()?;
             }
         }
 
@@ -861,7 +861,7 @@ pub struct RoomLeaveResponse {
 impl ReadFromPacket for RoomLeaveResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
         Ok(RoomLeaveResponse {
-            room_name: try!(packet.read_value()),
+            room_name: packet.read_value()?,
         })
     }
 }
@@ -893,10 +893,10 @@ pub struct RoomListResponse {
 
 impl ReadFromPacket for RoomListResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let rooms = try!(Self::read_rooms(packet));
-        let owned_private_rooms = try!(Self::read_rooms(packet));
-        let other_private_rooms = try!(Self::read_rooms(packet));
-        let operated_private_room_names = try!(packet.read_value());
+        let rooms = Self::read_rooms(packet)?;
+        let owned_private_rooms = Self::read_rooms(packet)?;
+        let other_private_rooms = Self::read_rooms(packet)?;
+        let operated_private_room_names = packet.read_value()?;
         Ok(RoomListResponse {
             rooms,
             owned_private_rooms,
@@ -908,17 +908,17 @@ impl ReadFromPacket for RoomListResponse {
 
 impl RoomListResponse {
     fn read_rooms(packet: &mut Packet) -> Result<Vec<(String, u32)>, PacketReadError> {
-        let num_rooms: usize = try!(packet.read_value());
+        let num_rooms: usize = packet.read_value()?;
         let mut rooms = Vec::new();
         for _ in 0..num_rooms {
-            let room_name = try!(packet.read_value());
+            let room_name = packet.read_value()?;
             rooms.push((room_name, 0));
         }
 
-        let num_user_counts: usize = try!(packet.read_value());
+        let num_user_counts: usize = packet.read_value()?;
         for i in 0..num_user_counts {
             if let Some(&mut (_, ref mut count)) = rooms.get_mut(i) {
-                *count = try!(packet.read_value());
+                *count = packet.read_value()?;
             }
         }
 
@@ -1019,9 +1019,9 @@ pub struct RoomMessageResponse {
 
 impl ReadFromPacket for RoomMessageResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let room_name = try!(packet.read_value());
-        let user_name = try!(packet.read_value());
-        let message = try!(packet.read_value());
+        let room_name = packet.read_value()?;
+        let user_name = packet.read_value()?;
+        let message = packet.read_value()?;
         Ok(RoomMessageResponse {
             room_name,
             user_name,
@@ -1063,13 +1063,13 @@ pub struct RoomTickersResponse {
 
 impl ReadFromPacket for RoomTickersResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let room_name = try!(packet.read_value());
+        let room_name = packet.read_value()?;
 
-        let num_tickers: usize = try!(packet.read_value());
+        let num_tickers: usize = packet.read_value()?;
         let mut tickers = Vec::new();
         for _ in 0..num_tickers {
-            let user_name = try!(packet.read_value());
-            let message = try!(packet.read_value());
+            let user_name = packet.read_value()?;
+            let message = packet.read_value()?;
             tickers.push((user_name, message))
         }
 
@@ -1104,19 +1104,19 @@ pub struct RoomUserJoinedResponse {
 
 impl ReadFromPacket for RoomUserJoinedResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let room_name = try!(packet.read_value());
-        let user_name = try!(packet.read_value());
+        let room_name = packet.read_value()?;
+        let user_name = packet.read_value()?;
 
-        let status = try!(packet.read_value());
+        let status = packet.read_value()?;
 
-        let average_speed = try!(packet.read_value());
-        let num_downloads = try!(packet.read_value());
-        let unknown = try!(packet.read_value());
-        let num_files = try!(packet.read_value());
-        let num_folders = try!(packet.read_value());
-        let num_free_slots = try!(packet.read_value());
+        let average_speed = packet.read_value()?;
+        let num_downloads = packet.read_value()?;
+        let unknown = packet.read_value()?;
+        let num_files = packet.read_value()?;
+        let num_folders = packet.read_value()?;
+        let num_free_slots = packet.read_value()?;
 
-        let country = try!(packet.read_value());
+        let country = packet.read_value()?;
 
         Ok(RoomUserJoinedResponse {
             room_name,
@@ -1173,8 +1173,8 @@ pub struct RoomUserLeftResponse {
 
 impl ReadFromPacket for RoomUserLeftResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let room_name = try!(packet.read_value());
-        let user_name = try!(packet.read_value());
+        let room_name = packet.read_value()?;
+        let user_name = packet.read_value()?;
         Ok(RoomUserLeftResponse {
             room_name,
             user_name,
@@ -1215,11 +1215,11 @@ pub struct UserInfoResponse {
 
 impl ReadFromPacket for UserInfoResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let user_name = try!(packet.read_value());
-        let average_speed = try!(packet.read_value());
-        let num_downloads = try!(packet.read_value());
-        let num_files = try!(packet.read_value());
-        let num_folders = try!(packet.read_value());
+        let user_name = packet.read_value()?;
+        let average_speed = packet.read_value()?;
+        let num_downloads = packet.read_value()?;
+        let num_files = packet.read_value()?;
+        let num_folders = packet.read_value()?;
         Ok(UserInfoResponse {
             user_name,
             average_speed,
@@ -1270,9 +1270,9 @@ pub struct UserStatusResponse {
 
 impl ReadFromPacket for UserStatusResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let user_name = try!(packet.read_value());
-        let status = try!(packet.read_value());
-        let is_privileged = try!(packet.read_value());
+        let user_name = packet.read_value()?;
+        let status = packet.read_value()?;
+        let is_privileged = packet.read_value()?;
         Ok(UserStatusResponse {
             user_name,
             status,
@@ -1313,7 +1313,7 @@ pub struct WishlistIntervalResponse {
 
 impl ReadFromPacket for WishlistIntervalResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let seconds = try!(packet.read_value());
+        let seconds = packet.read_value()?;
         Ok(WishlistIntervalResponse { seconds })
     }
 }
@@ -1342,8 +1342,8 @@ mod tests {
 
     use bytes::BytesMut;
 
-    use proto::base_codec::tests::{expect_io_error, roundtrip};
-    use proto::ProtoDecoder;
+    use crate::proto::base_codec::tests::{expect_io_error, roundtrip};
+    use crate::proto::ProtoDecoder;
 
     use super::*;
 

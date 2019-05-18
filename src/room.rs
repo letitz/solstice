@@ -3,7 +3,7 @@ use std::error;
 use std::fmt;
 use std::mem;
 
-use proto::{server, User};
+use crate::proto::{server, User};
 
 /// This enumeration is the list of possible membership states for a chat room.
 #[derive(Clone, Copy, Debug, RustcDecodable, RustcEncodable)]
@@ -211,7 +211,7 @@ impl RoomMap {
     /// If the room is not found, or if its membership is not `NonMember`,
     /// returns an error.
     pub fn start_joining(&mut self, room_name: &str) -> Result<(), Error> {
-        let room = try!(self.get_mut_strict(room_name));
+        let room = self.get_mut_strict(room_name)?;
 
         match room.membership {
             Membership::NonMember => {
@@ -236,7 +236,7 @@ impl RoomMap {
         members: &[User],
     ) -> Result<(), Error> {
         // First look up the room struct.
-        let room = try!(self.get_mut_strict(room_name));
+        let room = self.get_mut_strict(room_name)?;
 
         // Log what's happening.
         if let Membership::Joining = room.membership {
@@ -270,7 +270,7 @@ impl RoomMap {
     /// If the room is not found, or if its membership status is not `Member`,
     /// returns an error.
     pub fn start_leaving(&mut self, room_name: &str) -> Result<(), Error> {
-        let room = try!(self.get_mut_strict(room_name));
+        let room = self.get_mut_strict(room_name)?;
 
         match room.membership {
             Membership::Member => {
@@ -287,7 +287,7 @@ impl RoomMap {
 
     /// Records that we have now left the given room.
     pub fn leave(&mut self, room_name: &str) -> Result<(), Error> {
-        let room = try!(self.get_mut_strict(room_name));
+        let room = self.get_mut_strict(room_name)?;
 
         match room.membership {
             Membership::Leaving => info!("Left room {:?}", room_name),
@@ -304,7 +304,7 @@ impl RoomMap {
 
     /// Saves the given message as the last one in the given room.
     pub fn add_message(&mut self, room_name: &str, message: Message) -> Result<(), Error> {
-        let room = try!(self.get_mut_strict(room_name));
+        let room = self.get_mut_strict(room_name)?;
         room.messages.push(message);
         Ok(())
     }
@@ -312,7 +312,7 @@ impl RoomMap {
     /// Inserts the given user in the given room's set of members.
     /// Returns an error if the room is not found.
     pub fn insert_member(&mut self, room_name: &str, user_name: String) -> Result<(), Error> {
-        let room = try!(self.get_mut_strict(room_name));
+        let room = self.get_mut_strict(room_name)?;
         room.members.insert(user_name);
         Ok(())
     }
@@ -320,7 +320,7 @@ impl RoomMap {
     /// Removes the given user from the given room's set of members.
     /// Returns an error if the room is not found.
     pub fn remove_member(&mut self, room_name: &str, user_name: &str) -> Result<(), Error> {
-        let room = try!(self.get_mut_strict(room_name));
+        let room = self.get_mut_strict(room_name)?;
         room.members.remove(user_name);
         Ok(())
     }
@@ -334,7 +334,7 @@ impl RoomMap {
         room_name: &str,
         tickers: Vec<(String, String)>,
     ) -> Result<(), Error> {
-        let room = try!(self.get_mut_strict(room_name));
+        let room = self.get_mut_strict(room_name)?;
         room.tickers = tickers;
         Ok(())
     }

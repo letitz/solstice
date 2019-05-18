@@ -4,13 +4,13 @@ use std::sync::mpsc;
 use mio;
 use slab;
 
-use config;
-use control;
-use proto;
-use proto::peer;
-use proto::server;
-use room;
-use user;
+use crate::config;
+use crate::control;
+use crate::proto;
+use crate::proto::peer;
+use crate::proto::server;
+use crate::room;
+use crate::user;
 
 #[derive(Debug)]
 enum IncomingMessage {

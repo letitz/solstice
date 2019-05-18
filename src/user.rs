@@ -2,7 +2,7 @@ use std::collections;
 use std::error;
 use std::fmt;
 
-use proto::{User, UserStatus};
+use crate::proto::{User, UserStatus};
 
 /// The error returned when a user name was not found in the user map.
 #[derive(Debug)]

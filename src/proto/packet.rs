@@ -28,7 +28,7 @@ impl io::Read for Packet {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let bytes_read = {
             let mut slice = &self.bytes[self.cursor..];
-            try!(slice.read(buf))
+            slice.read(buf)?
         };
         self.cursor += bytes_read;
         Ok(bytes_read)
@@ -179,27 +179,27 @@ impl From<io::Error> for PacketReadError {
 /// This trait is implemented by types that can be deserialized from binary
 /// Packets.
 pub trait ReadFromPacket: Sized {
-    fn read_from_packet(&mut Packet) -> Result<Self, PacketReadError>;
+    fn read_from_packet(_: &mut Packet) -> Result<Self, PacketReadError>;
 }
 
 /// 32-bit integers are serialized in 4 bytes, little-endian.
 impl ReadFromPacket for u32 {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        Ok(try!(packet.read_u32::<LittleEndian>()))
+        Ok(packet.read_u32::<LittleEndian>()?)
     }
 }
 
 /// For convenience, usize's are deserialized as u32's then casted.
 impl ReadFromPacket for usize {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        Ok(try!(u32::read_from_packet(packet)) as usize)
+        Ok(u32::read_from_packet(packet)? as usize)
     }
 }
 
 /// Booleans are serialized as single bytes, containing either 0 or 1.
 impl ReadFromPacket for bool {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        match try!(packet.read_u8()) {
+        match packet.read_u8()? {
             0 => Ok(false),
             1 => Ok(true),
             n => Err(PacketReadError::InvalidBoolError(n)),
@@ -210,7 +210,7 @@ impl ReadFromPacket for bool {
 /// 16-bit integers are serialized as 32-bit integers.
 impl ReadFromPacket for u16 {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let n = try!(u32::read_from_packet(packet));
+        let n = u32::read_from_packet(packet)?;
         if n > MAX_PORT {
             return Err(PacketReadError::InvalidU16Error(n));
         }
@@ -221,7 +221,7 @@ impl ReadFromPacket for u16 {
 /// IPv4 addresses are serialized directly as 32-bit integers.
 impl ReadFromPacket for net::Ipv4Addr {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let ip = try!(u32::read_from_packet(packet));
+        let ip = u32::read_from_packet(packet)?;
         Ok(net::Ipv4Addr::from(ip))
     }
 }
@@ -230,10 +230,10 @@ impl ReadFromPacket for net::Ipv4Addr {
 /// characters.
 impl ReadFromPacket for String {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let len = try!(usize::read_from_packet(packet));
+        let len = usize::read_from_packet(packet)?;
 
         let mut buffer = vec![0; len];
-        try!(packet.read_exact(&mut buffer));
+        packet.read_exact(&mut buffer)?;
 
         match ISO_8859_1.decode(&buffer, DecoderTrap::Strict) {
             Ok(string) => Ok(string),
@@ -245,11 +245,11 @@ impl ReadFromPacket for String {
 /// Vectors are serialized as length-prefixed arrays of values.
 impl<T: ReadFromPacket> ReadFromPacket for Vec<T> {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
-        let len = try!(usize::read_from_packet(packet));
+        let len = usize::read_from_packet(packet)?;
 
         let mut vec = Vec::new();
         for _ in 0..len {
-            vec.push(try!(T::read_from_packet(packet)));
+            vec.push(T::read_from_packet(packet)?);
         }
 
         Ok(vec)
@@ -263,7 +263,7 @@ impl<T: ReadFromPacket> ReadFromPacket for Vec<T> {
 /// This trait is implemented by types that can be serialized to a binary
 /// MutPacket.
 pub trait WriteToPacket {
-    fn write_to_packet(&self, &mut MutPacket) -> io::Result<()>;
+    fn write_to_packet(&self, _: &mut MutPacket) -> io::Result<()>;
 }
 
 /// 32-bit integers are serialized in 4 bytes, little-endian.
@@ -276,7 +276,7 @@ impl WriteToPacket for u32 {
 /// Booleans are serialized as single bytes, containing either 0 or 1.
 impl WriteToPacket for bool {
     fn write_to_packet(&self, packet: &mut MutPacket) -> io::Result<()> {
-        try!(packet.write_u8(*self as u8));
+        packet.write_u8(*self as u8)?;
         Ok(())
     }
 }
@@ -301,8 +301,8 @@ impl WriteToPacket for str {
             }
         };
         // Then write the bytes to the packet.
-        try!((bytes.len() as u32).write_to_packet(packet));
-        try!(packet.write(&bytes));
+        (bytes.len() as u32).write_to_packet(packet)?;
+        packet.write(&bytes)?;
         Ok(())
     }
 }
@@ -361,7 +361,7 @@ impl Parser {
         // Try to read as many bytes as we currently need from the underlying
         // byte stream.
         let offset = self.buffer.len() - self.num_bytes_left;
-        match try!(stream.try_read(&mut self.buffer[offset..])) {
+        match stream.try_read(&mut self.buffer[offset..])? {
             None => (),
 
             Some(num_bytes_read) => {

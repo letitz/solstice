@@ -5,7 +5,7 @@ use std::sync::mpsc;
 use rustc_serialize::json;
 use ws;
 
-use config;
+use crate::config;
 
 use super::request::*;
 use super::response::*;
@@ -82,8 +82,8 @@ pub struct Sender {
 impl Sender {
     /// Queues up a control response to be sent to the controller.
     pub fn send(&mut self, response: Response) -> Result<(), SendError> {
-        let encoded = try!(json::encode(&response));
-        try!(self.sender.send(encoded));
+        let encoded = json::encode(&response)?;
+        self.sender.send(encoded)?;
         Ok(())
     }
 }
