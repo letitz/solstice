@@ -197,7 +197,7 @@ impl ProtoDecode for ServerRequest {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     format!("unknown server request code: {}", code),
-                ))
+                ));
             }
         };
         Ok(request)

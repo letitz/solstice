@@ -3,9 +3,9 @@ use std::io;
 use std::net;
 use std::net::ToSocketAddrs;
 
+use crossbeam_channel;
 use mio;
 use slab;
-use crossbeam_channel;
 
 use crate::config;
 
@@ -122,10 +122,7 @@ impl Handler {
     ) -> io::Result<Self> {
         let host = config::SERVER_HOST;
         let port = config::SERVER_PORT;
-        let server_stream = Stream::new(
-            (host, port),
-            ServerResponseSender(client_tx.clone()),
-        )?;
+        let server_stream = Stream::new((host, port), ServerResponseSender(client_tx.clone()))?;
 
         info!("Connected to server at {}:{}", host, port);
 
@@ -172,7 +169,7 @@ impl Handler {
             None => return Err("id out of range".to_string()),
 
             Some(slab::Entry::Occupied(_occupied_entry)) => {
-                return Err("id already taken".to_string())
+                return Err("id already taken".to_string());
             }
 
             Some(slab::Entry::Vacant(vacant_entry)) => vacant_entry,
@@ -197,7 +194,8 @@ impl Handler {
                 mio::Token(peer_id),
                 mio::Ready::all(),
                 mio::PollOpt::edge() | mio::PollOpt::oneshot(),
-            ).unwrap();
+            )
+            .unwrap();
 
         vacant_entry.insert(peer_stream);
 
@@ -221,7 +219,8 @@ impl Handler {
                         mio::Token(SERVER_TOKEN),
                         event_set,
                         mio::PollOpt::edge() | mio::PollOpt::oneshot(),
-                    ).unwrap();
+                    )
+                    .unwrap();
             }
         }
     }
@@ -248,7 +247,8 @@ impl Handler {
                             token,
                             event_set,
                             mio::PollOpt::edge() | mio::PollOpt::oneshot(),
-                        ).unwrap();
+                        )
+                        .unwrap();
                 }
             }
         }
@@ -286,7 +286,8 @@ impl mio::deprecated::Handler for Handler {
                         token,
                         mio::Ready::all(),
                         mio::PollOpt::edge() | mio::PollOpt::oneshot(),
-                    ).unwrap();
+                    )
+                    .unwrap();
             }
 
             mio::Token(SERVER_TOKEN) => {

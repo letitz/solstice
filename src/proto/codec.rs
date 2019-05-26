@@ -140,7 +140,9 @@ mod tests {
     #[test]
     fn encode_u32() {
         let mut bytes = BytesMut::new();
-        LengthPrefixedEncoder::new().encode(U32_1337, &mut bytes).unwrap();
+        LengthPrefixedEncoder::new()
+            .encode(U32_1337, &mut bytes)
+            .unwrap();
 
         assert_eq!(
             bytes,
@@ -261,7 +263,9 @@ mod tests {
 
         let mut buffer = BytesMut::new();
 
-        LengthPrefixedEncoder::new().encode(value.clone(), &mut buffer).unwrap();
+        LengthPrefixedEncoder::new()
+            .encode(value.clone(), &mut buffer)
+            .unwrap();
         let decoded = LengthPrefixedDecoder::new().decode(&mut buffer).unwrap();
 
         assert_eq!(decoded, Some(value));

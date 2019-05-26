@@ -96,7 +96,8 @@ impl Client {
                 config::PASSWORD,
                 config::VER_MAJOR,
                 config::VER_MINOR,
-            ).unwrap(),
+            )
+            .unwrap(),
         ));
 
         self.send_to_server(server::ServerRequest::SetListenPortRequest(
@@ -354,7 +355,8 @@ impl Client {
                             user_name: peer.user_name.clone(),
                             connection_type: peer.connection_type.clone(),
                         }),
-                    )).unwrap();
+                    ))
+                    .unwrap();
             }
 
             PeerState::OpeningFirewalled => {
@@ -370,7 +372,8 @@ impl Client {
                             token: peer.token,
                             user_name: peer.user_name,
                         }),
-                    )).unwrap();
+                    ))
+                    .unwrap();
             }
         }
     }
@@ -517,7 +520,8 @@ impl Client {
                         peer_id,
                         response.ip,
                         response.port,
-                    )).unwrap();
+                    ))
+                    .unwrap();
             }
 
             Err(peer) => {

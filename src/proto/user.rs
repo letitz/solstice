@@ -1,8 +1,8 @@
 use std::io;
 
 use crate::proto::{
-    MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder, ReadFromPacket,
-    WriteToPacket,
+    MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder,
+    ReadFromPacket, WriteToPacket,
 };
 
 const STATUS_OFFLINE: u32 = 1;

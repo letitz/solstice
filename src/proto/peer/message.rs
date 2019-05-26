@@ -2,8 +2,8 @@ use std::io;
 
 use crate::proto::peer::constants::*;
 use crate::proto::{
-    MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder, ReadFromPacket,
-    WriteToPacket,
+    MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder,
+    ReadFromPacket, WriteToPacket,
 };
 
 /*=========*
@@ -57,7 +57,7 @@ impl ProtoDecode for Message {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     format!("unknown peer message code: {}", code),
-                ))
+                ));
             }
         };
         Ok(message)

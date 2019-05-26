@@ -69,7 +69,7 @@ pub trait ProtoDecode: Sized {
 impl<'a> ProtoDecoder<'a> {
     /// Wraps the given byte buffer.
     pub fn new(bytes: &'a BytesMut) -> Self {
-        Self{
+        Self {
             inner: io::Cursor::new(bytes),
         }
     }
@@ -176,8 +176,7 @@ impl ProtoDecode for String {
     }
 }
 
-impl<T: ProtoDecode, U: ProtoDecode> ProtoDecode for (T, U)
-{
+impl<T: ProtoDecode, U: ProtoDecode> ProtoDecode for (T, U) {
     fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
         let first = decoder.decode()?;
         let second = decoder.decode()?;
@@ -185,8 +184,7 @@ impl<T: ProtoDecode, U: ProtoDecode> ProtoDecode for (T, U)
     }
 }
 
-impl<T: ProtoDecode> ProtoDecode for Vec<T>
-{
+impl<T: ProtoDecode> ProtoDecode for Vec<T> {
     fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
         let len = decoder.decode_u32_generic("vector length")? as usize;
         let mut vec = Vec::with_capacity(len);
@@ -547,9 +545,7 @@ pub mod tests {
             let mut expected_bytes = vec![13];
             expected_bytes.extend(encoded_bytes);
 
-            ProtoEncoder::new(&mut bytes)
-                .encode(&(val as u16))
-                .unwrap();
+            ProtoEncoder::new(&mut bytes).encode(&(val as u16)).unwrap();
             assert_eq!(bytes, expected_bytes);
         }
     }

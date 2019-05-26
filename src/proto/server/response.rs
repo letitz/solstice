@@ -38,9 +38,7 @@ impl ReadFromPacket for ServerResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
         let code: u32 = packet.read_value()?;
         let resp = match code {
-            CODE_CONNECT_TO_PEER => {
-                ServerResponse::ConnectToPeerResponse(packet.read_value()?)
-            }
+            CODE_CONNECT_TO_PEER => ServerResponse::ConnectToPeerResponse(packet.read_value()?),
 
             CODE_FILE_SEARCH => ServerResponse::FileSearchResponse(packet.read_value()?),
 
@@ -48,9 +46,7 @@ impl ReadFromPacket for ServerResponse {
 
             CODE_PEER_ADDRESS => ServerResponse::PeerAddressResponse(packet.read_value()?),
 
-            CODE_PRIVILEGED_USERS => {
-                ServerResponse::PrivilegedUsersResponse(packet.read_value()?)
-            }
+            CODE_PRIVILEGED_USERS => ServerResponse::PrivilegedUsersResponse(packet.read_value()?),
 
             CODE_ROOM_JOIN => ServerResponse::RoomJoinResponse(packet.read_value()?),
 
@@ -62,9 +58,7 @@ impl ReadFromPacket for ServerResponse {
 
             CODE_ROOM_TICKERS => ServerResponse::RoomTickersResponse(packet.read_value()?),
 
-            CODE_ROOM_USER_JOINED => {
-                ServerResponse::RoomUserJoinedResponse(packet.read_value()?)
-            }
+            CODE_ROOM_USER_JOINED => ServerResponse::RoomUserJoinedResponse(packet.read_value()?),
 
             CODE_ROOM_USER_LEFT => ServerResponse::RoomUserLeftResponse(packet.read_value()?),
 
@@ -76,9 +70,7 @@ impl ReadFromPacket for ServerResponse {
                 ServerResponse::WishlistIntervalResponse(packet.read_value()?)
             }
 
-            CODE_PARENT_MIN_SPEED => {
-                ServerResponse::ParentMinSpeedResponse(packet.read_value()?)
-            }
+            CODE_PARENT_MIN_SPEED => ServerResponse::ParentMinSpeedResponse(packet.read_value()?),
 
             CODE_PARENT_SPEED_RATIO => {
                 ServerResponse::ParentSpeedRatioResponse(packet.read_value()?)
