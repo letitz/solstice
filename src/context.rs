@@ -13,6 +13,7 @@ pub struct Context {
 }
 
 impl Context {
+    /// Creates a new empty context.
     pub fn new() -> Self {
         Self {
             rooms: Mutex::new(RoomMap::new()),

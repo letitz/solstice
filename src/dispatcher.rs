@@ -3,7 +3,7 @@
 use std::io;
 
 use crate::context::Context;
-use crate::executor::Execute;
+use crate::executor::Job;
 use crate::message_handler::MessageHandler;
 use crate::proto::server::ServerResponse;
 
@@ -25,8 +25,8 @@ impl<M, H> DispatchedMessage<M, H> {
     }
 }
 
-impl<M, H: MessageHandler<M>> Execute for DispatchedMessage<M, H> {
-    fn execute(self, context: &Context) -> io::Result<()> {
+impl<M: Send, H: MessageHandler<M> + Send> Job for DispatchedMessage<M, H> {
+    fn execute(self: Box<Self>, context: &Context) -> io::Result<()> {
         self.handler.run(context, self.message)
     }
 }
@@ -38,7 +38,7 @@ impl Dispatcher {
         Self {}
     }
 
-    fn dispatch(message: Message) -> Box<dyn Execute> {
+    fn dispatch(message: Message) -> Box<dyn Job> {
         panic!("Unimplemented")
     }
 }
