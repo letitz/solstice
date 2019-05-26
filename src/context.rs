@@ -7,6 +7,8 @@ use crate::room::RoomMap;
 use crate::user::UserMap;
 
 /// Contains all the different bits of client state.
+///
+/// Implements `Sync`.
 pub struct Context {
     pub rooms: Mutex<RoomMap>,
     pub users: Mutex<UserMap>,
@@ -19,5 +21,25 @@ impl Context {
             rooms: Mutex::new(RoomMap::new()),
             users: Mutex::new(UserMap::new()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::thread;
+    use std::sync::Arc;
+
+    use super::Context;
+
+    #[test]
+    fn new_context_is_empty() {
+        let context = Context::new();
+        assert_eq!(context.rooms.lock().get_room_list(), vec![]);
+        assert_eq!(context.users.lock().get_list(), vec![]);
+    }
+
+    #[test]
+    fn context_is_sync() {
+        let sync: &dyn Sync = &Context::new();
     }
 }

@@ -6,7 +6,7 @@ use std::mem;
 use crate::proto::{server, User};
 
 /// This enumeration is the list of possible membership states for a chat room.
-#[derive(Clone, Copy, Debug, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
 pub enum Membership {
     /// The user is not a member of this room.
     NonMember,
@@ -22,7 +22,7 @@ pub enum Membership {
 
 /// This enumeration is the list of visibility types for rooms that the user is
 /// a member of.
-#[derive(Clone, Copy, Debug, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
 pub enum Visibility {
     /// This room is visible to any user.
     Public,
@@ -33,7 +33,7 @@ pub enum Visibility {
 }
 
 /// This structure contains a chat room message.
-#[derive(Clone, Debug, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
 pub struct Message {
     pub user_name: String,
     pub message: String,
@@ -42,7 +42,7 @@ pub struct Message {
 /// This structure contains the last known information about a chat room.
 /// It does not store the name, as that is stored implicitly as the key in the
 /// room hash table.
-#[derive(Clone, Debug, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
 pub struct Room {
     /// The membership state of the user for the room.
     pub membership: Membership,
