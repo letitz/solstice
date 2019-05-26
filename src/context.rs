@@ -9,6 +9,7 @@ use crate::user::UserMap;
 /// Contains all the different bits of client state.
 ///
 /// Implements `Sync`.
+#[derive(Debug)]
 pub struct Context {
     pub rooms: Mutex<RoomMap>,
     pub users: Mutex<UserMap>,
@@ -26,8 +27,8 @@ impl Context {
 
 #[cfg(test)]
 mod tests {
-    use std::thread;
     use std::sync::Arc;
+    use std::thread;
 
     use super::Context;
 
