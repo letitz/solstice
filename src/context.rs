@@ -38,6 +38,6 @@ mod tests {
 
     #[test]
     fn context_is_sync() {
-        let sync: &dyn Sync = &Context::new();
+        let _sync: &dyn Sync = &Context::new();
     }
 }

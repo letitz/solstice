@@ -77,7 +77,7 @@ mod tests {
     }
 
     impl Job for Waiter {
-        fn execute(self: Box<Self>, context: &Context) {
+        fn execute(self: Box<Self>, _context: &Context) {
             self.barrier.wait();
         }
     }

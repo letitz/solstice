@@ -13,6 +13,7 @@ mod context;
 mod control;
 mod dispatcher;
 mod executor;
+mod handlers;
 mod message_handler;
 mod proto;
 mod room;

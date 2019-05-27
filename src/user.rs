@@ -93,6 +93,11 @@ impl UserMap {
         }
     }
 
+    /// Returns a copy of the set of privileged users.
+    pub fn get_all_privileged(&self) -> Vec<String> {
+        self.privileged.iter().map(|s| s.to_string()).collect()
+    }
+
     /// Marks the given user as privileged.
     pub fn insert_privileged(&mut self, user_name: String) {
         self.privileged.insert(user_name);

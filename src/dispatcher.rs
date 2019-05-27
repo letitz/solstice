@@ -4,6 +4,7 @@ use std::fmt::Debug;
 
 use crate::context::Context;
 use crate::executor::Job;
+use crate::handlers::SetPrivilegedUsersHandler;
 use crate::message_handler::MessageHandler;
 use crate::proto::server::ServerResponse;
 
@@ -53,7 +54,30 @@ impl Dispatcher {
     }
 
     /// Dispatches the given message by wrapping it with a handler.
-    pub fn dispatch(message: Message) -> Box<dyn Job> {
-        panic!("Unimplemented")
+    pub fn dispatch(&self, message: Message) -> Box<dyn Job> {
+        let dispatched = match message {
+            Message::ServerResponse(ServerResponse::PrivilegedUsersResponse(response)) => {
+                DispatchedMessage::new(response, SetPrivilegedUsersHandler::default())
+            }
+            _ => panic!("Unimplemented"),
+        };
+
+        Box::new(dispatched)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::proto::server;
+
+    use super::*;
+
+    #[test]
+    fn dispatcher_privileged_users_response() {
+        Dispatcher::new().dispatch(Message::ServerResponse(
+            server::ServerResponse::PrivilegedUsersResponse(server::PrivilegedUsersResponse {
+                users: vec!["foo".to_string(), "bar".to_string(), "baz".to_string()],
+            }),
+        ));
     }
 }
