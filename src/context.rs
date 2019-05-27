@@ -27,9 +27,6 @@ impl Context {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-    use std::thread;
-
     use super::Context;
 
     #[test]

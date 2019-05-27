@@ -1,8 +1,7 @@
 //! This module defines the central message dispatcher to the client process.
 
-use std::io;
+use std::fmt::Debug;
 
-use crate::context::Context;
 use crate::executor::Job;
 use crate::message_handler::MessageHandler;
 use crate::proto::server::ServerResponse;
@@ -25,9 +24,20 @@ impl<M, H> DispatchedMessage<M, H> {
     }
 }
 
-impl<M: Send, H: MessageHandler<M> + Send> Job for DispatchedMessage<M, H> {
-    fn execute(self: Box<Self>, context: &Context) -> io::Result<()> {
-        self.handler.run(context, self.message)
+impl<M, H> Job for DispatchedMessage<M, H>
+where
+    M: Debug + Send,
+    H: Debug + Send + MessageHandler<M>,
+{
+    fn execute(self: Box<Self>) {
+        if let Err(error) = self.handler.run(&self.message) {
+            error!(
+                "Error in handler {}: {:?}\nMessage: {:?}",
+                H::name(),
+                error,
+                &self.message
+            );
+        }
     }
 }
 
