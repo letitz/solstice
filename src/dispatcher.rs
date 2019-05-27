@@ -2,17 +2,19 @@
 
 use std::fmt::Debug;
 
+use crate::context::Context;
 use crate::executor::Job;
 use crate::message_handler::MessageHandler;
 use crate::proto::server::ServerResponse;
 
 /// The type of messages dispatched by a dispatcher.
-enum Message {
+#[derive(Debug)]
+pub enum Message {
     ServerResponse(ServerResponse),
 }
 
 /// Pairs together a message and its handler as chosen by the dispatcher.
-/// Implements Execute so as to be scheduled on an executor.
+/// Implements Job so as to be scheduled on an executor.
 struct DispatchedMessage<M, H> {
     message: M,
     handler: H,
@@ -29,8 +31,8 @@ where
     M: Debug + Send,
     H: Debug + Send + MessageHandler<M>,
 {
-    fn execute(self: Box<Self>) {
-        if let Err(error) = self.handler.run(&self.message) {
+    fn execute(self: Box<Self>, context: &Context) {
+        if let Err(error) = self.handler.run(context, &self.message) {
             error!(
                 "Error in handler {}: {:?}\nMessage: {:?}",
                 H::name(),
@@ -41,14 +43,17 @@ where
     }
 }
 
-struct Dispatcher;
+/// The Dispatcher is in charge of mapping messages to their handlers.
+pub struct Dispatcher;
 
 impl Dispatcher {
-    fn new() -> Self {
+    /// Returns a new dispatcher.
+    pub fn new() -> Self {
         Self {}
     }
 
-    fn dispatch(message: Message) -> Box<dyn Job> {
+    /// Dispatches the given message by wrapping it with a handler.
+    pub fn dispatch(message: Message) -> Box<dyn Job> {
         panic!("Unimplemented")
     }
 }

@@ -10,7 +10,7 @@ const STATUS_AWAY: u32 = 2;
 const STATUS_ONLINE: u32 = 3;
 
 /// This enumeration is the list of possible user statuses.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, RustcDecodable, RustcEncodable)]
 pub enum UserStatus {
     /// The user if offline.
     Offline,
@@ -71,7 +71,7 @@ impl ProtoDecode for UserStatus {
 }
 
 /// This structure contains the last known information about a fellow user.
-#[derive(Clone, Debug, Eq, PartialEq, RustcDecodable, RustcEncodable)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, RustcDecodable, RustcEncodable)]
 pub struct User {
     /// The name of the user.
     pub name: String,
