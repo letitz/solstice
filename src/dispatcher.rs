@@ -29,7 +29,7 @@ impl<M, H> DispatchedMessage<M, H> {
 impl<M, H> Job for DispatchedMessage<M, H>
 where
     M: Debug + Send,
-    H: Debug + Send + MessageHandler<M>,
+    H: MessageHandler<M> + Send,
 {
     fn execute(self: Box<Self>, context: &Context) {
         if let Err(error) = self.handler.run(context, &self.message) {
