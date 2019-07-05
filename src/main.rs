@@ -14,6 +14,7 @@ mod control;
 mod dispatcher;
 mod executor;
 mod handlers;
+mod login;
 mod message_handler;
 mod proto;
 mod room;

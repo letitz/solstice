@@ -6,6 +6,7 @@ use slab;
 
 use crate::config;
 use crate::control;
+use crate::login::LoginStatus;
 use crate::proto;
 use crate::proto::peer;
 use crate::proto::server;
@@ -16,13 +17,6 @@ use crate::user;
 enum IncomingMessage {
     Proto(proto::Response),
     ControlNotification(control::Notification),
-}
-
-#[derive(Clone, Debug)]
-enum LoginStatus {
-    Pending,
-    Success(String),
-    Failure(String),
 }
 
 #[derive(Debug)]
