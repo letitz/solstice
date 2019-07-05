@@ -6,10 +6,11 @@
 /// successfully logged in, the client can interact with the server.
 #[derive(Clone, Debug)]
 pub enum LoginStatus {
-    // TODO: add a state representing the fact that no request has been sent.
+    /// Request not sent yet.
+    Todo,
 
     /// Sent request, awaiting response.
-    Pending,
+    AwaitingResponse,
 
     /// Logged in.
     /// Stores the MOTD as received from the server.
@@ -19,4 +20,3 @@ pub enum LoginStatus {
     /// Stores the error message as received from the server.
     Failure(String),
 }
-

@@ -72,7 +72,7 @@ impl Client {
             control_tx: None,
             control_rx: control_rx,
 
-            login_status: LoginStatus::Pending,
+            login_status: LoginStatus::Todo,
 
             rooms: room::RoomMap::new(),
             users: user::UserMap::new(),
@@ -93,6 +93,8 @@ impl Client {
             )
             .unwrap(),
         ));
+
+        self.login_status = LoginStatus::AwaitingResponse;
 
         self.send_to_server(server::ServerRequest::SetListenPortRequest(
             server::SetListenPortRequest {
@@ -210,7 +212,10 @@ impl Client {
         let username = config::USERNAME.to_string();
 
         let response = match self.login_status {
-            LoginStatus::Pending => control::LoginStatusResponse::Pending { username: username },
+            LoginStatus::Todo => control::LoginStatusResponse::Pending { username: username },
+            LoginStatus::AwaitingResponse => {
+                control::LoginStatusResponse::Pending { username: username }
+            }
 
             LoginStatus::Success(ref motd) => control::LoginStatusResponse::Success {
                 username: username,
@@ -528,7 +533,7 @@ impl Client {
     }
 
     fn handle_login_response(&mut self, login: server::LoginResponse) {
-        if let LoginStatus::Pending = self.login_status {
+        if let LoginStatus::AwaitingResponse = self.login_status {
             match login {
                 server::LoginResponse::LoginOk {
                     motd,
