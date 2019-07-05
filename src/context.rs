@@ -3,6 +3,7 @@
 
 use parking_lot::Mutex;
 
+use crate::login::LoginStatus;
 use crate::room::RoomMap;
 use crate::user::UserMap;
 
@@ -11,6 +12,7 @@ use crate::user::UserMap;
 /// Implements `Sync`.
 #[derive(Debug)]
 pub struct Context {
+    pub login: Mutex<LoginStatus>,
     pub rooms: Mutex<RoomMap>,
     pub users: Mutex<UserMap>,
 }
@@ -19,6 +21,7 @@ impl Context {
     /// Creates a new empty context.
     pub fn new() -> Self {
         Self {
+            login: Mutex::new(LoginStatus::Todo),
             rooms: Mutex::new(RoomMap::new()),
             users: Mutex::new(UserMap::new()),
         }
