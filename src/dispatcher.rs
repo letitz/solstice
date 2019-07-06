@@ -4,7 +4,7 @@ use std::fmt::Debug;
 
 use crate::context::Context;
 use crate::executor::Job;
-use crate::handlers::SetPrivilegedUsersHandler;
+use crate::handlers::{LoginHandler, SetPrivilegedUsersHandler};
 use crate::message_handler::MessageHandler;
 use crate::proto::server::ServerResponse;
 
@@ -55,14 +55,15 @@ impl Dispatcher {
 
     /// Dispatches the given message by wrapping it with a handler.
     pub fn dispatch(&self, message: Message) -> Box<dyn Job> {
-        let dispatched = match message {
-            Message::ServerResponse(ServerResponse::PrivilegedUsersResponse(response)) => {
-                DispatchedMessage::new(response, SetPrivilegedUsersHandler::default())
+        match message {
+            Message::ServerResponse(ServerResponse::LoginResponse(response)) => {
+                Box::new(DispatchedMessage::new(response, LoginHandler::default()))
             }
+            Message::ServerResponse(ServerResponse::PrivilegedUsersResponse(response)) => Box::new(
+                DispatchedMessage::new(response, SetPrivilegedUsersHandler::default()),
+            ),
             _ => panic!("Unimplemented"),
-        };
-
-        Box::new(dispatched)
+        }
     }
 }
 
@@ -77,6 +78,15 @@ mod tests {
         Dispatcher::new().dispatch(Message::ServerResponse(
             server::ServerResponse::PrivilegedUsersResponse(server::PrivilegedUsersResponse {
                 users: vec!["foo".to_string(), "bar".to_string(), "baz".to_string()],
+            }),
+        ));
+    }
+
+    #[test]
+    fn dispatcher_login_response() {
+        Dispatcher::new().dispatch(Message::ServerResponse(
+            server::ServerResponse::LoginResponse(server::LoginResponse::LoginFail {
+                reason: "bleep bloop".to_string(),
             }),
         ));
     }
