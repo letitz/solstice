@@ -385,7 +385,9 @@ impl Client {
             }
 
             Some(
-                peer @ &mut Peer {
+                peer
+                @
+                &mut Peer {
                     state: PeerState::Open,
                     ..
                 },
@@ -395,7 +397,9 @@ impl Client {
             }
 
             Some(
-                peer @ &mut Peer {
+                peer
+                @
+                &mut Peer {
                     state: PeerState::WaitingFirewalled,
                     ..
                 },
@@ -405,7 +409,9 @@ impl Client {
             }
 
             Some(
-                peer @ &mut Peer {
+                peer
+                @
+                &mut Peer {
                     state: PeerState::Opening,
                     ..
                 },
@@ -422,7 +428,9 @@ impl Client {
             }
 
             Some(
-                peer @ &mut Peer {
+                peer
+                @
+                &mut Peer {
                     state: PeerState::OpeningFirewalled,
                     ..
                 },
