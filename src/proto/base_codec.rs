@@ -29,7 +29,7 @@ use encoding::{DecoderTrap, EncoderTrap, Encoding};
 pub const U32_BYTE_LEN: usize = 4;
 
 pub trait Decode<T> {
-    /// Attempts to decode an istance of `T` from `self`.
+    /// Attempts to decode an instance of `T` from `self`.
     fn decode(&mut self) -> io::Result<T>;
 }
 
