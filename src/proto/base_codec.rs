@@ -13,7 +13,6 @@
 //!   * Pairs are serialized as two consecutive values.
 //!   * Vectors are serialized as length-prefixed arrays of serialized values.
 
-use std::fmt;
 use std::io;
 use std::net;
 
@@ -21,6 +20,7 @@ use bytes::{BufMut, BytesMut};
 use encoding::all::WINDOWS_1252;
 use encoding::{DecoderTrap, EncoderTrap, Encoding};
 use std::convert::{TryFrom, TryInto};
+use thiserror::Error;
 
 // Constants
 // ---------
@@ -38,8 +38,70 @@ pub trait Encode<T> {
     fn encode(&mut self, value: T) -> io::Result<()>;
 }
 
-// TODO: Define a real DecodeError type using the thiserror crate for better
-// error messages without all this io::Error hackery.
+// TODO: Add backtrace fields to each enum variant once std::backtrace is
+// stabilized.
+#[derive(PartialEq, Error, Debug)]
+pub enum ProtoDecodeError {
+    #[error("at position {position}: not enough bytes to decode: expected {expected}, found {remaining}")]
+    NotEnoughData {
+        /// The number of bytes the decoder expected to read.
+        ///
+        /// Invariant: `remaining < expected`.
+        expected: usize,
+
+        /// The number of bytes remaining in the input buffer.
+        ///
+        /// Invariant: `remaining < expected`.
+        remaining: usize,
+
+        /// The decoder's position in the input buffer.
+        position: usize,
+    },
+    #[error("at position {position}: invalid boolean value: {value}")]
+    InvalidBool {
+        /// The invalid value. Never equal to 0 nor 1.
+        value: u8,
+
+        /// The decoder's position in the input buffer.
+        position: usize,
+    },
+    #[error("at position {position}: invalid u16 value: {value}")]
+    InvalidU16 {
+        /// The invalid value. Always greater than u16::max_value().
+        value: u32,
+
+        /// The decoder's position in the input buffer.
+        position: usize,
+    },
+    #[error("at position {position}: failed to decode string: {cause}")]
+    InvalidString {
+        /// The cause of the error, as reported by the encoding library.
+        cause: String,
+
+        /// The decoder's position in the input buffer.
+        position: usize,
+    },
+    #[error("at position {position}: invalid {value_name}: {cause}")]
+    InvalidData {
+        /// The name of the value the decoder failed to decode.
+        value_name: String,
+
+        /// The cause of the error.
+        cause: String,
+
+        /// The decoder's position in the input buffer.
+        position: usize,
+    },
+}
+
+impl From<ProtoDecodeError> for io::Error {
+    fn from(error: ProtoDecodeError) -> Self {
+        match &error {
+            &ProtoDecodeError::NotEnoughData { .. } => unexpected_eof_error(format!("{}", error)),
+            _ => invalid_data_error(format!("{}", error)),
+        }
+    }
+}
 
 /// Builds an UnexpectedEof error with the given message.
 fn unexpected_eof_error(message: String) -> io::Error {
@@ -78,7 +140,7 @@ pub struct ProtoDecoder<'a> {
 /// a `ProtoDecoder`.
 pub trait ProtoDecode: Sized {
     /// Attempts to decode a value of this type with the given decoder.
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self>;
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError>;
 }
 
 impl<'a> ProtoDecoder<'a> {
@@ -88,6 +150,11 @@ impl<'a> ProtoDecoder<'a> {
             buffer: buffer,
             position: 0,
         }
+    }
+
+    /// The current position of this decoder in the input buffer.
+    pub fn position(&self) -> usize {
+        self.position
     }
 
     /// Returns the number of bytes remaining to decode.
@@ -113,13 +180,13 @@ impl<'a> ProtoDecoder<'a> {
     ///
     /// Returns a slice of size `n` if successful, in which case this decoder
     /// advances its internal position by `n`.
-    fn consume(&mut self, n: usize) -> io::Result<&[u8]> {
+    fn consume(&mut self, n: usize) -> Result<&[u8], ProtoDecodeError> {
         if self.remaining() < n {
-            return Err(unexpected_eof_error(format!(
-                "expected {} bytes remaining, found {}",
-                n,
-                self.remaining()
-            )));
+            return Err(ProtoDecodeError::NotEnoughData {
+                expected: n,
+                remaining: self.remaining(),
+                position: self.position,
+            });
         }
 
         // Cannot use bytes() here as it borrows self immutably, which
@@ -131,11 +198,7 @@ impl<'a> ProtoDecoder<'a> {
     }
 
     /// Attempts to decode a u32 value.
-    ///
-    /// Note that this method returns a less descriptive error than
-    /// `self.decode::<u32>()`. It is intended to be a low-level building block
-    /// for decoding other types.
-    fn decode_u32(&mut self) -> io::Result<u32> {
+    fn decode_u32(&mut self) -> Result<u32, ProtoDecodeError> {
         let bytes = self.consume(U32_BYTE_LEN)?;
         // The conversion from slice to fixed-size array cannot fail, because
         // consume() guarantees that its return value is of size n.
@@ -143,33 +206,46 @@ impl<'a> ProtoDecoder<'a> {
         Ok(u32::from_le_bytes(array))
     }
 
+    fn decode_u16(&mut self) -> Result<u16, ProtoDecodeError> {
+        let position = self.position;
+        let n = self.decode_u32()?;
+        match u16::try_from(n) {
+            Ok(value) => Ok(value),
+            Err(_) => Err(ProtoDecodeError::InvalidU16 {
+                value: n,
+                position: position,
+            }),
+        }
+    }
+
     /// Attempts to decode a boolean value.
-    ///
-    /// Note that this method returns a less descriptive error than
-    /// `self.decode::<bool>()`. It is intended to be a low-level building block
-    /// for decoding other types.
-    fn decode_bool(&mut self) -> io::Result<bool> {
+    fn decode_bool(&mut self) -> Result<bool, ProtoDecodeError> {
+        let position = self.position;
         let bytes = self.consume(1)?;
         match bytes[0] {
             0 => Ok(false),
             1 => Ok(true),
-            n => Err(invalid_data_error(format!("invalid bool value {}", n))),
+            n => Err(ProtoDecodeError::InvalidBool {
+                value: n,
+                position: position,
+            }),
         }
     }
 
     /// Attempts to decode a string value.
-    ///
-    /// Note that this method returns a less descriptive error than
-    /// `self.decode::<String>()`. It is intended to be a low-level building
-    /// block for decoding other types.
-    fn decode_string(&mut self) -> io::Result<String> {
+    fn decode_string(&mut self) -> Result<String, ProtoDecodeError> {
         let length = self.decode_u32()? as usize;
+
+        let position = self.position;
         let bytes = self.consume(length)?;
 
         let result = WINDOWS_1252.decode(bytes, DecoderTrap::Strict);
         match result {
             Ok(string) => Ok(string),
-            Err(error) => Err(invalid_data_error(format!("invalid string: {:?}", error))),
+            Err(error) => Err(ProtoDecodeError::InvalidString {
+                cause: error.to_string(),
+                position: position,
+            }),
         }
     }
 
@@ -180,55 +256,44 @@ impl<'a> ProtoDecoder<'a> {
     /// ```
     /// let val: Foo = decoder.decode()?;
     /// ```
-    pub fn decode<T: ProtoDecode>(&mut self) -> io::Result<T> {
-        let position = self.position;
-        match T::decode_from(self) {
-            Ok(value) => Ok(value),
-            Err(ref error) => Err(annotate_error(
-                error,
-                &format!("decoding value at position {}", position),
-            )),
-        }
+    pub fn decode<T: ProtoDecode>(&mut self) -> Result<T, ProtoDecodeError> {
+        T::decode_from(self)
     }
 }
 
 impl ProtoDecode for u32 {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
         decoder.decode_u32()
     }
 }
 
 impl ProtoDecode for u16 {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
-        let n = decoder.decode_u32()?;
-        match u16::try_from(n) {
-            Ok(value) => Ok(value),
-            Err(_) => Err(invalid_data_error(format!("invalid u16 value {}", n))),
-        }
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+        decoder.decode_u16()
     }
 }
 
 impl ProtoDecode for bool {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
         decoder.decode_bool()
     }
 }
 
 impl ProtoDecode for net::Ipv4Addr {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
         let ip = decoder.decode_u32()?;
         Ok(net::Ipv4Addr::from(ip))
     }
 }
 
 impl ProtoDecode for String {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
         decoder.decode_string()
     }
 }
 
 impl<T: ProtoDecode, U: ProtoDecode> ProtoDecode for (T, U) {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
         let first = decoder.decode()?;
         let second = decoder.decode()?;
         Ok((first, second))
@@ -236,7 +301,7 @@ impl<T: ProtoDecode, U: ProtoDecode> ProtoDecode for (T, U) {
 }
 
 impl<T: ProtoDecode> ProtoDecode for Vec<T> {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
         let len = decoder.decode_u32()? as usize;
         let mut vec = Vec::with_capacity(len);
         for _ in 0..len {
@@ -404,7 +469,7 @@ pub mod tests {
 
     use bytes::BytesMut;
 
-    use super::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
+    use super::{ProtoDecode, ProtoDecodeError, ProtoDecoder, ProtoEncode, ProtoEncoder};
 
     // Declared here because assert_eq!(bytes, &[]) fails to infer types.
     const EMPTY_BYTES: &'static [u8] = &[];
@@ -421,28 +486,6 @@ pub mod tests {
         assert_eq!(output, input);
     }
 
-    pub fn expect_io_error<T>(result: io::Result<T>, kind: io::ErrorKind, message: &str)
-    where
-        T: fmt::Debug + Send + 'static,
-    {
-        match result {
-            Err(e) => {
-                assert_eq!(e.kind(), kind);
-                let ok = match e.get_ref() {
-                    Some(e) => {
-                        assert_eq!(e.description(), message);
-                        true
-                    }
-                    None => false,
-                };
-                if !ok {
-                    panic!(e)
-                }
-            }
-            Ok(message) => panic!(message),
-        }
-    }
-
     // A few integers and their corresponding byte encodings.
     const U32_ENCODINGS: [(u32, [u8; 4]); 8] = [
         (0, [0, 0, 0, 0]),
@@ -454,36 +497,6 @@ pub mod tests {
         (16777216, [0, 0, 0, 1]),
         (u32::MAX, [255, 255, 255, 255]),
     ];
-
-    #[test]
-    fn expect_io_error_success() {
-        let kind = io::ErrorKind::InvalidInput;
-        let message = "some message";
-        let result: io::Result<()> = Err(io::Error::new(kind, message));
-        expect_io_error(result, kind, message);
-    }
-
-    #[test]
-    #[should_panic]
-    fn expect_io_error_not_err() {
-        expect_io_error(Ok(()), io::ErrorKind::InvalidInput, "some message");
-    }
-
-    #[test]
-    #[should_panic]
-    fn expect_io_error_wrong_kind() {
-        let result: io::Result<()> =
-            Err(io::Error::new(io::ErrorKind::UnexpectedEof, "some message"));
-        expect_io_error(result, io::ErrorKind::InvalidInput, "some message");
-    }
-
-    #[test]
-    #[should_panic]
-    fn expect_io_error_wrong_message() {
-        let result: io::Result<()> =
-            Err(io::Error::new(io::ErrorKind::InvalidInput, "some message"));
-        expect_io_error(result, io::ErrorKind::InvalidInput, "other message");
-    }
 
     #[test]
     fn encode_u32() {
@@ -524,10 +537,13 @@ pub mod tests {
 
         let result = decoder.decode::<u32>();
 
-        expect_io_error(
+        assert_eq!(
             result,
-            io::ErrorKind::UnexpectedEof,
-            "decoding value at position 0: expected 4 bytes remaining, found 1",
+            Err(ProtoDecodeError::NotEnoughData {
+                expected: 4,
+                remaining: 1,
+                position: 0,
+            })
         );
         assert_eq!(decoder.bytes(), &[13]);
     }
@@ -571,10 +587,12 @@ pub mod tests {
 
         let result = ProtoDecoder::new(&buffer).decode::<bool>();
 
-        expect_io_error(
+        assert_eq!(
             result,
-            io::ErrorKind::InvalidData,
-            "decoding value at position 0: invalid bool value 42",
+            Err(ProtoDecodeError::InvalidBool {
+                value: 42,
+                position: 0,
+            })
         );
     }
 
@@ -584,10 +602,13 @@ pub mod tests {
 
         let result = ProtoDecoder::new(&buffer).decode::<bool>();
 
-        expect_io_error(
+        assert_eq!(
             result,
-            io::ErrorKind::UnexpectedEof,
-            "decoding value at position 0: expected 1 bytes remaining, found 0",
+            Err(ProtoDecodeError::NotEnoughData {
+                expected: 1,
+                remaining: 0,
+                position: 0,
+            })
         );
     }
 
@@ -623,13 +644,12 @@ pub mod tests {
                 assert_eq!(val, expected_val as u16);
                 assert_eq!(decoder.bytes(), EMPTY_BYTES);
             } else {
-                expect_io_error(
+                assert_eq!(
                     decoder.decode::<u16>(),
-                    io::ErrorKind::InvalidData,
-                    &format!(
-                        "decoding value at position 0: invalid u16 value {}",
-                        expected_val
-                    ),
+                    Err(ProtoDecodeError::InvalidU16 {
+                        value: expected_val,
+                        position: 0,
+                    })
                 );
             }
         }
@@ -642,10 +662,13 @@ pub mod tests {
 
         let result = decoder.decode::<u16>();
 
-        expect_io_error(
+        assert_eq!(
             result,
-            io::ErrorKind::UnexpectedEof,
-            "decoding value at position 0: expected 4 bytes remaining, found 0",
+            Err(ProtoDecodeError::NotEnoughData {
+                expected: 4,
+                remaining: 0,
+                position: 0,
+            })
         );
     }
 

@@ -5,7 +5,7 @@ use crypto::md5::Md5;
 
 use crate::proto::packet::{MutPacket, WriteToPacket};
 use crate::proto::server::constants::*;
-use crate::proto::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
+use crate::proto::{ProtoDecode, ProtoDecodeError, ProtoDecoder, ProtoEncode, ProtoEncoder};
 
 /* ------- *
  * Helpers *
@@ -149,7 +149,8 @@ impl ProtoEncode for ServerRequest {
 }
 
 impl ProtoDecode for ServerRequest {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+        let position = decoder.position();
         let code: u32 = decoder.decode()?;
         let request = match code {
             CODE_CANNOT_CONNECT => {
@@ -194,10 +195,11 @@ impl ProtoDecode for ServerRequest {
                 ServerRequest::UserStatusRequest(request)
             }
             _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("unknown server request code: {}", code),
-                ));
+                return Err(ProtoDecodeError::InvalidData {
+                    value_name: "server request code".to_string(),
+                    cause: format!("unknown value {}", code),
+                    position: position,
+                })
             }
         };
         Ok(request)
@@ -230,7 +232,7 @@ impl ProtoEncode for CannotConnectRequest {
 }
 
 impl ProtoDecode for CannotConnectRequest {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
         let token = decoder.decode()?;
         let user_name = decoder.decode()?;
         Ok(CannotConnectRequest { token, user_name })
@@ -266,7 +268,7 @@ impl ProtoEncode for ConnectToPeerRequest {
 }
 
 impl ProtoDecode for ConnectToPeerRequest {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
         let token = decoder.decode()?;
         let user_name = decoder.decode()?;
         let connection_type = decoder.decode()?;
@@ -304,7 +306,7 @@ impl ProtoEncode for FileSearchRequest {
 }
 
 impl ProtoDecode for FileSearchRequest {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
         let ticket = decoder.decode()?;
         let query = decoder.decode()?;
         Ok(FileSearchRequest { ticket, query })
@@ -376,7 +378,7 @@ impl ProtoEncode for LoginRequest {
 }
 
 impl ProtoDecode for LoginRequest {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
         let username = decoder.decode()?;
         let password = decoder.decode()?;
         let major = decoder.decode()?;
@@ -415,7 +417,7 @@ impl ProtoEncode for PeerAddressRequest {
 }
 
 impl ProtoDecode for PeerAddressRequest {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
         let username = decoder.decode()?;
         Ok(PeerAddressRequest { username: username })
     }
@@ -444,7 +446,7 @@ impl ProtoEncode for RoomJoinRequest {
 }
 
 impl ProtoDecode for RoomJoinRequest {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
         let room_name = decoder.decode()?;
         Ok(RoomJoinRequest {
             room_name: room_name,
@@ -475,7 +477,7 @@ impl ProtoEncode for RoomLeaveRequest {
 }
 
 impl ProtoDecode for RoomLeaveRequest {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
         let room_name = decoder.decode()?;
         Ok(RoomLeaveRequest {
             room_name: room_name,
@@ -509,7 +511,7 @@ impl ProtoEncode for RoomMessageRequest {
 }
 
 impl ProtoDecode for RoomMessageRequest {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
         let room_name = decoder.decode()?;
         let message = decoder.decode()?;
         Ok(RoomMessageRequest { room_name, message })
@@ -539,7 +541,7 @@ impl ProtoEncode for SetListenPortRequest {
 }
 
 impl ProtoDecode for SetListenPortRequest {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
         let port = decoder.decode()?;
         Ok(SetListenPortRequest { port: port })
     }
@@ -568,7 +570,7 @@ impl ProtoEncode for UserStatusRequest {
 }
 
 impl ProtoDecode for UserStatusRequest {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
         let user_name = decoder.decode()?;
         Ok(UserStatusRequest {
             user_name: user_name,
@@ -586,8 +588,8 @@ mod tests {
 
     use bytes::BytesMut;
 
-    use crate::proto::base_codec::tests::{expect_io_error, roundtrip};
-    use crate::proto::ProtoDecoder;
+    use crate::proto::base_codec::tests::roundtrip;
+    use crate::proto::{ProtoDecodeError, ProtoDecoder};
 
     use super::*;
 
@@ -597,10 +599,13 @@ mod tests {
 
         let result = ProtoDecoder::new(&bytes).decode::<ServerRequest>();
 
-        expect_io_error(
+        assert_eq!(
             result,
-            io::ErrorKind::InvalidData,
-            "decoding value at position 0: unknown server request code: 1337",
+            Err(ProtoDecodeError::InvalidData {
+                value_name: "server request code".to_string(),
+                cause: "unknown value 1337".to_string(),
+                position: 0,
+            })
         );
     }
 

@@ -8,7 +8,9 @@ pub mod server;
 mod stream;
 mod user;
 
-pub use self::base_codec::{Decode, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder};
+pub use self::base_codec::{
+    Decode, ProtoDecode, ProtoDecodeError, ProtoDecoder, ProtoEncode, ProtoEncoder,
+};
 pub use self::codec::*;
 pub use self::handler::*;
 pub use self::packet::*;

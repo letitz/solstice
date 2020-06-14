@@ -1,8 +1,8 @@
 use std::io;
 
 use crate::proto::{
-    MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder,
-    ReadFromPacket, WriteToPacket,
+    MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecodeError, ProtoDecoder, ProtoEncode,
+    ProtoEncoder, ReadFromPacket, WriteToPacket,
 };
 
 const STATUS_OFFLINE: u32 = 1;
@@ -56,16 +56,18 @@ impl ProtoEncode for UserStatus {
 }
 
 impl ProtoDecode for UserStatus {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+        let position = decoder.position();
         let value: u32 = decoder.decode()?;
         match value {
             STATUS_OFFLINE => Ok(UserStatus::Offline),
             STATUS_AWAY => Ok(UserStatus::Away),
             STATUS_ONLINE => Ok(UserStatus::Online),
-            _ => Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("invalid user status: {}", value),
-            )),
+            _ => Err(ProtoDecodeError::InvalidData {
+                value_name: "user status".to_string(),
+                cause: format!("unknown value {}", value),
+                position: position,
+            }),
         }
     }
 }

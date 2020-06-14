@@ -2,8 +2,8 @@ use std::io;
 
 use crate::proto::peer::constants::*;
 use crate::proto::{
-    MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder,
-    ReadFromPacket, WriteToPacket,
+    MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecodeError, ProtoDecoder, ProtoEncode,
+    ProtoEncoder, ReadFromPacket, WriteToPacket,
 };
 
 /*=========*
@@ -42,7 +42,8 @@ impl ReadFromPacket for Message {
 }
 
 impl ProtoDecode for Message {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+        let position = decoder.position();
         let code: u32 = decoder.decode()?;
         let message = match code {
             CODE_PIERCE_FIREWALL => {
@@ -54,10 +55,11 @@ impl ProtoDecode for Message {
                 Message::PeerInit(peer_init)
             }
             _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("unknown peer message code: {}", code),
-                ));
+                return Err(ProtoDecodeError::InvalidData {
+                    value_name: "peer message code".to_string(),
+                    cause: format!("unknown value {}", code),
+                    position: position,
+                })
             }
         };
         Ok(message)
@@ -139,7 +141,7 @@ impl ProtoEncode for PeerInit {
 }
 
 impl ProtoDecode for PeerInit {
-    fn decode_from(decoder: &mut ProtoDecoder) -> io::Result<Self> {
+    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
         let user_name = decoder.decode()?;
         let connection_type = decoder.decode()?;
         let token = decoder.decode()?;
@@ -157,8 +159,8 @@ mod tests {
 
     use bytes::BytesMut;
 
-    use crate::proto::base_codec::tests::{expect_io_error, roundtrip};
-    use crate::proto::ProtoDecoder;
+    use crate::proto::base_codec::tests::roundtrip;
+    use crate::proto::{ProtoDecodeError, ProtoDecoder};
 
     use super::*;
 
@@ -168,10 +170,13 @@ mod tests {
 
         let result = ProtoDecoder::new(&bytes).decode::<Message>();
 
-        expect_io_error(
+        assert_eq!(
             result,
-            io::ErrorKind::InvalidData,
-            "decoding value at position 0: unknown peer message code: 1337",
+            Err(ProtoDecodeError::InvalidData {
+                value_name: "peer message code".to_string(),
+                cause: "unknown value 1337".to_string(),
+                position: 0,
+            })
         );
     }
 
