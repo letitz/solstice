@@ -3,7 +3,7 @@ use std::io;
 use crate::proto::peer::constants::*;
 use crate::proto::{
     MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecodeError, ProtoDecoder, ProtoEncode,
-    ProtoEncoder, ReadFromPacket, WriteToPacket,
+    ProtoEncodeError, ProtoEncoder, ReadFromPacket, WriteToPacket,
 };
 
 /*=========*
@@ -67,7 +67,7 @@ impl ProtoDecode for Message {
 }
 
 impl ProtoEncode for Message {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         match *self {
             Message::PierceFirewall(token) => {
                 encoder.encode_u32(CODE_PIERCE_FIREWALL)?;
@@ -132,7 +132,7 @@ impl WriteToPacket for PeerInit {
 }
 
 impl ProtoEncode for PeerInit {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_string(&self.user_name)?;
         encoder.encode_string(&self.connection_type)?;
         encoder.encode_u32(self.token)?;

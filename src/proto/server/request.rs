@@ -5,7 +5,9 @@ use crypto::md5::Md5;
 
 use crate::proto::packet::{MutPacket, WriteToPacket};
 use crate::proto::server::constants::*;
-use crate::proto::{ProtoDecode, ProtoDecodeError, ProtoDecoder, ProtoEncode, ProtoEncoder};
+use crate::proto::{
+    ProtoDecode, ProtoDecodeError, ProtoDecoder, ProtoEncode, ProtoEncodeError, ProtoEncoder,
+};
 
 /* ------- *
  * Helpers *
@@ -98,7 +100,7 @@ impl WriteToPacket for ServerRequest {
 }
 
 impl ProtoEncode for ServerRequest {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         match *self {
             ServerRequest::CannotConnectRequest(ref request) => {
                 encoder.encode_u32(CODE_CANNOT_CONNECT)?;
@@ -225,7 +227,7 @@ impl WriteToPacket for CannotConnectRequest {
 }
 
 impl ProtoEncode for CannotConnectRequest {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_u32(self.token)?;
         encoder.encode_string(&self.user_name)
     }
@@ -260,7 +262,7 @@ impl WriteToPacket for ConnectToPeerRequest {
 }
 
 impl ProtoEncode for ConnectToPeerRequest {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_u32(self.token)?;
         encoder.encode_string(&self.user_name)?;
         encoder.encode_string(&self.connection_type)
@@ -299,7 +301,7 @@ impl WriteToPacket for FileSearchRequest {
 }
 
 impl ProtoEncode for FileSearchRequest {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_u32(self.ticket)?;
         encoder.encode_string(&self.query)
     }
@@ -368,7 +370,7 @@ impl WriteToPacket for LoginRequest {
 }
 
 impl ProtoEncode for LoginRequest {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_string(&self.username)?;
         encoder.encode_string(&self.password)?;
         encoder.encode_u32(self.major)?;
@@ -411,7 +413,7 @@ impl WriteToPacket for PeerAddressRequest {
 }
 
 impl ProtoEncode for PeerAddressRequest {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_string(&self.username)
     }
 }
@@ -440,7 +442,7 @@ impl WriteToPacket for RoomJoinRequest {
 }
 
 impl ProtoEncode for RoomJoinRequest {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_string(&self.room_name)
     }
 }
@@ -471,7 +473,7 @@ impl WriteToPacket for RoomLeaveRequest {
 }
 
 impl ProtoEncode for RoomLeaveRequest {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_string(&self.room_name)
     }
 }
@@ -504,7 +506,7 @@ impl WriteToPacket for RoomMessageRequest {
 }
 
 impl ProtoEncode for RoomMessageRequest {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_string(&self.room_name)?;
         encoder.encode_string(&self.message)
     }
@@ -535,7 +537,7 @@ impl WriteToPacket for SetListenPortRequest {
 }
 
 impl ProtoEncode for SetListenPortRequest {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode(&self.port)
     }
 }
@@ -564,7 +566,7 @@ impl WriteToPacket for UserStatusRequest {
 }
 
 impl ProtoEncode for UserStatusRequest {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_string(&self.user_name)
     }
 }

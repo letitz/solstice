@@ -2,7 +2,7 @@ use std::io;
 
 use crate::proto::{
     MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecodeError, ProtoDecoder, ProtoEncode,
-    ProtoEncoder, ReadFromPacket, WriteToPacket,
+    ProtoEncodeError, ProtoEncoder, ReadFromPacket, WriteToPacket,
 };
 
 const STATUS_OFFLINE: u32 = 1;
@@ -45,7 +45,7 @@ impl WriteToPacket for UserStatus {
 }
 
 impl ProtoEncode for UserStatus {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         let value = match *self {
             UserStatus::Offline => STATUS_OFFLINE,
             UserStatus::Away => STATUS_AWAY,

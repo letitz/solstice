@@ -4,7 +4,8 @@ use std::net;
 use crate::proto::packet::{Packet, PacketReadError, ReadFromPacket};
 use crate::proto::server::constants::*;
 use crate::proto::{
-    ProtoDecode, ProtoDecodeError, ProtoDecoder, ProtoEncode, ProtoEncoder, User, UserStatus,
+    ProtoDecode, ProtoDecodeError, ProtoDecoder, ProtoEncode, ProtoEncodeError, ProtoEncoder, User,
+    UserStatus,
 };
 
 /*=================*
@@ -92,7 +93,7 @@ impl ReadFromPacket for ServerResponse {
 }
 
 impl ProtoEncode for ServerResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         match *self {
             ServerResponse::ConnectToPeerResponse(ref response) => {
                 encoder.encode_u32(CODE_CONNECT_TO_PEER)?;
@@ -290,11 +291,11 @@ impl ReadFromPacket for ConnectToPeerResponse {
 }
 
 impl ProtoEncode for ConnectToPeerResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
-        encoder.encode_string(&self.user_name)?;
-        encoder.encode_string(&self.connection_type)?;
-        encoder.encode_ipv4_addr(self.ip)?;
-        encoder.encode(&self.port)?;
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+        encoder.encode(&self.user_name)?;
+        encoder.encode(&self.connection_type)?;
+        encoder.encode(&self.ip)?;
+        encoder.encode_u16(self.port)?;
         encoder.encode_u32(self.token)?;
         encoder.encode_bool(self.is_privileged)
     }
@@ -346,7 +347,7 @@ impl ReadFromPacket for FileSearchResponse {
 }
 
 impl ProtoEncode for FileSearchResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_string(&self.user_name)?;
         encoder.encode_u32(self.ticket)?;
         encoder.encode_string(&self.query)
@@ -409,7 +410,7 @@ impl ReadFromPacket for LoginResponse {
 }
 
 impl ProtoEncode for LoginResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         match *self {
             LoginResponse::LoginOk {
                 ref motd,
@@ -417,12 +418,12 @@ impl ProtoEncode for LoginResponse {
                 password_md5_opt: _,
             } => {
                 encoder.encode_bool(true)?;
-                encoder.encode_string(motd)?;
-                encoder.encode_ipv4_addr(ip)?;
+                encoder.encode(motd)?;
+                encoder.encode(&ip)?;
             }
             LoginResponse::LoginFail { ref reason } => {
                 encoder.encode_bool(false)?;
-                encoder.encode_string(reason)?;
+                encoder.encode(reason)?;
             }
         };
         Ok(())
@@ -471,7 +472,7 @@ impl ReadFromPacket for ParentMinSpeedResponse {
 }
 
 impl ProtoEncode for ParentMinSpeedResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_u32(self.value)
     }
 }
@@ -500,7 +501,7 @@ impl ReadFromPacket for ParentSpeedRatioResponse {
 }
 
 impl ProtoEncode for ParentSpeedRatioResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_u32(self.value)
     }
 }
@@ -534,10 +535,10 @@ impl ReadFromPacket for PeerAddressResponse {
 }
 
 impl ProtoEncode for PeerAddressResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
-        encoder.encode_string(&self.username)?;
-        encoder.encode_ipv4_addr(self.ip)?;
-        encoder.encode(&self.port)
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+        encoder.encode(&self.username)?;
+        encoder.encode(&self.ip)?;
+        encoder.encode_u16(self.port)
     }
 }
 
@@ -567,7 +568,7 @@ impl ReadFromPacket for PrivilegedUsersResponse {
 }
 
 impl ProtoEncode for PrivilegedUsersResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode(&self.users)
     }
 }
@@ -727,7 +728,7 @@ fn build_user(
 }
 
 impl ProtoEncode for UserInfo {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_u32(self.average_speed)?;
         encoder.encode_u32(self.num_downloads)?;
         encoder.encode_u32(self.unknown)?;
@@ -754,7 +755,7 @@ impl ProtoDecode for UserInfo {
 }
 
 impl ProtoEncode for RoomJoinResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), io::Error> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         let mut user_names = vec![];
         let mut user_statuses = vec![];
         let mut user_infos = vec![];
@@ -863,7 +864,7 @@ impl ReadFromPacket for RoomLeaveResponse {
 }
 
 impl ProtoEncode for RoomLeaveResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_string(&self.room_name)
     }
 }
@@ -964,7 +965,10 @@ impl RoomListResponse {
         Ok(Self::build_rooms(room_names, user_counts))
     }
 
-    fn encode_rooms(rooms: &[(String, u32)], encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode_rooms(
+        rooms: &[(String, u32)],
+        encoder: &mut ProtoEncoder,
+    ) -> Result<(), ProtoEncodeError> {
         let mut room_names = vec![];
         let mut user_counts = vec![];
 
@@ -979,7 +983,7 @@ impl RoomListResponse {
 }
 
 impl ProtoEncode for RoomListResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         Self::encode_rooms(&self.rooms, encoder)?;
         Self::encode_rooms(&self.owned_private_rooms, encoder)?;
         Self::encode_rooms(&self.other_private_rooms, encoder)?;
@@ -1027,7 +1031,7 @@ impl ReadFromPacket for RoomMessageResponse {
 }
 
 impl ProtoEncode for RoomMessageResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_string(&self.room_name)?;
         encoder.encode_string(&self.user_name)?;
         encoder.encode_string(&self.message)
@@ -1074,7 +1078,7 @@ impl ReadFromPacket for RoomTickersResponse {
 }
 
 impl ProtoEncode for RoomTickersResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_string(&self.room_name)?;
         encoder.encode(&self.tickers)
     }
@@ -1132,7 +1136,7 @@ impl ReadFromPacket for RoomUserJoinedResponse {
 }
 
 impl ProtoEncode for RoomUserJoinedResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_string(&self.room_name)?;
         encoder.encode_string(&self.user.name)?;
         self.user.status.encode(encoder)?;
@@ -1179,7 +1183,7 @@ impl ReadFromPacket for RoomUserLeftResponse {
 }
 
 impl ProtoEncode for RoomUserLeftResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_string(&self.room_name)?;
         encoder.encode_string(&self.user_name)
     }
@@ -1227,7 +1231,7 @@ impl ReadFromPacket for UserInfoResponse {
 }
 
 impl ProtoEncode for UserInfoResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_string(&self.user_name)?;
         encoder.encode_u32(self.average_speed as u32)?;
         encoder.encode_u32(self.num_downloads as u32)?;
@@ -1278,7 +1282,7 @@ impl ReadFromPacket for UserStatusResponse {
 }
 
 impl ProtoEncode for UserStatusResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_string(&self.user_name)?;
         self.status.encode(encoder)?;
         encoder.encode_bool(self.is_privileged)
@@ -1315,7 +1319,7 @@ impl ReadFromPacket for WishlistIntervalResponse {
 }
 
 impl ProtoEncode for WishlistIntervalResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_u32(self.seconds)
     }
 }

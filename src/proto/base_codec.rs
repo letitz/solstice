@@ -299,96 +299,130 @@ impl<T: ProtoDecode> ProtoDecode for Vec<T> {
     }
 }
 
+#[derive(Debug, Error, PartialEq)]
+pub enum ProtoEncodeError {
+    #[error("encoded string length {length} is too large: {string:?}")]
+    StringTooLong {
+        /// The string that is too long to encode.
+        string: String,
+
+        /// The length of `string` in the Windows-1252 encoding.
+        /// Always larger than `u32::max_value()`.
+        length: usize,
+    },
+}
+
+impl From<ProtoEncodeError> for io::Error {
+    fn from(error: ProtoEncodeError) -> Self {
+        io::Error::new(io::ErrorKind::InvalidData, format!("{}", error))
+    }
+}
+
 /// A type for encoding various types of values into protocol messages.
 pub struct ProtoEncoder<'a> {
-    inner: &'a mut BytesMut,
+    /// The buffer to which the encoder appends encoded bytes.
+    buffer: &'a mut Vec<u8>,
 }
 
 /// This trait is implemented by types that can be encoded into messages using
 /// a `ProtoEncoder`.
 pub trait ProtoEncode {
+    // TODO: Rename to encode_to().
     /// Attempts to encode `self` with the given encoder.
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()>;
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError>;
 }
 
 impl<'a> ProtoEncoder<'a> {
     /// Wraps the given buffer for encoding values into.
     ///
-    /// The buffer is grown as required.
-    pub fn new(inner: &'a mut BytesMut) -> Self {
-        ProtoEncoder { inner: inner }
+    /// Encoded bytes are appended. The buffer is not pre-cleared.
+    pub fn new(buffer: &'a mut Vec<u8>) -> Self {
+        ProtoEncoder { buffer: buffer }
     }
 
-    /// Attempts to encode the given u32 value.
-    pub fn encode_u32(&mut self, val: u32) -> io::Result<()> {
-        self.inner.reserve(U32_BYTE_LEN);
-        self.inner.put_u32_le(val);
+    /// Encodes the given u32 value into the underlying buffer.
+    pub fn encode_u32(&mut self, val: u32) -> Result<(), ProtoEncodeError> {
+        self.buffer.extend_from_slice(&val.to_le_bytes());
         Ok(())
     }
 
-    /// Attempts to encode the given boolean value.
-    pub fn encode_bool(&mut self, val: bool) -> io::Result<()> {
-        self.inner.reserve(1);
-        self.inner.put_u8(val as u8);
+    /// Encodes the given u16 value into the underlying buffer.
+    pub fn encode_u16(&mut self, val: u16) -> Result<(), ProtoEncodeError> {
+        self.encode_u32(val as u32)
+    }
+
+    /// Encodes the given boolean value into the underlying buffer.
+    pub fn encode_bool(&mut self, val: bool) -> Result<(), ProtoEncodeError> {
+        self.buffer.push(val as u8);
         Ok(())
     }
 
-    /// Attempts to encode the given IPv4 address.
-    pub fn encode_ipv4_addr(&mut self, addr: net::Ipv4Addr) -> io::Result<()> {
-        let mut octets = addr.octets();
-        octets.reverse(); // Little endian.
-        self.inner.extend(&octets);
-        Ok(())
-    }
+    /// Encodes the given string into the underlying buffer.
+    pub fn encode_string(&mut self, val: &str) -> Result<(), ProtoEncodeError> {
+        // Record where we were when we started. This is where we will write
+        // the length prefix once we are done encoding the string. Until then
+        // we do not know how many bytes are needed to encode the string.
+        let prefix_position = self.buffer.len();
+        self.buffer.extend_from_slice(&[0; U32_BYTE_LEN]);
+        let string_position = prefix_position + U32_BYTE_LEN;
 
-    /// Attempts to encode the given string.
-    pub fn encode_string(&mut self, val: &str) -> io::Result<()> {
-        // Encode the string.
-        let bytes = match WINDOWS_1252.encode(val, EncoderTrap::Strict) {
-            Ok(bytes) => bytes,
+        // Encode the string. We are quite certain this cannot fail because we
+        // use EncoderTrap::Replace to replace any unencodable characters with
+        // '?' which is always encodable in Windows-1252.
+        WINDOWS_1252
+            .encode_to(val, EncoderTrap::Replace, self.buffer)
+            .unwrap();
+
+        // Calculate the length of the string we just encoded.
+        let length = self.buffer.len() - string_position;
+        let length_u32 = match u32::try_from(length) {
+            Ok(value) => value,
             Err(_) => {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, val.to_string()));
+                return Err(ProtoEncodeError::StringTooLong {
+                    string: val.to_string(),
+                    length: length,
+                })
             }
         };
-        // Prefix the bytes with the length.
-        self.encode_u32(bytes.len() as u32)?;
-        self.inner.extend(bytes);
+
+        // Write the length prefix in the space we initially reserved for it.
+        self.buffer[prefix_position..string_position].copy_from_slice(&length_u32.to_le_bytes());
+
         Ok(())
     }
 
-    /// Attempts to encode the given value.
+    /// Encodes the given value into the underlying buffer.
     ///
     /// Allows for easy encoding with type inference:
     /// ```
-    /// let val : Foo = Foo::new(bar);
-    /// encoder.encode(&val)?;
+    /// encoder.encode(&Foo::new(bar))?;
     /// ```
-    pub fn encode<T: ProtoEncode>(&mut self, val: &T) -> io::Result<()> {
+    pub fn encode<T: ProtoEncode>(&mut self, val: &T) -> Result<(), ProtoEncodeError> {
         val.encode(self)
     }
 }
 
 impl ProtoEncode for u32 {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_u32(*self)
     }
 }
 
+impl ProtoEncode for u16 {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+        encoder.encode_u16(*self)
+    }
+}
+
 impl ProtoEncode for bool {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_bool(*self)
     }
 }
 
-impl ProtoEncode for u16 {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
-        encoder.encode_u32(*self as u32)
-    }
-}
-
 impl ProtoEncode for net::Ipv4Addr {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
-        encoder.encode_ipv4_addr(*self)
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+        encoder.encode_u32(u32::from(*self))
     }
 }
 
@@ -401,32 +435,32 @@ impl ProtoEncode for net::Ipv4Addr {
 // Proto{De,En}code) but it is not really worth the hassle.
 
 impl ProtoEncode for str {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_string(self)
     }
 }
 
 impl ProtoEncode for String {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_string(self)
     }
 }
 
 impl<'a> ProtoEncode for &'a String {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_string(*self)
     }
 }
 
 impl<T: ProtoEncode, U: ProtoEncode> ProtoEncode for (T, U) {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         self.0.encode(encoder)?;
         self.1.encode(encoder)
     }
 }
 
 impl<T: ProtoEncode> ProtoEncode for [T] {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         encoder.encode_u32(self.len() as u32)?;
         for ref item in self {
             item.encode(encoder)?;
@@ -436,7 +470,7 @@ impl<T: ProtoEncode> ProtoEncode for [T] {
 }
 
 impl<T: ProtoEncode> ProtoEncode for Vec<T> {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> io::Result<()> {
+    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
         let slice: &[T] = &*self;
         slice.encode(encoder)
     }

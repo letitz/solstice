@@ -9,6 +9,8 @@
 //! This enables wrapping AsyncRead and AsyncWrite objects into Stream and Sink
 //! objects using tokio_codec's FramedRead and FramedWrite adapters.
 
+// TODO: Refactor all this into futures and remove tokio dependency.
+
 use std::io;
 use std::marker;
 
@@ -37,18 +39,19 @@ impl<T: ProtoEncode> tokio_codec::Encoder for LengthPrefixedEncoder<T> {
     type Error = io::Error;
 
     fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        // Split buffer into two parts: the length prefix and the message.
-        dst.reserve(U32_BYTE_LEN);
-        let mut msg_dst = dst.split_off(U32_BYTE_LEN);
-
         // Encode the message.
-        item.encode(&mut ProtoEncoder::new(&mut msg_dst))?;
+        // Note that this is ugly right now, but will get better once we switch
+        // off of Tokio and onto regular futures.
+        let mut buffer = vec![];
+        ProtoEncoder::new(&mut buffer).encode(&item)?;
 
         // Encode the message length.
-        ProtoEncoder::new(dst).encode_u32(msg_dst.len() as u32)?;
+        let mut prefix = vec![];
+        ProtoEncoder::new(&mut prefix).encode_u32(buffer.len() as u32)?;
 
-        // Reassemble both parts into one contiguous buffer.
-        dst.unsplit(msg_dst);
+        dst.reserve(prefix.len() + buffer.len());
+        dst.extend_from_slice(&prefix);
+        dst.extend_from_slice(&buffer);
         Ok(())
     }
 }
