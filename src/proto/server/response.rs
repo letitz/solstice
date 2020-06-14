@@ -1348,7 +1348,7 @@ mod tests {
         expect_io_error(
             result,
             io::ErrorKind::InvalidData,
-            "unknown server response code: 1337",
+            "decoding value at position 0: unknown server response code: 1337",
         );
     }
 

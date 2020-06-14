@@ -171,7 +171,7 @@ mod tests {
         expect_io_error(
             result,
             io::ErrorKind::InvalidData,
-            "unknown peer message code: 1337",
+            "decoding value at position 0: unknown peer message code: 1337",
         );
     }
 
