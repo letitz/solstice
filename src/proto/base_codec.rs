@@ -96,26 +96,13 @@ pub enum ProtoDecodeError {
 
 impl From<ProtoDecodeError> for io::Error {
     fn from(error: ProtoDecodeError) -> Self {
-        match &error {
-            &ProtoDecodeError::NotEnoughData { .. } => unexpected_eof_error(format!("{}", error)),
-            _ => invalid_data_error(format!("{}", error)),
-        }
+        let kind = match &error {
+            &ProtoDecodeError::NotEnoughData { .. } => io::ErrorKind::UnexpectedEof,
+            _ => io::ErrorKind::InvalidData,
+        };
+        let message = format!("{}", &error);
+        io::Error::new(kind, message)
     }
-}
-
-/// Builds an UnexpectedEof error with the given message.
-fn unexpected_eof_error(message: String) -> io::Error {
-    io::Error::new(io::ErrorKind::UnexpectedEof, message)
-}
-
-/// Builds an InvalidData error with the given message.
-fn invalid_data_error(message: String) -> io::Error {
-    io::Error::new(io::ErrorKind::InvalidData, message)
-}
-
-/// Annotates the given error with the given context.
-fn annotate_error(error: &io::Error, context: &str) -> io::Error {
-    io::Error::new(error.kind(), format!("{}: {}", context, error))
 }
 
 /// A type for decoding various types of values from protocol messages.
