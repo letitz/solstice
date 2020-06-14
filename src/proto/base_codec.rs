@@ -519,7 +519,7 @@ pub mod tests {
 
     #[test]
     fn decode_u32_unexpected_eof() {
-        let buffer = BytesMut::from(vec![13]);
+        let buffer = vec![13];
         let mut decoder = ProtoDecoder::new(&buffer);
 
         let result = decoder.decode::<u32>();
@@ -545,7 +545,7 @@ pub mod tests {
 
     #[test]
     fn decode_bool_false() {
-        let buffer = BytesMut::from(vec![0]);
+        let buffer = vec![0];
         let mut decoder = ProtoDecoder::new(&buffer);
 
         let val = decoder.decode::<bool>().unwrap();
@@ -556,7 +556,7 @@ pub mod tests {
 
     #[test]
     fn decode_bool_true() {
-        let buffer = BytesMut::from(vec![1]);
+        let buffer = vec![1];
         let mut decoder = ProtoDecoder::new(&buffer);
 
         let val = decoder.decode::<bool>().unwrap();
@@ -567,7 +567,7 @@ pub mod tests {
 
     #[test]
     fn decode_bool_invalid() {
-        let buffer = BytesMut::from(vec![42]);
+        let buffer = vec![42];
 
         let result = ProtoDecoder::new(&buffer).decode::<bool>();
 
@@ -580,7 +580,7 @@ pub mod tests {
 
     #[test]
     fn decode_bool_unexpected_eof() {
-        let buffer = BytesMut::new();
+        let buffer = vec![];
 
         let result = ProtoDecoder::new(&buffer).decode::<bool>();
 
@@ -615,9 +615,8 @@ pub mod tests {
 
     #[test]
     fn decode_u16() {
-        for &(expected_val, ref bytes) in &U32_ENCODINGS {
-            let buffer = BytesMut::from(bytes.to_vec());
-            let mut decoder = ProtoDecoder::new(&buffer);
+        for &(expected_val, ref buffer) in &U32_ENCODINGS {
+            let mut decoder = ProtoDecoder::new(buffer);
 
             if expected_val <= u16::MAX as u32 {
                 let val = decoder.decode::<u16>().unwrap();
@@ -638,7 +637,7 @@ pub mod tests {
 
     #[test]
     fn decode_u16_unexpected_eof() {
-        let buffer = BytesMut::new();
+        let buffer = vec![];
         let mut decoder = ProtoDecoder::new(&buffer);
 
         let result = decoder.decode::<u16>();
@@ -676,9 +675,8 @@ pub mod tests {
 
     #[test]
     fn decode_ipv4() {
-        for &(expected_val, ref bytes) in &U32_ENCODINGS {
-            let buffer = BytesMut::from(bytes.to_vec());
-            let mut decoder = ProtoDecoder::new(&buffer);
+        for &(expected_val, ref buffer) in &U32_ENCODINGS {
+            let mut decoder = ProtoDecoder::new(buffer);
 
             let val = decoder.decode::<net::Ipv4Addr>().unwrap();
 
@@ -725,8 +723,7 @@ pub mod tests {
 
     #[test]
     fn decode_string() {
-        for &(expected_string, bytes) in &STRING_ENCODINGS {
-            let buffer = BytesMut::from(bytes);
+        for &(expected_string, buffer) in &STRING_ENCODINGS {
             let mut decoder = ProtoDecoder::new(&buffer);
 
             let string = decoder.decode::<String>().unwrap();
@@ -763,15 +760,14 @@ pub mod tests {
 
     #[test]
     fn decode_pair_u32_string() {
-        let mut bytes = vec![];
+        let mut buffer = vec![];
 
         let (expected_integer, ref integer_bytes) = U32_ENCODINGS[0];
         let (expected_string, string_bytes) = STRING_ENCODINGS[0];
 
-        bytes.extend(integer_bytes);
-        bytes.extend(string_bytes);
+        buffer.extend(integer_bytes);
+        buffer.extend(string_bytes);
 
-        let buffer = BytesMut::from(bytes);
         let mut decoder = ProtoDecoder::new(&buffer);
 
         let pair = decoder.decode::<(u32, String)>().unwrap();
@@ -803,13 +799,12 @@ pub mod tests {
     #[test]
     fn decode_u32_vector() {
         let mut expected_vec = vec![];
-        let mut bytes = vec![U32_ENCODINGS.len() as u8, 0, 0, 0];
+        let mut buffer = vec![U32_ENCODINGS.len() as u8, 0, 0, 0];
         for &(expected_val, ref encoded_bytes) in &U32_ENCODINGS {
             expected_vec.push(expected_val);
-            bytes.extend(encoded_bytes);
+            buffer.extend(encoded_bytes);
         }
 
-        let buffer = BytesMut::from(bytes);
         let mut decoder = ProtoDecoder::new(&buffer);
 
         let vec = decoder.decode::<Vec<u32>>().unwrap();
