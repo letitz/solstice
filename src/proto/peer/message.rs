@@ -159,7 +159,7 @@ mod tests {
 
     use bytes::BytesMut;
 
-    use crate::proto::base_codec::tests::roundtrip;
+    use crate::proto::value_codec::tests::roundtrip;
     use crate::proto::{ValueDecodeError, ValueDecoder};
 
     use super::*;

@@ -17,9 +17,9 @@ use std::marker;
 use bytes::BytesMut;
 use tokio_codec;
 
-use super::base_codec::{ValueDecode, ValueDecoder, ValueEncode, ValueEncoder, U32_BYTE_LEN};
 use super::peer::Message;
 use super::server::{ServerRequest, ServerResponse};
+use super::value_codec::{ValueDecode, ValueDecoder, ValueEncode, ValueEncoder, U32_BYTE_LEN};
 
 /// Implements tokio's Encoder trait for types that implement ValueEncode.
 pub struct LengthPrefixedEncoder<T> {

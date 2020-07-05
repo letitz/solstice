@@ -1,4 +1,4 @@
-//! This module provides encoding and decoding functionality for basic types.
+//! This module provides encoding and decoding functionality for basic values.
 //!
 //! The protocol is pretty basic, though quirky. Base types are serialized in
 //! the following way:
