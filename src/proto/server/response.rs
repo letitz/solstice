@@ -4,8 +4,8 @@ use std::net;
 use crate::proto::packet::{Packet, PacketReadError, ReadFromPacket};
 use crate::proto::server::constants::*;
 use crate::proto::{
-    ProtoDecode, ProtoDecodeError, ProtoDecoder, ProtoEncode, ProtoEncodeError, ProtoEncoder, User,
-    UserStatus,
+    User, UserStatus, ValueDecode, ValueDecodeError, ValueDecoder, ValueEncode, ValueEncodeError,
+    ValueEncoder,
 };
 
 /*=================*
@@ -92,8 +92,8 @@ impl ReadFromPacket for ServerResponse {
     }
 }
 
-impl ProtoEncode for ServerResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for ServerResponse {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         match *self {
             ServerResponse::ConnectToPeerResponse(ref response) => {
                 encoder.encode_u32(CODE_CONNECT_TO_PEER)?;
@@ -171,8 +171,8 @@ impl ProtoEncode for ServerResponse {
     }
 }
 
-impl ProtoDecode for ServerResponse {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for ServerResponse {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let position = decoder.position();
         let code: u32 = decoder.decode()?;
         let response = match code {
@@ -245,7 +245,7 @@ impl ProtoDecode for ServerResponse {
                 ServerResponse::WishlistIntervalResponse(response)
             }
             _ => {
-                return Err(ProtoDecodeError::InvalidData {
+                return Err(ValueDecodeError::InvalidData {
                     value_name: "server response code".to_string(),
                     cause: format!("unknown value {}", code),
                     position: position,
@@ -290,8 +290,8 @@ impl ReadFromPacket for ConnectToPeerResponse {
     }
 }
 
-impl ProtoEncode for ConnectToPeerResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for ConnectToPeerResponse {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode(&self.user_name)?;
         encoder.encode(&self.connection_type)?;
         encoder.encode(&self.ip)?;
@@ -301,8 +301,8 @@ impl ProtoEncode for ConnectToPeerResponse {
     }
 }
 
-impl ProtoDecode for ConnectToPeerResponse {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for ConnectToPeerResponse {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let user_name = decoder.decode()?;
         let connection_type = decoder.decode()?;
         let ip = decoder.decode()?;
@@ -346,16 +346,16 @@ impl ReadFromPacket for FileSearchResponse {
     }
 }
 
-impl ProtoEncode for FileSearchResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for FileSearchResponse {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.user_name)?;
         encoder.encode_u32(self.ticket)?;
         encoder.encode_string(&self.query)
     }
 }
 
-impl ProtoDecode for FileSearchResponse {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for FileSearchResponse {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let user_name = decoder.decode()?;
         let ticket = decoder.decode()?;
         let query = decoder.decode()?;
@@ -409,8 +409,8 @@ impl ReadFromPacket for LoginResponse {
     }
 }
 
-impl ProtoEncode for LoginResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for LoginResponse {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         match *self {
             LoginResponse::LoginOk {
                 ref motd,
@@ -430,8 +430,8 @@ impl ProtoEncode for LoginResponse {
     }
 }
 
-impl ProtoDecode for LoginResponse {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for LoginResponse {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let ok: bool = decoder.decode()?;
         if !ok {
             let reason = decoder.decode()?;
@@ -471,14 +471,14 @@ impl ReadFromPacket for ParentMinSpeedResponse {
     }
 }
 
-impl ProtoEncode for ParentMinSpeedResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for ParentMinSpeedResponse {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_u32(self.value)
     }
 }
 
-impl ProtoDecode for ParentMinSpeedResponse {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for ParentMinSpeedResponse {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let value = decoder.decode()?;
         Ok(ParentMinSpeedResponse { value })
     }
@@ -500,14 +500,14 @@ impl ReadFromPacket for ParentSpeedRatioResponse {
     }
 }
 
-impl ProtoEncode for ParentSpeedRatioResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for ParentSpeedRatioResponse {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_u32(self.value)
     }
 }
 
-impl ProtoDecode for ParentSpeedRatioResponse {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for ParentSpeedRatioResponse {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let value = decoder.decode()?;
         Ok(ParentSpeedRatioResponse { value })
     }
@@ -534,16 +534,16 @@ impl ReadFromPacket for PeerAddressResponse {
     }
 }
 
-impl ProtoEncode for PeerAddressResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for PeerAddressResponse {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode(&self.username)?;
         encoder.encode(&self.ip)?;
         encoder.encode_u16(self.port)
     }
 }
 
-impl ProtoDecode for PeerAddressResponse {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for PeerAddressResponse {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let username = decoder.decode()?;
         let ip = decoder.decode()?;
         let port = decoder.decode()?;
@@ -567,14 +567,14 @@ impl ReadFromPacket for PrivilegedUsersResponse {
     }
 }
 
-impl ProtoEncode for PrivilegedUsersResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for PrivilegedUsersResponse {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode(&self.users)
     }
 }
 
-impl ProtoDecode for PrivilegedUsersResponse {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for PrivilegedUsersResponse {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let users = decoder.decode()?;
         Ok(PrivilegedUsersResponse { users })
     }
@@ -727,8 +727,8 @@ fn build_user(
     }
 }
 
-impl ProtoEncode for UserInfo {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for UserInfo {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_u32(self.average_speed)?;
         encoder.encode_u32(self.num_downloads)?;
         encoder.encode_u32(self.unknown)?;
@@ -737,8 +737,8 @@ impl ProtoEncode for UserInfo {
     }
 }
 
-impl ProtoDecode for UserInfo {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for UserInfo {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let average_speed = decoder.decode()?;
         let num_downloads = decoder.decode()?;
         let unknown = decoder.decode()?;
@@ -754,8 +754,8 @@ impl ProtoDecode for UserInfo {
     }
 }
 
-impl ProtoEncode for RoomJoinResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for RoomJoinResponse {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         let mut user_names = vec![];
         let mut user_statuses = vec![];
         let mut user_infos = vec![];
@@ -813,8 +813,8 @@ fn build_users(
     users
 }
 
-impl ProtoDecode for RoomJoinResponse {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for RoomJoinResponse {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let room_name = decoder.decode()?;
         let user_names = decoder.decode()?;
         let user_statuses = decoder.decode()?;
@@ -863,14 +863,14 @@ impl ReadFromPacket for RoomLeaveResponse {
     }
 }
 
-impl ProtoEncode for RoomLeaveResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for RoomLeaveResponse {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.room_name)
     }
 }
 
-impl ProtoDecode for RoomLeaveResponse {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for RoomLeaveResponse {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let room_name = decoder.decode()?;
         Ok(RoomLeaveResponse { room_name })
     }
@@ -959,7 +959,7 @@ impl RoomListResponse {
         rooms
     }
 
-    fn decode_rooms(decoder: &mut ProtoDecoder) -> Result<Vec<(String, u32)>, ProtoDecodeError> {
+    fn decode_rooms(decoder: &mut ValueDecoder) -> Result<Vec<(String, u32)>, ValueDecodeError> {
         let room_names = decoder.decode()?;
         let user_counts = decoder.decode()?;
         Ok(Self::build_rooms(room_names, user_counts))
@@ -967,8 +967,8 @@ impl RoomListResponse {
 
     fn encode_rooms(
         rooms: &[(String, u32)],
-        encoder: &mut ProtoEncoder,
-    ) -> Result<(), ProtoEncodeError> {
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         let mut room_names = vec![];
         let mut user_counts = vec![];
 
@@ -982,8 +982,8 @@ impl RoomListResponse {
     }
 }
 
-impl ProtoEncode for RoomListResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for RoomListResponse {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         Self::encode_rooms(&self.rooms, encoder)?;
         Self::encode_rooms(&self.owned_private_rooms, encoder)?;
         Self::encode_rooms(&self.other_private_rooms, encoder)?;
@@ -991,8 +991,8 @@ impl ProtoEncode for RoomListResponse {
     }
 }
 
-impl ProtoDecode for RoomListResponse {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for RoomListResponse {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let rooms = RoomListResponse::decode_rooms(decoder)?;
         let owned_private_rooms = RoomListResponse::decode_rooms(decoder)?;
         let other_private_rooms = RoomListResponse::decode_rooms(decoder)?;
@@ -1030,16 +1030,16 @@ impl ReadFromPacket for RoomMessageResponse {
     }
 }
 
-impl ProtoEncode for RoomMessageResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for RoomMessageResponse {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.room_name)?;
         encoder.encode_string(&self.user_name)?;
         encoder.encode_string(&self.message)
     }
 }
 
-impl ProtoDecode for RoomMessageResponse {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for RoomMessageResponse {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let room_name = decoder.decode()?;
         let user_name = decoder.decode()?;
         let message = decoder.decode()?;
@@ -1077,15 +1077,15 @@ impl ReadFromPacket for RoomTickersResponse {
     }
 }
 
-impl ProtoEncode for RoomTickersResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for RoomTickersResponse {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.room_name)?;
         encoder.encode(&self.tickers)
     }
 }
 
-impl ProtoDecode for RoomTickersResponse {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for RoomTickersResponse {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let room_name = decoder.decode()?;
         let tickers = decoder.decode()?;
         Ok(RoomTickersResponse { room_name, tickers })
@@ -1135,8 +1135,8 @@ impl ReadFromPacket for RoomUserJoinedResponse {
     }
 }
 
-impl ProtoEncode for RoomUserJoinedResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for RoomUserJoinedResponse {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.room_name)?;
         encoder.encode_string(&self.user.name)?;
         self.user.status.encode(encoder)?;
@@ -1146,8 +1146,8 @@ impl ProtoEncode for RoomUserJoinedResponse {
     }
 }
 
-impl ProtoDecode for RoomUserJoinedResponse {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for RoomUserJoinedResponse {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let room_name = decoder.decode()?;
         let user_name = decoder.decode()?;
         let status = decoder.decode()?;
@@ -1182,15 +1182,15 @@ impl ReadFromPacket for RoomUserLeftResponse {
     }
 }
 
-impl ProtoEncode for RoomUserLeftResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for RoomUserLeftResponse {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.room_name)?;
         encoder.encode_string(&self.user_name)
     }
 }
 
-impl ProtoDecode for RoomUserLeftResponse {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for RoomUserLeftResponse {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let room_name = decoder.decode()?;
         let user_name = decoder.decode()?;
         Ok(RoomUserLeftResponse {
@@ -1230,8 +1230,8 @@ impl ReadFromPacket for UserInfoResponse {
     }
 }
 
-impl ProtoEncode for UserInfoResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for UserInfoResponse {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.user_name)?;
         encoder.encode_u32(self.average_speed as u32)?;
         encoder.encode_u32(self.num_downloads as u32)?;
@@ -1240,8 +1240,8 @@ impl ProtoEncode for UserInfoResponse {
     }
 }
 
-impl ProtoDecode for UserInfoResponse {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for UserInfoResponse {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let user_name = decoder.decode()?;
         let average_speed: u32 = decoder.decode()?;
         let num_downloads: u32 = decoder.decode()?;
@@ -1281,16 +1281,16 @@ impl ReadFromPacket for UserStatusResponse {
     }
 }
 
-impl ProtoEncode for UserStatusResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for UserStatusResponse {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.user_name)?;
         self.status.encode(encoder)?;
         encoder.encode_bool(self.is_privileged)
     }
 }
 
-impl ProtoDecode for UserStatusResponse {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for UserStatusResponse {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let user_name = decoder.decode()?;
         let status = decoder.decode()?;
         let is_privileged = decoder.decode()?;
@@ -1318,14 +1318,14 @@ impl ReadFromPacket for WishlistIntervalResponse {
     }
 }
 
-impl ProtoEncode for WishlistIntervalResponse {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for WishlistIntervalResponse {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_u32(self.seconds)
     }
 }
 
-impl ProtoDecode for WishlistIntervalResponse {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for WishlistIntervalResponse {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let seconds = decoder.decode()?;
         Ok(WishlistIntervalResponse { seconds })
     }
@@ -1343,7 +1343,7 @@ mod tests {
     use bytes::BytesMut;
 
     use crate::proto::base_codec::tests::roundtrip;
-    use crate::proto::{ProtoDecodeError, ProtoDecoder};
+    use crate::proto::{ValueDecodeError, ValueDecoder};
 
     use super::*;
 
@@ -1351,11 +1351,11 @@ mod tests {
     fn invalid_code() {
         let bytes = BytesMut::from(vec![57, 5, 0, 0]);
 
-        let result = ProtoDecoder::new(&bytes).decode::<ServerResponse>();
+        let result = ValueDecoder::new(&bytes).decode::<ServerResponse>();
 
         assert_eq!(
             result,
-            Err(ProtoDecodeError::InvalidData {
+            Err(ValueDecodeError::InvalidData {
                 value_name: "server response code".to_string(),
                 cause: "unknown value 1337".to_string(),
                 position: 0,

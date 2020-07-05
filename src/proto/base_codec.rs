@@ -40,7 +40,7 @@ pub trait Encode<T> {
 // TODO: Add backtrace fields to each enum variant once std::backtrace is
 // stabilized.
 #[derive(PartialEq, Error, Debug)]
-pub enum ProtoDecodeError {
+pub enum ValueDecodeError {
     #[error("at position {position}: not enough bytes to decode: expected {expected}, found {remaining}")]
     NotEnoughData {
         /// The number of bytes the decoder expected to read.
@@ -93,10 +93,10 @@ pub enum ProtoDecodeError {
     },
 }
 
-impl From<ProtoDecodeError> for io::Error {
-    fn from(error: ProtoDecodeError) -> Self {
+impl From<ValueDecodeError> for io::Error {
+    fn from(error: ValueDecodeError) -> Self {
         let kind = match &error {
-            &ProtoDecodeError::NotEnoughData { .. } => io::ErrorKind::UnexpectedEof,
+            &ValueDecodeError::NotEnoughData { .. } => io::ErrorKind::UnexpectedEof,
             _ => io::ErrorKind::InvalidData,
         };
         let message = format!("{}", &error);
@@ -105,7 +105,7 @@ impl From<ProtoDecodeError> for io::Error {
 }
 
 /// A type for decoding various types of values from protocol messages.
-pub struct ProtoDecoder<'a> {
+pub struct ValueDecoder<'a> {
     // The buffer we are decoding from.
     //
     // Invariant: `position <= buffer.len()`.
@@ -123,13 +123,13 @@ pub struct ProtoDecoder<'a> {
 }
 
 /// This trait is implemented by types that can be decoded from messages using
-/// a `ProtoDecoder`.
-pub trait ProtoDecode: Sized {
+/// a `ValueDecoder`.
+pub trait ValueDecode: Sized {
     /// Attempts to decode a value of this type with the given decoder.
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError>;
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError>;
 }
 
-impl<'a> ProtoDecoder<'a> {
+impl<'a> ValueDecoder<'a> {
     /// Wraps the given byte buffer.
     pub fn new(buffer: &'a [u8]) -> Self {
         Self {
@@ -166,9 +166,9 @@ impl<'a> ProtoDecoder<'a> {
     ///
     /// Returns a slice of size `n` if successful, in which case this decoder
     /// advances its internal position by `n`.
-    fn consume(&mut self, n: usize) -> Result<&[u8], ProtoDecodeError> {
+    fn consume(&mut self, n: usize) -> Result<&[u8], ValueDecodeError> {
         if self.remaining() < n {
-            return Err(ProtoDecodeError::NotEnoughData {
+            return Err(ValueDecodeError::NotEnoughData {
                 expected: n,
                 remaining: self.remaining(),
                 position: self.position,
@@ -184,7 +184,7 @@ impl<'a> ProtoDecoder<'a> {
     }
 
     /// Attempts to decode a u32 value.
-    fn decode_u32(&mut self) -> Result<u32, ProtoDecodeError> {
+    fn decode_u32(&mut self) -> Result<u32, ValueDecodeError> {
         let bytes = self.consume(U32_BYTE_LEN)?;
         // The conversion from slice to fixed-size array cannot fail, because
         // consume() guarantees that its return value is of size n.
@@ -192,12 +192,12 @@ impl<'a> ProtoDecoder<'a> {
         Ok(u32::from_le_bytes(array))
     }
 
-    fn decode_u16(&mut self) -> Result<u16, ProtoDecodeError> {
+    fn decode_u16(&mut self) -> Result<u16, ValueDecodeError> {
         let position = self.position;
         let n = self.decode_u32()?;
         match u16::try_from(n) {
             Ok(value) => Ok(value),
-            Err(_) => Err(ProtoDecodeError::InvalidU16 {
+            Err(_) => Err(ValueDecodeError::InvalidU16 {
                 value: n,
                 position: position,
             }),
@@ -205,13 +205,13 @@ impl<'a> ProtoDecoder<'a> {
     }
 
     /// Attempts to decode a boolean value.
-    fn decode_bool(&mut self) -> Result<bool, ProtoDecodeError> {
+    fn decode_bool(&mut self) -> Result<bool, ValueDecodeError> {
         let position = self.position;
         let bytes = self.consume(1)?;
         match bytes[0] {
             0 => Ok(false),
             1 => Ok(true),
-            n => Err(ProtoDecodeError::InvalidBool {
+            n => Err(ValueDecodeError::InvalidBool {
                 value: n,
                 position: position,
             }),
@@ -219,7 +219,7 @@ impl<'a> ProtoDecoder<'a> {
     }
 
     /// Attempts to decode a string value.
-    fn decode_string(&mut self) -> Result<String, ProtoDecodeError> {
+    fn decode_string(&mut self) -> Result<String, ValueDecodeError> {
         let length = self.decode_u32()? as usize;
 
         let position = self.position;
@@ -228,7 +228,7 @@ impl<'a> ProtoDecoder<'a> {
         let result = WINDOWS_1252.decode(bytes, DecoderTrap::Strict);
         match result {
             Ok(string) => Ok(string),
-            Err(error) => Err(ProtoDecodeError::InvalidString {
+            Err(error) => Err(ValueDecodeError::InvalidString {
                 cause: error.to_string(),
                 position: position,
             }),
@@ -242,52 +242,52 @@ impl<'a> ProtoDecoder<'a> {
     /// ```
     /// let val: Foo = decoder.decode()?;
     /// ```
-    pub fn decode<T: ProtoDecode>(&mut self) -> Result<T, ProtoDecodeError> {
+    pub fn decode<T: ValueDecode>(&mut self) -> Result<T, ValueDecodeError> {
         T::decode_from(self)
     }
 }
 
-impl ProtoDecode for u32 {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for u32 {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         decoder.decode_u32()
     }
 }
 
-impl ProtoDecode for u16 {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for u16 {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         decoder.decode_u16()
     }
 }
 
-impl ProtoDecode for bool {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for bool {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         decoder.decode_bool()
     }
 }
 
-impl ProtoDecode for net::Ipv4Addr {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for net::Ipv4Addr {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let ip = decoder.decode_u32()?;
         Ok(net::Ipv4Addr::from(ip))
     }
 }
 
-impl ProtoDecode for String {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for String {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         decoder.decode_string()
     }
 }
 
-impl<T: ProtoDecode, U: ProtoDecode> ProtoDecode for (T, U) {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl<T: ValueDecode, U: ValueDecode> ValueDecode for (T, U) {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let first = decoder.decode()?;
         let second = decoder.decode()?;
         Ok((first, second))
     }
 }
 
-impl<T: ProtoDecode> ProtoDecode for Vec<T> {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl<T: ValueDecode> ValueDecode for Vec<T> {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let len = decoder.decode_u32()? as usize;
         let mut vec = Vec::with_capacity(len);
         for _ in 0..len {
@@ -299,7 +299,7 @@ impl<T: ProtoDecode> ProtoDecode for Vec<T> {
 }
 
 #[derive(Debug, Error, PartialEq)]
-pub enum ProtoEncodeError {
+pub enum ValueEncodeError {
     #[error("encoded string length {length} is too large: {string:?}")]
     StringTooLong {
         /// The string that is too long to encode.
@@ -311,53 +311,53 @@ pub enum ProtoEncodeError {
     },
 }
 
-impl From<ProtoEncodeError> for io::Error {
-    fn from(error: ProtoEncodeError) -> Self {
+impl From<ValueEncodeError> for io::Error {
+    fn from(error: ValueEncodeError) -> Self {
         io::Error::new(io::ErrorKind::InvalidData, format!("{}", error))
     }
 }
 
 /// A type for encoding various types of values into protocol messages.
-pub struct ProtoEncoder<'a> {
+pub struct ValueEncoder<'a> {
     /// The buffer to which the encoder appends encoded bytes.
     buffer: &'a mut Vec<u8>,
 }
 
 /// This trait is implemented by types that can be encoded into messages using
-/// a `ProtoEncoder`.
-pub trait ProtoEncode {
+/// a `ValueEncoder`.
+pub trait ValueEncode {
     // TODO: Rename to encode_to().
     /// Attempts to encode `self` with the given encoder.
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError>;
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError>;
 }
 
-impl<'a> ProtoEncoder<'a> {
+impl<'a> ValueEncoder<'a> {
     /// Wraps the given buffer for encoding values into.
     ///
     /// Encoded bytes are appended. The buffer is not pre-cleared.
     pub fn new(buffer: &'a mut Vec<u8>) -> Self {
-        ProtoEncoder { buffer: buffer }
+        ValueEncoder { buffer: buffer }
     }
 
     /// Encodes the given u32 value into the underlying buffer.
-    pub fn encode_u32(&mut self, val: u32) -> Result<(), ProtoEncodeError> {
+    pub fn encode_u32(&mut self, val: u32) -> Result<(), ValueEncodeError> {
         self.buffer.extend_from_slice(&val.to_le_bytes());
         Ok(())
     }
 
     /// Encodes the given u16 value into the underlying buffer.
-    pub fn encode_u16(&mut self, val: u16) -> Result<(), ProtoEncodeError> {
+    pub fn encode_u16(&mut self, val: u16) -> Result<(), ValueEncodeError> {
         self.encode_u32(val as u32)
     }
 
     /// Encodes the given boolean value into the underlying buffer.
-    pub fn encode_bool(&mut self, val: bool) -> Result<(), ProtoEncodeError> {
+    pub fn encode_bool(&mut self, val: bool) -> Result<(), ValueEncodeError> {
         self.buffer.push(val as u8);
         Ok(())
     }
 
     /// Encodes the given string into the underlying buffer.
-    pub fn encode_string(&mut self, val: &str) -> Result<(), ProtoEncodeError> {
+    pub fn encode_string(&mut self, val: &str) -> Result<(), ValueEncodeError> {
         // Record where we were when we started. This is where we will write
         // the length prefix once we are done encoding the string. Until then
         // we do not know how many bytes are needed to encode the string.
@@ -377,7 +377,7 @@ impl<'a> ProtoEncoder<'a> {
         let length_u32 = match u32::try_from(length) {
             Ok(value) => value,
             Err(_) => {
-                return Err(ProtoEncodeError::StringTooLong {
+                return Err(ValueEncodeError::StringTooLong {
                     string: val.to_string(),
                     length: length,
                 })
@@ -396,31 +396,31 @@ impl<'a> ProtoEncoder<'a> {
     /// ```
     /// encoder.encode(&Foo::new(bar))?;
     /// ```
-    pub fn encode<T: ProtoEncode>(&mut self, val: &T) -> Result<(), ProtoEncodeError> {
+    pub fn encode<T: ValueEncode>(&mut self, val: &T) -> Result<(), ValueEncodeError> {
         val.encode(self)
     }
 }
 
-impl ProtoEncode for u32 {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for u32 {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_u32(*self)
     }
 }
 
-impl ProtoEncode for u16 {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for u16 {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_u16(*self)
     }
 }
 
-impl ProtoEncode for bool {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for bool {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_bool(*self)
     }
 }
 
-impl ProtoEncode for net::Ipv4Addr {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for net::Ipv4Addr {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_u32(u32::from(*self))
     }
 }
@@ -433,33 +433,33 @@ impl ProtoEncode for net::Ipv4Addr {
 // wrapping primitive types in a newtype for which we implement
 // Proto{De,En}code) but it is not really worth the hassle.
 
-impl ProtoEncode for str {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for str {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_string(self)
     }
 }
 
-impl ProtoEncode for String {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for String {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_string(self)
     }
 }
 
-impl<'a> ProtoEncode for &'a String {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl<'a> ValueEncode for &'a String {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_string(*self)
     }
 }
 
-impl<T: ProtoEncode, U: ProtoEncode> ProtoEncode for (T, U) {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl<T: ValueEncode, U: ValueEncode> ValueEncode for (T, U) {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         self.0.encode(encoder)?;
         self.1.encode(encoder)
     }
 }
 
-impl<T: ProtoEncode> ProtoEncode for [T] {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl<T: ValueEncode> ValueEncode for [T] {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_u32(self.len() as u32)?;
         for ref item in self {
             item.encode(encoder)?;
@@ -468,8 +468,8 @@ impl<T: ProtoEncode> ProtoEncode for [T] {
     }
 }
 
-impl<T: ProtoEncode> ProtoEncode for Vec<T> {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl<T: ValueEncode> ValueEncode for Vec<T> {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         let slice: &[T] = &*self;
         slice.encode(encoder)
     }
@@ -487,19 +487,19 @@ pub mod tests {
     use std::u16;
     use std::u32;
 
-    use super::{ProtoDecode, ProtoDecodeError, ProtoDecoder, ProtoEncode, ProtoEncoder};
+    use super::{ValueDecode, ValueDecodeError, ValueDecoder, ValueEncode, ValueEncoder};
 
     // Declared here because assert_eq!(bytes, &[]) fails to infer types.
     const EMPTY_BYTES: &'static [u8] = &[];
 
     pub fn roundtrip<T>(input: T)
     where
-        T: fmt::Debug + Eq + PartialEq + ProtoEncode + ProtoDecode,
+        T: fmt::Debug + Eq + PartialEq + ValueEncode + ValueDecode,
     {
         let mut bytes = vec![];
 
-        ProtoEncoder::new(&mut bytes).encode(&input).unwrap();
-        let output = ProtoDecoder::new(&bytes).decode::<T>().unwrap();
+        ValueEncoder::new(&mut bytes).encode(&input).unwrap();
+        let output = ValueDecoder::new(&bytes).decode::<T>().unwrap();
 
         assert_eq!(output, input);
     }
@@ -523,7 +523,7 @@ pub mod tests {
             let mut expected_bytes = vec![13];
             expected_bytes.extend(encoded_bytes);
 
-            ProtoEncoder::new(&mut bytes).encode_u32(val).unwrap();
+            ValueEncoder::new(&mut bytes).encode_u32(val).unwrap();
             assert_eq!(bytes, expected_bytes);
         }
     }
@@ -532,7 +532,7 @@ pub mod tests {
     fn decode_u32() {
         for &(expected_val, ref bytes) in &U32_ENCODINGS {
             let buffer = bytes.to_vec();
-            let mut decoder = ProtoDecoder::new(&buffer);
+            let mut decoder = ValueDecoder::new(&buffer);
 
             let val = decoder.decode::<u32>().unwrap();
 
@@ -551,13 +551,13 @@ pub mod tests {
     #[test]
     fn decode_u32_unexpected_eof() {
         let buffer = vec![13];
-        let mut decoder = ProtoDecoder::new(&buffer);
+        let mut decoder = ValueDecoder::new(&buffer);
 
         let result = decoder.decode::<u32>();
 
         assert_eq!(
             result,
-            Err(ProtoDecodeError::NotEnoughData {
+            Err(ValueDecodeError::NotEnoughData {
                 expected: 4,
                 remaining: 1,
                 position: 0,
@@ -569,21 +569,21 @@ pub mod tests {
     #[test]
     fn encode_bool_false() {
         let mut bytes = vec![13];
-        ProtoEncoder::new(&mut bytes).encode_bool(false).unwrap();
+        ValueEncoder::new(&mut bytes).encode_bool(false).unwrap();
         assert_eq!(bytes, vec![13, 0]);
     }
 
     #[test]
     fn encode_bool_true() {
         let mut bytes = vec![13];
-        ProtoEncoder::new(&mut bytes).encode_bool(true).unwrap();
+        ValueEncoder::new(&mut bytes).encode_bool(true).unwrap();
         assert_eq!(bytes, vec![13, 1]);
     }
 
     #[test]
     fn decode_bool_false() {
         let buffer = vec![0];
-        let mut decoder = ProtoDecoder::new(&buffer);
+        let mut decoder = ValueDecoder::new(&buffer);
 
         let val = decoder.decode::<bool>().unwrap();
 
@@ -594,7 +594,7 @@ pub mod tests {
     #[test]
     fn decode_bool_true() {
         let buffer = vec![1];
-        let mut decoder = ProtoDecoder::new(&buffer);
+        let mut decoder = ValueDecoder::new(&buffer);
 
         let val = decoder.decode::<bool>().unwrap();
 
@@ -606,11 +606,11 @@ pub mod tests {
     fn decode_bool_invalid() {
         let buffer = vec![42];
 
-        let result = ProtoDecoder::new(&buffer).decode::<bool>();
+        let result = ValueDecoder::new(&buffer).decode::<bool>();
 
         assert_eq!(
             result,
-            Err(ProtoDecodeError::InvalidBool {
+            Err(ValueDecodeError::InvalidBool {
                 value: 42,
                 position: 0,
             })
@@ -621,11 +621,11 @@ pub mod tests {
     fn decode_bool_unexpected_eof() {
         let buffer = vec![];
 
-        let result = ProtoDecoder::new(&buffer).decode::<bool>();
+        let result = ValueDecoder::new(&buffer).decode::<bool>();
 
         assert_eq!(
             result,
-            Err(ProtoDecodeError::NotEnoughData {
+            Err(ValueDecodeError::NotEnoughData {
                 expected: 1,
                 remaining: 0,
                 position: 0,
@@ -650,7 +650,7 @@ pub mod tests {
             let mut expected_bytes = vec![13];
             expected_bytes.extend(encoded_bytes);
 
-            ProtoEncoder::new(&mut bytes).encode(&(val as u16)).unwrap();
+            ValueEncoder::new(&mut bytes).encode(&(val as u16)).unwrap();
             assert_eq!(bytes, expected_bytes);
         }
     }
@@ -658,7 +658,7 @@ pub mod tests {
     #[test]
     fn decode_u16() {
         for &(expected_val, ref buffer) in &U32_ENCODINGS {
-            let mut decoder = ProtoDecoder::new(buffer);
+            let mut decoder = ValueDecoder::new(buffer);
 
             if expected_val <= u16::MAX as u32 {
                 let val = decoder.decode::<u16>().unwrap();
@@ -667,7 +667,7 @@ pub mod tests {
             } else {
                 assert_eq!(
                     decoder.decode::<u16>(),
-                    Err(ProtoDecodeError::InvalidU16 {
+                    Err(ValueDecodeError::InvalidU16 {
                         value: expected_val,
                         position: 0,
                     })
@@ -679,13 +679,13 @@ pub mod tests {
     #[test]
     fn decode_u16_unexpected_eof() {
         let buffer = vec![];
-        let mut decoder = ProtoDecoder::new(&buffer);
+        let mut decoder = ValueDecoder::new(&buffer);
 
         let result = decoder.decode::<u16>();
 
         assert_eq!(
             result,
-            Err(ProtoDecodeError::NotEnoughData {
+            Err(ValueDecodeError::NotEnoughData {
                 expected: 4,
                 remaining: 0,
                 position: 0,
@@ -710,7 +710,7 @@ pub mod tests {
             expected_bytes.extend(encoded_bytes);
 
             let addr = net::Ipv4Addr::from(val);
-            ProtoEncoder::new(&mut bytes).encode(&addr).unwrap();
+            ValueEncoder::new(&mut bytes).encode(&addr).unwrap();
             assert_eq!(bytes, expected_bytes);
         }
     }
@@ -718,7 +718,7 @@ pub mod tests {
     #[test]
     fn decode_ipv4() {
         for &(expected_val, ref buffer) in &U32_ENCODINGS {
-            let mut decoder = ProtoDecoder::new(buffer);
+            let mut decoder = ValueDecoder::new(buffer);
 
             let val = decoder.decode::<net::Ipv4Addr>().unwrap();
 
@@ -749,7 +749,7 @@ pub mod tests {
             let mut expected_bytes = vec![13];
             expected_bytes.extend(encoded_bytes);
 
-            ProtoEncoder::new(&mut bytes).encode_string(string).unwrap();
+            ValueEncoder::new(&mut bytes).encode_string(string).unwrap();
             assert_eq!(bytes, expected_bytes);
         }
     }
@@ -758,20 +758,20 @@ pub mod tests {
     fn encode_string_with_unencodable_characters() {
         let mut bytes = vec![];
 
-        ProtoEncoder::new(&mut bytes)
+        ValueEncoder::new(&mut bytes)
             .encode_string("忠犬ハチ公")
             .unwrap();
 
         // Characters not in the Windows 1252 codepage are rendered as '?'.
         assert_eq!(bytes, &[5, 0, 0, 0, 63, 63, 63, 63, 63]);
 
-        assert_eq!(ProtoDecoder::new(&bytes).decode_string().unwrap(), "?????");
+        assert_eq!(ValueDecoder::new(&bytes).decode_string().unwrap(), "?????");
     }
 
     #[test]
     fn decode_string() {
         for &(expected_string, buffer) in &STRING_ENCODINGS {
-            let mut decoder = ProtoDecoder::new(&buffer);
+            let mut decoder = ValueDecoder::new(&buffer);
 
             let string = decoder.decode::<String>().unwrap();
 
@@ -798,7 +798,7 @@ pub mod tests {
         expected_bytes.extend(expected_integer_bytes);
         expected_bytes.extend(expected_string_bytes);
 
-        ProtoEncoder::new(&mut bytes)
+        ValueEncoder::new(&mut bytes)
             .encode(&(integer, string.to_string()))
             .unwrap();
 
@@ -815,7 +815,7 @@ pub mod tests {
         buffer.extend(integer_bytes);
         buffer.extend(string_bytes);
 
-        let mut decoder = ProtoDecoder::new(&buffer);
+        let mut decoder = ValueDecoder::new(&buffer);
 
         let pair = decoder.decode::<(u32, String)>().unwrap();
 
@@ -838,7 +838,7 @@ pub mod tests {
         }
 
         let mut bytes = vec![13];
-        ProtoEncoder::new(&mut bytes).encode(&vec).unwrap();
+        ValueEncoder::new(&mut bytes).encode(&vec).unwrap();
 
         assert_eq!(bytes, expected_bytes);
     }
@@ -852,7 +852,7 @@ pub mod tests {
             buffer.extend(encoded_bytes);
         }
 
-        let mut decoder = ProtoDecoder::new(&buffer);
+        let mut decoder = ValueDecoder::new(&buffer);
 
         let vec = decoder.decode::<Vec<u32>>().unwrap();
 

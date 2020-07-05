@@ -9,8 +9,8 @@ mod stream;
 mod user;
 
 pub use self::base_codec::{
-    Decode, ProtoDecode, ProtoDecodeError, ProtoDecoder, ProtoEncode, ProtoEncodeError,
-    ProtoEncoder,
+    Decode, ValueDecode, ValueDecodeError, ValueDecoder, ValueEncode, ValueEncodeError,
+    ValueEncoder,
 };
 pub use self::codec::*;
 pub use self::handler::*;

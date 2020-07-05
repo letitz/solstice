@@ -1,8 +1,8 @@
 use std::io;
 
 use crate::proto::{
-    MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecodeError, ProtoDecoder, ProtoEncode,
-    ProtoEncodeError, ProtoEncoder, ReadFromPacket, WriteToPacket,
+    MutPacket, Packet, PacketReadError, ReadFromPacket, ValueDecode, ValueDecodeError,
+    ValueDecoder, ValueEncode, ValueEncodeError, ValueEncoder, WriteToPacket,
 };
 
 const STATUS_OFFLINE: u32 = 1;
@@ -44,8 +44,8 @@ impl WriteToPacket for UserStatus {
     }
 }
 
-impl ProtoEncode for UserStatus {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for UserStatus {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         let value = match *self {
             UserStatus::Offline => STATUS_OFFLINE,
             UserStatus::Away => STATUS_AWAY,
@@ -55,15 +55,15 @@ impl ProtoEncode for UserStatus {
     }
 }
 
-impl ProtoDecode for UserStatus {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for UserStatus {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let position = decoder.position();
         let value: u32 = decoder.decode()?;
         match value {
             STATUS_OFFLINE => Ok(UserStatus::Offline),
             STATUS_AWAY => Ok(UserStatus::Away),
             STATUS_ONLINE => Ok(UserStatus::Online),
-            _ => Err(ProtoDecodeError::InvalidData {
+            _ => Err(ValueDecodeError::InvalidData {
                 value_name: "user status".to_string(),
                 cause: format!("unknown value {}", value),
                 position: position,

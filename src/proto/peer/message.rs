@@ -2,8 +2,8 @@ use std::io;
 
 use crate::proto::peer::constants::*;
 use crate::proto::{
-    MutPacket, Packet, PacketReadError, ProtoDecode, ProtoDecodeError, ProtoDecoder, ProtoEncode,
-    ProtoEncodeError, ProtoEncoder, ReadFromPacket, WriteToPacket,
+    MutPacket, Packet, PacketReadError, ReadFromPacket, ValueDecode, ValueDecodeError,
+    ValueDecoder, ValueEncode, ValueEncodeError, ValueEncoder, WriteToPacket,
 };
 
 /*=========*
@@ -41,8 +41,8 @@ impl ReadFromPacket for Message {
     }
 }
 
-impl ProtoDecode for Message {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for Message {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let position = decoder.position();
         let code: u32 = decoder.decode()?;
         let message = match code {
@@ -55,7 +55,7 @@ impl ProtoDecode for Message {
                 Message::PeerInit(peer_init)
             }
             _ => {
-                return Err(ProtoDecodeError::InvalidData {
+                return Err(ValueDecodeError::InvalidData {
                     value_name: "peer message code".to_string(),
                     cause: format!("unknown value {}", code),
                     position: position,
@@ -66,8 +66,8 @@ impl ProtoDecode for Message {
     }
 }
 
-impl ProtoEncode for Message {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for Message {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         match *self {
             Message::PierceFirewall(token) => {
                 encoder.encode_u32(CODE_PIERCE_FIREWALL)?;
@@ -131,8 +131,8 @@ impl WriteToPacket for PeerInit {
     }
 }
 
-impl ProtoEncode for PeerInit {
-    fn encode(&self, encoder: &mut ProtoEncoder) -> Result<(), ProtoEncodeError> {
+impl ValueEncode for PeerInit {
+    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.user_name)?;
         encoder.encode_string(&self.connection_type)?;
         encoder.encode_u32(self.token)?;
@@ -140,8 +140,8 @@ impl ProtoEncode for PeerInit {
     }
 }
 
-impl ProtoDecode for PeerInit {
-    fn decode_from(decoder: &mut ProtoDecoder) -> Result<Self, ProtoDecodeError> {
+impl ValueDecode for PeerInit {
+    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
         let user_name = decoder.decode()?;
         let connection_type = decoder.decode()?;
         let token = decoder.decode()?;
@@ -160,7 +160,7 @@ mod tests {
     use bytes::BytesMut;
 
     use crate::proto::base_codec::tests::roundtrip;
-    use crate::proto::{ProtoDecodeError, ProtoDecoder};
+    use crate::proto::{ValueDecodeError, ValueDecoder};
 
     use super::*;
 
@@ -168,11 +168,11 @@ mod tests {
     fn invalid_code() {
         let bytes = BytesMut::from(vec![57, 5, 0, 0]);
 
-        let result = ProtoDecoder::new(&bytes).decode::<Message>();
+        let result = ValueDecoder::new(&bytes).decode::<Message>();
 
         assert_eq!(
             result,
-            Err(ProtoDecodeError::InvalidData {
+            Err(ValueDecodeError::InvalidData {
                 value_name: "peer message code".to_string(),
                 cause: "unknown value 1337".to_string(),
                 position: 0,

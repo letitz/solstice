@@ -17,11 +17,11 @@ use std::marker;
 use bytes::BytesMut;
 use tokio_codec;
 
-use super::base_codec::{ProtoDecode, ProtoDecoder, ProtoEncode, ProtoEncoder, U32_BYTE_LEN};
+use super::base_codec::{ValueDecode, ValueDecoder, ValueEncode, ValueEncoder, U32_BYTE_LEN};
 use super::peer::Message;
 use super::server::{ServerRequest, ServerResponse};
 
-/// Implements tokio's Encoder trait for types that implement ProtoEncode.
+/// Implements tokio's Encoder trait for types that implement ValueEncode.
 pub struct LengthPrefixedEncoder<T> {
     phantom: marker::PhantomData<T>,
 }
@@ -34,7 +34,7 @@ impl<T> LengthPrefixedEncoder<T> {
     }
 }
 
-impl<T: ProtoEncode> tokio_codec::Encoder for LengthPrefixedEncoder<T> {
+impl<T: ValueEncode> tokio_codec::Encoder for LengthPrefixedEncoder<T> {
     type Item = T;
     type Error = io::Error;
 
@@ -43,11 +43,11 @@ impl<T: ProtoEncode> tokio_codec::Encoder for LengthPrefixedEncoder<T> {
         // Note that this is ugly right now, but will get better once we switch
         // off of Tokio and onto regular futures.
         let mut buffer = vec![];
-        ProtoEncoder::new(&mut buffer).encode(&item)?;
+        ValueEncoder::new(&mut buffer).encode(&item)?;
 
         // Encode the message length.
         let mut prefix = vec![];
-        ProtoEncoder::new(&mut prefix).encode_u32(buffer.len() as u32)?;
+        ValueEncoder::new(&mut prefix).encode_u32(buffer.len() as u32)?;
 
         dst.reserve(prefix.len() + buffer.len());
         dst.extend_from_slice(&prefix);
@@ -56,7 +56,7 @@ impl<T: ProtoEncode> tokio_codec::Encoder for LengthPrefixedEncoder<T> {
     }
 }
 
-/// Implements tokio's Decoder trait for types that implement ProtoDecode.
+/// Implements tokio's Decoder trait for types that implement ValueDecode.
 pub struct LengthPrefixedDecoder<T> {
     // The length, as a number of bytes, of the next item to decode.
     // None if we have not read the length prefix yet.
@@ -95,14 +95,14 @@ impl<T> LengthPrefixedDecoder<T> {
         }
 
         let prefix = src.split_to(U32_BYTE_LEN);
-        let length = ProtoDecoder::new(&prefix).decode::<u32>()?;
+        let length = ValueDecoder::new(&prefix).decode::<u32>()?;
 
         self.length = Some(length as usize);
         Ok(())
     }
 }
 
-impl<T: ProtoDecode> tokio_codec::Decoder for LengthPrefixedDecoder<T> {
+impl<T: ValueDecode> tokio_codec::Decoder for LengthPrefixedDecoder<T> {
     type Item = T;
     type Error = io::Error;
 
@@ -124,7 +124,7 @@ impl<T: ProtoDecode> tokio_codec::Decoder for LengthPrefixedDecoder<T> {
         self.length = None;
 
         // Attempt to decode the value.
-        let item = ProtoDecoder::new(&buf).decode()?;
+        let item = ValueDecoder::new(&buf).decode()?;
         Ok(Some(item))
     }
 }
@@ -133,7 +133,7 @@ mod tests {
     use bytes::BytesMut;
     use tokio_codec::{Decoder, Encoder};
 
-    use crate::proto::ProtoEncode;
+    use crate::proto::ValueEncode;
 
     use super::{LengthPrefixedDecoder, LengthPrefixedEncoder};
 
