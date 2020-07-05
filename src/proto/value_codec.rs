@@ -16,16 +16,12 @@
 use std::io;
 use std::net;
 
+use crate::proto::prefix::Prefixer;
+use crate::proto::u32::{decode_u32, encode_u32, U32_BYTE_LEN};
 use encoding::all::WINDOWS_1252;
 use encoding::{DecoderTrap, EncoderTrap, Encoding};
 use std::convert::{TryFrom, TryInto};
 use thiserror::Error;
-
-// Constants
-// ---------
-
-/// Length of an encoded 32-bit integer in bytes.
-pub const U32_BYTE_LEN: usize = 4;
 
 pub trait Decode<T> {
     /// Attempts to decode an instance of `T` from `self`.
@@ -189,7 +185,7 @@ impl<'a> ValueDecoder<'a> {
         // The conversion from slice to fixed-size array cannot fail, because
         // consume() guarantees that its return value is of size n.
         let array: [u8; U32_BYTE_LEN] = bytes.try_into().unwrap();
-        Ok(u32::from_le_bytes(array))
+        Ok(decode_u32(array))
     }
 
     fn decode_u16(&mut self) -> Result<u16, ValueDecodeError> {
@@ -341,7 +337,7 @@ impl<'a> ValueEncoder<'a> {
 
     /// Encodes the given u32 value into the underlying buffer.
     pub fn encode_u32(&mut self, val: u32) -> Result<(), ValueEncodeError> {
-        self.buffer.extend_from_slice(&val.to_le_bytes());
+        self.buffer.extend_from_slice(&encode_u32(val));
         Ok(())
     }
 
@@ -358,12 +354,8 @@ impl<'a> ValueEncoder<'a> {
 
     /// Encodes the given string into the underlying buffer.
     pub fn encode_string(&mut self, val: &str) -> Result<(), ValueEncodeError> {
-        // Record where we were when we started. This is where we will write
-        // the length prefix once we are done encoding the string. Until then
-        // we do not know how many bytes are needed to encode the string.
-        let prefix_position = self.buffer.len();
-        self.buffer.extend_from_slice(&[0; U32_BYTE_LEN]);
-        let string_position = prefix_position + U32_BYTE_LEN;
+        // Reserve space for the length prefix.
+        let prefixer = Prefixer::new(self.buffer);
 
         // Encode the string. We are quite certain this cannot fail because we
         // use EncoderTrap::Replace to replace any unencodable characters with
@@ -372,22 +364,13 @@ impl<'a> ValueEncoder<'a> {
             .encode_to(val, EncoderTrap::Replace, self.buffer)
             .unwrap();
 
-        // Calculate the length of the string we just encoded.
-        let length = self.buffer.len() - string_position;
-        let length_u32 = match u32::try_from(length) {
-            Ok(value) => value,
-            Err(_) => {
-                return Err(ValueEncodeError::StringTooLong {
-                    string: val.to_string(),
-                    length: length,
-                })
-            }
-        };
-
         // Write the length prefix in the space we initially reserved for it.
-        self.buffer[prefix_position..string_position].copy_from_slice(&length_u32.to_le_bytes());
-
-        Ok(())
+        prefixer
+            .finalize(self.buffer)
+            .map_err(|length| ValueEncodeError::StringTooLong {
+                string: val.to_string(),
+                length: length,
+            })
     }
 
     /// Encodes the given value into the underlying buffer.

@@ -19,7 +19,8 @@ use tokio_codec;
 
 use super::peer::Message;
 use super::server::{ServerRequest, ServerResponse};
-use super::value_codec::{ValueDecode, ValueDecoder, ValueEncode, ValueEncoder, U32_BYTE_LEN};
+use super::u32::U32_BYTE_LEN;
+use super::value_codec::{ValueDecode, ValueDecoder, ValueEncode, ValueEncoder};
 
 /// Implements tokio's Encoder trait for types that implement ValueEncode.
 pub struct LengthPrefixedEncoder<T> {

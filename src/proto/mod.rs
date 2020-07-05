@@ -3,8 +3,10 @@ mod constants;
 mod handler;
 mod packet;
 pub mod peer;
+mod prefix;
 pub mod server;
 mod stream;
+pub mod u32;
 mod user;
 mod value_codec;
 
