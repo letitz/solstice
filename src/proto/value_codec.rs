@@ -12,16 +12,20 @@
 //!     encoded characters.
 //!   * Pairs are serialized as two consecutive values.
 //!   * Vectors are serialized as length-prefixed arrays of serialized values.
+//!
+//! See the `frame_codec` module for the codec applied to byte streams.
 
 use std::io;
 use std::net;
 
-use crate::proto::prefix::Prefixer;
-use crate::proto::u32::{decode_u32, encode_u32, U32_BYTE_LEN};
+use bytes::{BufMut, BytesMut};
 use encoding::all::WINDOWS_1252;
 use encoding::{DecoderTrap, EncoderTrap, Encoding};
 use std::convert::{TryFrom, TryInto};
 use thiserror::Error;
+
+use super::prefix::Prefixer;
+use super::u32::{decode_u32, encode_u32, U32_BYTE_LEN};
 
 pub trait Decode<T> {
     /// Attempts to decode an instance of `T` from `self`.
@@ -316,7 +320,7 @@ impl From<ValueEncodeError> for io::Error {
 /// A type for encoding various types of values into protocol messages.
 pub struct ValueEncoder<'a> {
     /// The buffer to which the encoder appends encoded bytes.
-    buffer: &'a mut Vec<u8>,
+    buffer: &'a mut BytesMut,
 }
 
 /// This trait is implemented by types that can be encoded into messages using
@@ -331,7 +335,7 @@ impl<'a> ValueEncoder<'a> {
     /// Wraps the given buffer for encoding values into.
     ///
     /// Encoded bytes are appended. The buffer is not pre-cleared.
-    pub fn new(buffer: &'a mut Vec<u8>) -> Self {
+    pub fn new(buffer: &'a mut BytesMut) -> Self {
         ValueEncoder { buffer: buffer }
     }
 
@@ -348,29 +352,33 @@ impl<'a> ValueEncoder<'a> {
 
     /// Encodes the given boolean value into the underlying buffer.
     pub fn encode_bool(&mut self, val: bool) -> Result<(), ValueEncodeError> {
-        self.buffer.push(val as u8);
+        self.buffer.put_u8(val as u8);
         Ok(())
     }
 
     /// Encodes the given string into the underlying buffer.
     pub fn encode_string(&mut self, val: &str) -> Result<(), ValueEncodeError> {
         // Reserve space for the length prefix.
-        let prefixer = Prefixer::new(self.buffer);
+        let mut prefixer = Prefixer::new(self.buffer);
 
         // Encode the string. We are quite certain this cannot fail because we
         // use EncoderTrap::Replace to replace any unencodable characters with
         // '?' which is always encodable in Windows-1252.
-        WINDOWS_1252
-            .encode_to(val, EncoderTrap::Replace, self.buffer)
-            .unwrap();
+        //
+        // TODO: Switch to the encoding_rs crate.
+        let bytes = WINDOWS_1252.encode(val, EncoderTrap::Replace).unwrap();
+
+        prefixer.suffix_mut().extend_from_slice(&bytes);
 
         // Write the length prefix in the space we initially reserved for it.
-        prefixer
-            .finalize(self.buffer)
-            .map_err(|length| ValueEncodeError::StringTooLong {
+        if let Err(prefixer) = prefixer.finalize() {
+            return Err(ValueEncodeError::StringTooLong {
                 string: val.to_string(),
-                length: length,
-            })
+                length: prefixer.suffix().len(),
+            });
+        }
+
+        Ok(())
     }
 
     /// Encodes the given value into the underlying buffer.
@@ -469,6 +477,8 @@ pub mod tests {
     use std::u16;
     use std::u32;
 
+    use bytes::{BufMut, BytesMut};
+
     use super::{ValueDecode, ValueDecodeError, ValueDecoder, ValueEncode, ValueEncoder};
 
     // Declared here because assert_eq!(bytes, &[]) fails to infer types.
@@ -478,7 +488,7 @@ pub mod tests {
     where
         T: fmt::Debug + Eq + PartialEq + ValueEncode + ValueDecode,
     {
-        let mut bytes = vec![];
+        let mut bytes = BytesMut::new();
 
         ValueEncoder::new(&mut bytes).encode(&input).unwrap();
         let output = ValueDecoder::new(&bytes).decode::<T>().unwrap();
@@ -501,9 +511,12 @@ pub mod tests {
     #[test]
     fn encode_u32() {
         for &(val, ref encoded_bytes) in &U32_ENCODINGS {
-            let mut bytes = vec![13];
-            let mut expected_bytes = vec![13];
-            expected_bytes.extend(encoded_bytes);
+            let mut bytes = BytesMut::new();
+            bytes.put_u8(13);
+
+            let mut expected_bytes = BytesMut::new();
+            expected_bytes.put_u8(13);
+            expected_bytes.extend_from_slice(encoded_bytes);
 
             ValueEncoder::new(&mut bytes).encode_u32(val).unwrap();
             assert_eq!(bytes, expected_bytes);
@@ -532,7 +545,9 @@ pub mod tests {
 
     #[test]
     fn decode_u32_unexpected_eof() {
-        let buffer = vec![13];
+        let mut buffer = BytesMut::new();
+        buffer.put_u8(13);
+
         let mut decoder = ValueDecoder::new(&buffer);
 
         let result = decoder.decode::<u32>();
@@ -550,15 +565,21 @@ pub mod tests {
 
     #[test]
     fn encode_bool_false() {
-        let mut bytes = vec![13];
+        let mut bytes = BytesMut::new();
+        bytes.put_u8(13);
+
         ValueEncoder::new(&mut bytes).encode_bool(false).unwrap();
+
         assert_eq!(bytes, vec![13, 0]);
     }
 
     #[test]
     fn encode_bool_true() {
-        let mut bytes = vec![13];
+        let mut bytes = BytesMut::new();
+        bytes.put_u8(13);
+
         ValueEncoder::new(&mut bytes).encode_bool(true).unwrap();
+
         assert_eq!(bytes, vec![13, 1]);
     }
 
@@ -628,11 +649,15 @@ pub mod tests {
                 continue;
             }
 
-            let mut bytes = vec![13];
-            let mut expected_bytes = vec![13];
+            let mut bytes = BytesMut::new();
+            bytes.put_u8(13);
+
+            let mut expected_bytes = BytesMut::new();
+            expected_bytes.put_u8(13);
             expected_bytes.extend(encoded_bytes);
 
             ValueEncoder::new(&mut bytes).encode(&(val as u16)).unwrap();
+
             assert_eq!(bytes, expected_bytes);
         }
     }
@@ -687,12 +712,17 @@ pub mod tests {
     #[test]
     fn encode_ipv4() {
         for &(val, ref encoded_bytes) in &U32_ENCODINGS {
-            let mut bytes = vec![13];
-            let mut expected_bytes = vec![13];
+            let mut bytes = BytesMut::new();
+            bytes.put_u8(13);
+
+            let mut expected_bytes = BytesMut::new();
+            expected_bytes.put_u8(13);
             expected_bytes.extend(encoded_bytes);
 
             let addr = net::Ipv4Addr::from(val);
+
             ValueEncoder::new(&mut bytes).encode(&addr).unwrap();
+
             assert_eq!(bytes, expected_bytes);
         }
     }
@@ -727,25 +757,29 @@ pub mod tests {
     #[test]
     fn encode_string() {
         for &(string, encoded_bytes) in &STRING_ENCODINGS {
-            let mut bytes = vec![13];
-            let mut expected_bytes = vec![13];
+            let mut bytes = BytesMut::new();
+            bytes.put_u8(13);
+
+            let mut expected_bytes = BytesMut::new();
+            expected_bytes.put_u8(13);
             expected_bytes.extend(encoded_bytes);
 
             ValueEncoder::new(&mut bytes).encode_string(string).unwrap();
+
             assert_eq!(bytes, expected_bytes);
         }
     }
 
     #[test]
     fn encode_string_with_unencodable_characters() {
-        let mut bytes = vec![];
+        let mut bytes = BytesMut::new();
 
         ValueEncoder::new(&mut bytes)
             .encode_string("忠犬ハチ公")
             .unwrap();
 
         // Characters not in the Windows 1252 codepage are rendered as '?'.
-        assert_eq!(bytes, &[5, 0, 0, 0, 63, 63, 63, 63, 63]);
+        assert_eq!(bytes, vec![5, 0, 0, 0, 63, 63, 63, 63, 63]);
 
         assert_eq!(ValueDecoder::new(&bytes).decode_string().unwrap(), "?????");
     }
@@ -771,8 +805,11 @@ pub mod tests {
 
     #[test]
     fn encode_pair_u32_string() {
-        let mut bytes = vec![13];
-        let mut expected_bytes = vec![13];
+        let mut bytes = BytesMut::new();
+        bytes.put_u8(13);
+
+        let mut expected_bytes = BytesMut::new();
+        expected_bytes.put_u8(13);
 
         let (integer, ref expected_integer_bytes) = U32_ENCODINGS[0];
         let (string, expected_string_bytes) = STRING_ENCODINGS[0];
@@ -813,13 +850,18 @@ pub mod tests {
     #[test]
     fn encode_u32_vector() {
         let mut vec = vec![];
-        let mut expected_bytes = vec![13, U32_ENCODINGS.len() as u8, 0, 0, 0];
+
+        let mut expected_bytes = BytesMut::new();
+        expected_bytes.extend_from_slice(&[13, U32_ENCODINGS.len() as u8, 0, 0, 0]);
+
         for &(val, ref encoded_bytes) in &U32_ENCODINGS {
             vec.push(val);
             expected_bytes.extend(encoded_bytes);
         }
 
-        let mut bytes = vec![13];
+        let mut bytes = BytesMut::new();
+        bytes.put_u8(13);
+
         ValueEncoder::new(&mut bytes).encode(&vec).unwrap();
 
         assert_eq!(bytes, expected_bytes);

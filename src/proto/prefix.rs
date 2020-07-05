@@ -3,50 +3,79 @@
 
 use std::convert::TryFrom;
 
+use bytes::BytesMut;
+
 use crate::proto::u32::{encode_u32, U32_BYTE_LEN};
 
-/// Encodes a length prefix in a buffer.
-pub struct Prefixer {
-    /// The position of the length prefix in the target buffer.
-    position: usize,
+/// Helper for writing length-prefixed values into buffers, without having to
+/// know the length ahead of encoding time.
+#[derive(Debug)]
+pub struct Prefixer<'a> {
+    /// The prefix buffer.
+    ///
+    /// The length of the suffix buffer is written to the end of this buffer
+    /// when the prefixer is finalized.
+    ///
+    /// Contains any bytes with which this prefixer was constructed.
+    prefix: &'a mut BytesMut,
+
+    /// The suffix buffer.
+    ///
+    /// This is the buffer into which data is written before finalization.
+    suffix: BytesMut,
 }
 
-impl Prefixer {
-    /// Reserves space for the length prefix at the end of the given buffer.
-    ///
-    /// Returns a prefixer for writing the length later.
-    pub fn new(buffer: &mut Vec<u8>) -> Prefixer {
-        // Remember where we were.
-        let result = Prefixer {
-            position: buffer.len(),
-        };
-        // Reserve enough bytes to write the prefix into later.
-        buffer.extend_from_slice(&[0; U32_BYTE_LEN]);
-        result
+impl Prefixer<'_> {
+    /// Constructs a prefixer for easily appending a length prefixed value to
+    /// the given buffer.
+    pub fn new<'a>(buffer: &'a mut BytesMut) -> Prefixer<'a> {
+        // Reserve some space fot the prefix, but don't write it yet.
+        buffer.reserve(U32_BYTE_LEN);
+
+        // Split off the suffix, into which bytes will be written.
+        let suffix = buffer.split_off(buffer.len() + U32_BYTE_LEN);
+
+        Prefixer {
+            prefix: buffer,
+            suffix: suffix,
+        }
     }
 
-    /// Writes the length prefix into the given buffer in the reserved space.
-    ///
-    /// The given buffer must be the same one passed to new(), and should not
-    /// have been truncated since then.
-    ///
-    /// Panics if the buffer is not large enough to store the prefix.
-    ///
-    /// Returns `Err(length)` if `length`, the length of the suffix, is too
-    /// large to store in the reserved space.
-    pub fn finalize(self, buffer: &mut Vec<u8>) -> Result<(), usize> {
-        // The position at which the value should have been encoded.
-        let value_position = self.position + U32_BYTE_LEN;
-        assert!(buffer.len() >= value_position);
+    /// Returns a reference to the buffer into which data is written.
+    pub fn suffix(&self) -> &BytesMut {
+        &self.suffix
+    }
 
-        // Calculate the value's length, check it is not too large.
-        let length = buffer.len() - value_position;
-        let length_u32 = u32::try_from(length).map_err(|_| length)?;
+    /// Returns a mutable reference to a buffer into which data can be written.
+    pub fn suffix_mut(&mut self) -> &mut BytesMut {
+        &mut self.suffix
+    }
 
-        // Write the length prefix into the reserved space.
-        let length_bytes = encode_u32(length_u32);
-        buffer[self.position..value_position].copy_from_slice(&length_bytes);
-        Ok(())
+    /// Returns a buffer containing the original data passed at construction
+    /// time, to which a length-prefixed value is appended. The value itself is
+    /// the data written into the buffer returned by `get_mut()`.
+    ///
+    /// Returns `Ok(length)` if successful, in which case the length of the
+    /// suffix is `length`.
+    ///
+    /// Returns `Err(self)` if the length of the suffix is too large to store as
+    /// a prefix.
+    pub fn finalize(self) -> Result<u32, Self> {
+        // Check that the suffix's length is not too large.
+        let length = self.suffix.len();
+        let length_u32 = match u32::try_from(length) {
+            Ok(value) => value,
+            Err(_) => return Err(self),
+        };
+
+        // Write the prefix.
+        self.prefix.extend_from_slice(&encode_u32(length_u32));
+
+        // Join the prefix and suffix back again. Because `self.prefix` is
+        // private, we are sure that this is O(1).
+        self.prefix.unsplit(self.suffix);
+
+        Ok(length_u32)
     }
 }
 
@@ -56,23 +85,16 @@ mod tests {
 
     use std::convert::TryInto;
 
+    use bytes::{BufMut, BytesMut};
+
     use crate::proto::u32::{decode_u32, U32_BYTE_LEN};
 
     #[test]
-    fn new_reserves_space() {
-        let mut buffer = vec![13];
-
-        Prefixer::new(&mut buffer);
-
-        assert_eq!(buffer.len(), U32_BYTE_LEN + 1);
-        assert_eq!(buffer[0], 13);
-    }
-
-    #[test]
     fn finalize_empty() {
-        let mut buffer = vec![13];
+        let mut buffer = BytesMut::new();
+        buffer.put_u8(13);
 
-        Prefixer::new(&mut buffer).finalize(&mut buffer).unwrap();
+        Prefixer::new(&mut buffer).finalize().unwrap();
 
         assert_eq!(buffer.len(), U32_BYTE_LEN + 1);
         let array: [u8; U32_BYTE_LEN] = buffer[1..].try_into().unwrap();
@@ -81,31 +103,19 @@ mod tests {
 
     #[test]
     fn finalize_ok() {
-        let mut buffer = vec![13];
+        let mut buffer = BytesMut::new();
+        buffer.put_u8(13);
 
-        let prefixer = Prefixer::new(&mut buffer);
+        let mut prefixer = Prefixer::new(&mut buffer);
 
-        buffer.extend_from_slice(&[0; 42]);
+        prefixer.suffix_mut().extend_from_slice(&[0; 42]);
 
-        prefixer.finalize(&mut buffer).unwrap();
+        prefixer.finalize().unwrap();
 
         // 1 junk prefix byte, length prefix, 42 bytes of value.
         assert_eq!(buffer.len(), U32_BYTE_LEN + 43);
         let prefix = &buffer[1..U32_BYTE_LEN + 1];
         let array: [u8; U32_BYTE_LEN] = prefix.try_into().unwrap();
         assert_eq!(decode_u32(array), 42);
-    }
-
-    #[test]
-    #[should_panic]
-    fn finalize_truncated() {
-        let mut buffer = vec![13];
-
-        let prefixer = Prefixer::new(&mut buffer);
-
-        buffer = vec![];
-
-        // Explodes.
-        let _ = prefixer.finalize(&mut buffer);
     }
 }
