@@ -16,7 +16,6 @@
 use std::io;
 use std::net;
 
-use bytes::{BufMut, BytesMut};
 use encoding::all::WINDOWS_1252;
 use encoding::{DecoderTrap, EncoderTrap, Encoding};
 use std::convert::{TryFrom, TryInto};
@@ -488,8 +487,6 @@ pub mod tests {
     use std::u16;
     use std::u32;
 
-    use bytes::BytesMut;
-
     use super::{ProtoDecode, ProtoDecodeError, ProtoDecoder, ProtoEncode, ProtoEncoder};
 
     // Declared here because assert_eq!(bytes, &[]) fails to infer types.
@@ -499,7 +496,7 @@ pub mod tests {
     where
         T: fmt::Debug + Eq + PartialEq + ProtoEncode + ProtoDecode,
     {
-        let mut bytes = BytesMut::new();
+        let mut bytes = vec![];
 
         ProtoEncoder::new(&mut bytes).encode(&input).unwrap();
         let output = ProtoDecoder::new(&bytes).decode::<T>().unwrap();
@@ -522,7 +519,7 @@ pub mod tests {
     #[test]
     fn encode_u32() {
         for &(val, ref encoded_bytes) in &U32_ENCODINGS {
-            let mut bytes = BytesMut::from(vec![13]);
+            let mut bytes = vec![13];
             let mut expected_bytes = vec![13];
             expected_bytes.extend(encoded_bytes);
 
@@ -534,7 +531,7 @@ pub mod tests {
     #[test]
     fn decode_u32() {
         for &(expected_val, ref bytes) in &U32_ENCODINGS {
-            let buffer = BytesMut::from(bytes.to_vec());
+            let buffer = bytes.to_vec();
             let mut decoder = ProtoDecoder::new(&buffer);
 
             let val = decoder.decode::<u32>().unwrap();
@@ -570,12 +567,15 @@ pub mod tests {
     }
 
     #[test]
-    fn encode_bool() {
-        let mut bytes = BytesMut::from(vec![13]);
+    fn encode_bool_false() {
+        let mut bytes = vec![13];
         ProtoEncoder::new(&mut bytes).encode_bool(false).unwrap();
         assert_eq!(bytes, vec![13, 0]);
+    }
 
-        bytes.truncate(1);
+    #[test]
+    fn encode_bool_true() {
+        let mut bytes = vec![13];
         ProtoEncoder::new(&mut bytes).encode_bool(true).unwrap();
         assert_eq!(bytes, vec![13, 1]);
     }
@@ -646,7 +646,7 @@ pub mod tests {
                 continue;
             }
 
-            let mut bytes = BytesMut::from(vec![13]);
+            let mut bytes = vec![13];
             let mut expected_bytes = vec![13];
             expected_bytes.extend(encoded_bytes);
 
@@ -705,14 +705,12 @@ pub mod tests {
     #[test]
     fn encode_ipv4() {
         for &(val, ref encoded_bytes) in &U32_ENCODINGS {
-            let mut bytes = BytesMut::from(vec![13]);
+            let mut bytes = vec![13];
             let mut expected_bytes = vec![13];
             expected_bytes.extend(encoded_bytes);
 
             let addr = net::Ipv4Addr::from(val);
-            ProtoEncoder::new(&mut bytes)
-                .encode_ipv4_addr(addr)
-                .unwrap();
+            ProtoEncoder::new(&mut bytes).encode(&addr).unwrap();
             assert_eq!(bytes, expected_bytes);
         }
     }
@@ -747,7 +745,7 @@ pub mod tests {
     #[test]
     fn encode_string() {
         for &(string, encoded_bytes) in &STRING_ENCODINGS {
-            let mut bytes = BytesMut::from(vec![13]);
+            let mut bytes = vec![13];
             let mut expected_bytes = vec![13];
             expected_bytes.extend(encoded_bytes);
 
@@ -757,12 +755,17 @@ pub mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn encode_invalid_string() {
-        let mut bytes = BytesMut::with_capacity(100);
+    fn encode_string_with_unencodable_characters() {
+        let mut bytes = vec![];
+
         ProtoEncoder::new(&mut bytes)
             .encode_string("忠犬ハチ公")
             .unwrap();
+
+        // Characters not in the Windows 1252 codepage are rendered as '?'.
+        assert_eq!(bytes, &[5, 0, 0, 0, 63, 63, 63, 63, 63]);
+
+        assert_eq!(ProtoDecoder::new(&bytes).decode_string().unwrap(), "?????");
     }
 
     #[test]
@@ -786,8 +789,8 @@ pub mod tests {
 
     #[test]
     fn encode_pair_u32_string() {
-        let mut bytes = BytesMut::from(vec![13]);
-        let mut expected_bytes = BytesMut::from(vec![13]);
+        let mut bytes = vec![13];
+        let mut expected_bytes = vec![13];
 
         let (integer, ref expected_integer_bytes) = U32_ENCODINGS[0];
         let (string, expected_string_bytes) = STRING_ENCODINGS[0];
@@ -834,7 +837,7 @@ pub mod tests {
             expected_bytes.extend(encoded_bytes);
         }
 
-        let mut bytes = BytesMut::from(vec![13]);
+        let mut bytes = vec![13];
         ProtoEncoder::new(&mut bytes).encode(&vec).unwrap();
 
         assert_eq!(bytes, expected_bytes);
