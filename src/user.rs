@@ -113,3 +113,61 @@ impl UserMap {
         self.privileged.contains(user_name)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::UserMap;
+
+    #[test]
+    fn new_is_empty() {
+        let users = UserMap::new();
+
+        assert_eq!(users.get_list(), vec![]);
+        assert_eq!(users.get("bleep"), None);
+    }
+
+    #[test]
+    fn set_get_all_privileged() {
+        let mut users = UserMap::new();
+
+        users.set_all_privileged(vec!["bleep".to_string(), "bloop".to_string()]);
+
+        let mut privileged = users.get_all_privileged();
+        privileged.sort();
+        assert_eq!(privileged, vec!["bleep".to_string(), "bloop".to_string()]);
+    }
+
+    #[test]
+    fn insert_privileged() {
+        let mut users = UserMap::new();
+
+        users.insert_privileged("bleep".to_string());
+        users.insert_privileged("bleep".to_string());
+        users.insert_privileged("bloop".to_string());
+
+        let mut privileged = users.get_all_privileged();
+        privileged.sort();
+        assert_eq!(privileged, vec!["bleep".to_string(), "bloop".to_string()]);
+    }
+
+    #[test]
+    fn remove_privileged() {
+        let mut users = UserMap::new();
+        users.insert_privileged("bleep".to_string());
+        users.insert_privileged("bloop".to_string());
+
+        users.remove_privileged("bleep");
+
+        let privileged = users.get_all_privileged();
+        assert_eq!(privileged, vec!["bloop".to_string()]);
+    }
+
+    #[test]
+    fn is_privileged() {
+        let mut users = UserMap::new();
+        users.insert_privileged("bleep".to_string());
+
+        assert!(users.is_privileged("bleep"));
+        assert!(!users.is_privileged("bloop"));
+    }
+}
