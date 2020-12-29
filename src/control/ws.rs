@@ -51,7 +51,7 @@ impl error::Error for SendError {
         }
     }
 
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&dyn error::Error> {
         match *self {
             SendError::JSONEncoderError(ref err) => Some(err),
             SendError::WebSocketError(ref err) => Some(err),

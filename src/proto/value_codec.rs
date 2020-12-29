@@ -465,7 +465,6 @@ impl<T: ValueEncode> ValueEncode for Vec<T> {
 #[cfg(test)]
 pub mod tests {
     use std::fmt;
-    use std::io;
     use std::net;
     use std::u16;
     use std::u32;

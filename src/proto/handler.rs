@@ -116,6 +116,7 @@ where
 }
 
 impl Handler {
+    #[allow(deprecated)]
     fn new(
         client_tx: crossbeam_channel::Sender<Response>,
         event_loop: &mut mio::deprecated::EventLoop<Self>,
@@ -158,6 +159,7 @@ impl Handler {
         })
     }
 
+    #[allow(deprecated)]
     fn connect_to_peer(
         &mut self,
         peer_id: usize,
@@ -202,6 +204,7 @@ impl Handler {
         Ok(())
     }
 
+    #[allow(deprecated)]
     fn process_server_intent(
         &mut self,
         intent: Intent,
@@ -225,6 +228,7 @@ impl Handler {
         }
     }
 
+    #[allow(deprecated)]
     fn process_peer_intent(
         &mut self,
         intent: Intent,
@@ -255,6 +259,7 @@ impl Handler {
     }
 }
 
+#[allow(deprecated)]
 impl mio::deprecated::Handler for Handler {
     type Timeout = ();
     type Message = Request;
@@ -342,9 +347,11 @@ impl mio::deprecated::Handler for Handler {
     }
 }
 
+#[allow(deprecated)]
 pub type Sender = mio::deprecated::Sender<Request>;
 
 pub struct Agent {
+    #[allow(deprecated)]
     event_loop: mio::deprecated::EventLoop<Handler>,
     handler: Handler,
 }
@@ -352,6 +359,7 @@ pub struct Agent {
 impl Agent {
     pub fn new(client_tx: crossbeam_channel::Sender<Response>) -> io::Result<Self> {
         // Create the event loop.
+        #[allow(deprecated)]
         let mut event_loop = mio::deprecated::EventLoop::new()?;
         // Create the handler for the event loop and register the handler's
         // sockets with the event loop.
@@ -364,10 +372,12 @@ impl Agent {
     }
 
     pub fn channel(&self) -> Sender {
+        #[allow(deprecated)]
         self.event_loop.channel()
     }
 
     pub fn run(&mut self) -> io::Result<()> {
+        #[allow(deprecated)]
         self.event_loop.run(&mut self.handler)
     }
 }

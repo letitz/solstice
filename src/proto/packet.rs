@@ -8,6 +8,7 @@ use std::net;
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
 use encoding::all::ISO_8859_1;
 use encoding::{DecoderTrap, EncoderTrap, Encoding};
+#[allow(deprecated)]
 use mio::deprecated::TryRead;
 
 use super::constants::*;
@@ -155,7 +156,7 @@ impl error::Error for PacketReadError {
         }
     }
 
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&dyn error::Error> {
         match *self {
             PacketReadError::InvalidBoolError(_) => None,
             PacketReadError::InvalidU16Error(_) => None,
@@ -361,6 +362,8 @@ impl Parser {
         // Try to read as many bytes as we currently need from the underlying
         // byte stream.
         let offset = self.buffer.len() - self.num_bytes_left;
+
+        #[allow(deprecated)]
         match stream.try_read(&mut self.buffer[offset..])? {
             None => (),
 

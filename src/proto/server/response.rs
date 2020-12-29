@@ -1,4 +1,3 @@
-use std::io;
 use std::net;
 
 use crate::proto::packet::{Packet, PacketReadError, ReadFromPacket};
@@ -1337,7 +1336,6 @@ impl ValueDecode for WishlistIntervalResponse {
 
 #[cfg(test)]
 mod tests {
-    use std::io;
     use std::net;
 
     use bytes::BytesMut;

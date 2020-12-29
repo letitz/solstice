@@ -39,6 +39,7 @@ impl OutBuf {
         self.remaining() > 0
     }
 
+    #[allow(deprecated)]
     fn try_write_to<T>(&mut self, mut writer: T) -> io::Result<Option<usize>>
     where
         T: mio::deprecated::TryWrite,
@@ -167,6 +168,7 @@ impl<T: SendPacket> Stream<T> {
 
     /// The stream is ready to read, write, or both.
     pub fn on_ready(&mut self, event_set: mio::Ready) -> Intent {
+        #[allow(deprecated)]
         if event_set.is_hup() || event_set.is_error() {
             return Intent::Done;
         }
@@ -198,6 +200,7 @@ impl<T: SendPacket> Stream<T> {
         }
 
         // We're always interested in reading more.
+        #[allow(deprecated)]
         let mut event_set = mio::Ready::readable() | mio::Ready::hup() | mio::Ready::error();
         // If there is still stuff to write in the queue, we're interested in
         // the socket becoming writable too.

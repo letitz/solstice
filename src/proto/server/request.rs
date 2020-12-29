@@ -586,8 +586,6 @@ impl ValueDecode for UserStatusRequest {
 
 #[cfg(test)]
 mod tests {
-    use std::io;
-
     use bytes::BytesMut;
 
     use crate::proto::value_codec::tests::roundtrip;

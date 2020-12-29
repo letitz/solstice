@@ -16,17 +16,23 @@ use crate::user;
 #[derive(Debug)]
 enum IncomingMessage {
     Proto(proto::Response),
+
+    #[allow(dead_code)]
     ControlNotification(control::Notification),
 }
 
 #[derive(Debug)]
 enum PeerState {
     /// We are trying to establish a direct connection.
+    #[allow(dead_code)]
     Opening,
+
     /// We are trying to establish a reverse connection.
     OpeningFirewalled,
+
     /// We are waiting for a reverse connection to be established to us.
     WaitingFirewalled,
+
     /// The connection is open.
     Open,
 }
@@ -42,10 +48,13 @@ struct Peer {
 }
 
 pub struct Client {
+    #[allow(deprecated)]
     proto_tx: mio::deprecated::Sender<proto::Request>,
     proto_rx: crossbeam_channel::Receiver<proto::Response>,
 
     control_tx: Option<control::Sender>,
+
+    #[allow(dead_code)]
     control_rx: crossbeam_channel::Receiver<control::Notification>,
 
     login_status: LoginStatus,
@@ -60,6 +69,7 @@ impl Client {
     /// Returns a new client that will communicate with the protocol agent
     /// through `proto_tx` and `proto_rx`, and with the controller agent
     /// through `control_rx`.
+    #[allow(deprecated)]
     pub fn new(
         proto_tx: mio::deprecated::Sender<proto::Request>,
         proto_rx: crossbeam_channel::Receiver<proto::Response>,
@@ -121,6 +131,7 @@ impl Client {
 
     /// Send a request to the server.
     fn send_to_server(&self, request: server::ServerRequest) {
+        #[allow(deprecated)]
         self.proto_tx
             .send(proto::Request::ServerRequest(request))
             .unwrap();
@@ -128,6 +139,7 @@ impl Client {
 
     /// Send a message to a peer.
     fn send_to_peer(&self, peer_id: usize, message: peer::Message) {
+        #[allow(deprecated)]
         self.proto_tx
             .send(proto::Request::PeerMessage(peer_id, message))
             .unwrap();
@@ -135,6 +147,7 @@ impl Client {
 
     /// Send a response to the controller client.
     fn send_to_controller(&mut self, response: control::Response) {
+        #[allow(deprecated)]
         let result = match self.control_tx {
             None => {
                 // Silently drop control requests when controller is
@@ -347,6 +360,7 @@ impl Client {
                 let peer = occupied_entry.get_mut();
                 peer.state = PeerState::WaitingFirewalled;
 
+                #[allow(deprecated)]
                 self.proto_tx
                     .send(proto::Request::ServerRequest(
                         server::ServerRequest::ConnectToPeerRequest(server::ConnectToPeerRequest {
@@ -365,6 +379,7 @@ impl Client {
                 );
 
                 let (peer, _) = occupied_entry.remove();
+                #[allow(deprecated)]
                 self.proto_tx
                     .send(proto::Request::ServerRequest(
                         server::ServerRequest::CannotConnectRequest(server::CannotConnectRequest {
@@ -522,6 +537,7 @@ impl Client {
                     "Opening peer connection {} to {}:{} to pierce firewall",
                     peer_id, response.ip, response.port
                 );
+                #[allow(deprecated)]
                 self.proto_tx
                     .send(proto::Request::PeerConnect(
                         peer_id,
