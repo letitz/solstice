@@ -191,14 +191,17 @@ mod tests {
 
     #[test]
     fn decode_not_enough_data_for_prefix() {
-        let mut bytes = BytesMut::from(vec![
+        let initial_bytes = vec![
             4, 0, 0, // Incomplete 32-bit length prefix.
-        ]);
+        ];
+
+        let mut bytes = BytesMut::new();
+        bytes.extend_from_slice(&initial_bytes);
 
         let value: Option<u32> = FrameDecoder::new().decode_from(&mut bytes).unwrap();
 
         assert_eq!(value, None);
-        assert_eq!(bytes, vec![4, 0, 0]); // Untouched.
+        assert_eq!(bytes, initial_bytes); // Untouched.
     }
 
     #[test]
@@ -219,7 +222,8 @@ mod tests {
 
     #[test]
     fn decode_u32() {
-        let mut bytes = BytesMut::from(vec![
+        let mut bytes = BytesMut::new();
+        bytes.extend_from_slice(&[
             4, 0, 0, 0, // 1 32-bit integer = 4 bytes.
             1, 3, 3, 7, // Little-endian integer.
             4, 2, // Trailing bytes.
@@ -233,7 +237,8 @@ mod tests {
 
     #[test]
     fn decode_vec() {
-        let mut bytes = BytesMut::from(vec![
+        let mut bytes = BytesMut::new();
+        bytes.extend_from_slice(&[
             20, 0, 0, 0, // 5 32-bit integers = 20 bytes.
             4, 0, 0, 0, // 4 elements in the vector.
             1, 0, 0, 0, // Little-endian vector elements.

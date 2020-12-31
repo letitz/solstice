@@ -595,7 +595,8 @@ mod tests {
 
     #[test]
     fn invalid_code() {
-        let bytes = BytesMut::from(vec![57, 5, 0, 0]);
+        let mut bytes = BytesMut::new();
+        bytes.extend_from_slice(&[57, 5, 0, 0]);
 
         let result = ValueDecoder::new(&bytes).decode::<ServerRequest>();
 
