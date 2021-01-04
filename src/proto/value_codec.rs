@@ -191,6 +191,7 @@ impl<'a> ValueDecoder<'a> {
         Ok(decode_u32(array))
     }
 
+    /// Attempts to decode a u16 value.
     fn decode_u16(&mut self) -> Result<u16, ValueDecodeError> {
         let position = self.position;
         let n = self.decode_u32()?;
@@ -422,7 +423,7 @@ impl ValueEncode for net::Ipv4Addr {
 // `core::convert::AsRef<str>` for type `bool` in future versions".
 // We could probably work around this with more complex type logic (e.g.
 // wrapping primitive types in a newtype for which we implement
-// Proto{De,En}code) but it is not really worth the hassle.
+// Value{De,En}code) but it is not really worth the hassle.
 
 impl ValueEncode for str {
     fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
