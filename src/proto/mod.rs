@@ -1,4 +1,5 @@
 mod codec;
+mod connection;
 mod constants;
 mod handler;
 mod packet;
@@ -6,11 +7,14 @@ pub mod peer;
 mod prefix;
 pub mod server;
 mod stream;
+#[cfg(test)]
+mod testing;
 pub mod u32;
 mod user;
 mod value_codec;
 
 pub use self::codec::*;
+pub use self::connection::Connection;
 pub use self::handler::*;
 pub use self::packet::*;
 pub use self::server::{ServerRequest, ServerResponse};

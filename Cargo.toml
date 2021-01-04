@@ -20,6 +20,7 @@ rustc-serialize = "^0.3.17"
 slab = "^0.2"
 thiserror = "^1.0"
 threadpool = "^1.0"
+tokio = { version = "1", features = ["full"] }
 tokio-core = "^0.1"
 tokio-io = "^0.1"
 tokio-codec = "^0.1"

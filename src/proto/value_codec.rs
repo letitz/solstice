@@ -388,7 +388,7 @@ impl<'a> ValueEncoder<'a> {
     /// ```
     /// encoder.encode(&Foo::new(bar))?;
     /// ```
-    pub fn encode<T: ValueEncode>(&mut self, val: &T) -> Result<(), ValueEncodeError> {
+    pub fn encode<T: ValueEncode + ?Sized>(&mut self, val: &T) -> Result<(), ValueEncodeError> {
         val.encode(self)
     }
 }

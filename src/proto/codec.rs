@@ -3,6 +3,7 @@
 //! The goal of this codec is to transform byte streams into value streams.
 
 use std::convert::TryInto;
+use std::io;
 use std::marker;
 
 use bytes::BytesMut;
@@ -26,19 +27,25 @@ pub enum FrameEncodeError {
     ValueEncodeError(#[from] ValueEncodeError),
 }
 
+impl From<FrameEncodeError> for io::Error {
+    fn from(error: FrameEncodeError) -> Self {
+        io::Error::new(io::ErrorKind::InvalidData, format!("{}", error))
+    }
+}
+
 /// Encodes entire protocol frames containing values of type `T`.
-pub struct FrameEncoder<T> {
+pub struct FrameEncoder<T: ?Sized> {
     phantom: marker::PhantomData<T>,
 }
 
-impl<T: ValueEncode> FrameEncoder<T> {
+impl<T: ValueEncode + ?Sized> FrameEncoder<T> {
     pub fn new() -> Self {
         Self {
             phantom: marker::PhantomData,
         }
     }
 
-    fn encode_to(&mut self, value: &T, buffer: &mut BytesMut) -> Result<(), FrameEncodeError> {
+    pub fn encode_to(&mut self, value: &T, buffer: &mut BytesMut) -> Result<(), FrameEncodeError> {
         let mut prefixer = Prefixer::new(buffer);
 
         ValueEncoder::new(prefixer.suffix_mut()).encode(value)?;
