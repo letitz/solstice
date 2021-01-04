@@ -25,7 +25,7 @@ where
     pub fn new(stream: TcpStream) -> Self {
         Connection {
             stream,
-            read_buffer: BytesMut::with_capacity(4096),
+            read_buffer: BytesMut::new(),
             phantom_read: PhantomData,
             phantom_write: PhantomData,
         }
@@ -77,6 +77,28 @@ mod tests {
         assert_eq!(connection.read().await.unwrap(), "pong");
         connection.write("ping").await.unwrap();
         assert_eq!(connection.read().await.unwrap(), "pong");
+
+        server_task.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn very_large_message() {
+        let listener = TcpListener::bind("localhost:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+
+        let server_task = tokio::spawn(async move {
+            let (stream, _peer_address) = listener.accept().await.unwrap();
+            let mut connection = Connection::<String, Vec<u32>>::new(stream);
+
+            assert_eq!(connection.read().await.unwrap(), "ping");
+            connection.write(&vec![0; 10 * 4096]).await.unwrap();
+        });
+
+        let stream = TcpStream::connect(address).await.unwrap();
+        let mut connection = Connection::<Vec<u32>, str>::new(stream);
+
+        connection.write("ping").await.unwrap();
+        assert_eq!(connection.read().await.unwrap(), vec![0; 10 * 4096]);
 
         server_task.await.unwrap();
     }
