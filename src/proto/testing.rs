@@ -5,9 +5,20 @@ use std::net::SocketAddr;
 
 use tokio::net::{TcpListener, TcpStream};
 
-// use crate::proto::{FrameEncoder, FrameDecoder};
+use crate::proto::{Connection, ServerRequest, ServerResponse};
 
-async fn process(_stream: TcpStream) -> io::Result<()> {
+async fn process(stream: TcpStream) -> io::Result<()> {
+    let mut connection = Connection::<ServerRequest, ServerResponse>::new(stream);
+
+    let _request = match connection.read().await? {
+        ServerRequest::LoginRequest(request) => request,
+        request => {
+            return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("expected login request, got: {:?}", request)));
+        }
+    };
+
     Ok(())
 }
 
