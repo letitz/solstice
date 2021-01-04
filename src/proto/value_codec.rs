@@ -19,8 +19,7 @@ use std::io;
 use std::net;
 
 use bytes::{BufMut, BytesMut};
-use encoding::all::WINDOWS_1252;
-use encoding::{DecoderTrap, EncoderTrap, Encoding};
+use encoding_rs::WINDOWS_1252;
 use std::convert::{TryFrom, TryInto};
 use thiserror::Error;
 
@@ -225,11 +224,11 @@ impl<'a> ValueDecoder<'a> {
         let position = self.position;
         let bytes = self.consume(length)?;
 
-        let result = WINDOWS_1252.decode(bytes, DecoderTrap::Strict);
+        let result = WINDOWS_1252.decode_without_bom_handling_and_without_replacement(bytes);
         match result {
-            Ok(string) => Ok(string),
-            Err(error) => Err(ValueDecodeError::InvalidString {
-                cause: error.to_string(),
+            Some(string) => Ok(string.into_owned()),
+            None => Err(ValueDecodeError::InvalidString {
+                cause: "malformed sequence in Windows-1252-encoded string".to_string(),
                 position: position,
             }),
         }
@@ -361,12 +360,13 @@ impl<'a> ValueEncoder<'a> {
         // Reserve space for the length prefix.
         let mut prefixer = Prefixer::new(self.buffer);
 
-        // Encode the string. We are quite certain this cannot fail because we
-        // use EncoderTrap::Replace to replace any unencodable characters with
-        // '?' which is always encodable in Windows-1252.
-        //
-        // TODO: Switch to the encoding_rs crate.
-        let bytes = WINDOWS_1252.encode(val, EncoderTrap::Replace).unwrap();
+        // Encode the string. This cannot fail because any unmappable characters
+        // are replaced.
+        let (bytes, encoding, _did_replace) = WINDOWS_1252.encode(val);
+
+        // Encodings in full generality can have a different "output encoding"
+        // but that is not the case of Windows-1252.
+        assert_eq!(encoding, WINDOWS_1252);
 
         prefixer.suffix_mut().extend_from_slice(&bytes);
 
@@ -747,11 +747,18 @@ pub mod tests {
     }
 
     // A few strings and their corresponding encodings.
-    const STRING_ENCODINGS: [(&'static str, &'static [u8]); 3] = [
+    const STRING_ENCODINGS: [(&'static str, &'static [u8]); 4] = [
         ("", &[0, 0, 0, 0]),
         ("hey!", &[4, 0, 0, 0, 104, 101, 121, 33]),
         // Windows 1252 specific codepoints.
         ("‘’“”€", &[5, 0, 0, 0, 145, 146, 147, 148, 128]),
+        // Undefined codepoints. They are not decoded to representable
+        // characters, but they do not generate errors either. In particular,
+        // they survive round-trips through the codec.
+        (
+            "\u{81}\u{8D}\u{8F}\u{90}\u{9D}",
+            &[5, 0, 0, 0, 0x81, 0x8D, 0x8F, 0x90, 0x9D],
+        ),
     ];
 
     #[test]
@@ -774,14 +781,18 @@ pub mod tests {
     fn encode_string_with_unencodable_characters() {
         let mut bytes = BytesMut::new();
 
-        ValueEncoder::new(&mut bytes)
-            .encode_string("忠犬ハチ公")
-            .unwrap();
+        ValueEncoder::new(&mut bytes).encode_string("你好").unwrap();
 
-        // Characters not in the Windows 1252 codepage are rendered as '?'.
-        assert_eq!(bytes, vec![5, 0, 0, 0, 63, 63, 63, 63, 63]);
+        // Characters not in the Windows 1252 codepage are replaced with their
+        // decimal representations. Thus the output is longer than the input.
+        assert_eq!(bytes[0..4], [16, 0, 0, 0]);
+        assert_eq!(&bytes[4..], b"&#20320;&#22909;");
 
-        assert_eq!(ValueDecoder::new(&bytes).decode_string().unwrap(), "?????");
+        // The replaced characters are not decoded back to their original values.
+        assert_eq!(
+            ValueDecoder::new(&bytes).decode_string().unwrap(),
+            "&#20320;&#22909;"
+        );
     }
 
     #[test]
