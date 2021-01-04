@@ -339,3 +339,31 @@ impl RoomMap {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::proto::server::RoomListResponse;
+
+    use super::{Room, RoomMap, Visibility};
+
+    #[test]
+    fn room_map_new_is_empty() {
+        assert_eq!(RoomMap::new().get_room_list(), vec![]);
+    }
+
+    #[test]
+    fn room_map_get_strict() {
+        let mut rooms = RoomMap::new();
+        rooms.set_room_list(RoomListResponse {
+            rooms: vec![("room a".to_string(), 42), ("room b".to_string(), 1337)],
+            owned_private_rooms: vec![],
+            other_private_rooms: vec![],
+            operated_private_room_names: vec![],
+        });
+
+        assert_eq!(
+            rooms.get_strict("room a").unwrap(),
+            &Room::new(Visibility::Public, 42)
+        );
+    }
+}
