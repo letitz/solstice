@@ -12,7 +12,7 @@ pub mod u32;
 mod user;
 mod value_codec;
 
-pub use self::codec::Connection;
+pub use self::codec::FrameStream;
 pub use self::handler::*;
 pub use self::packet::*;
 pub use self::server::{ServerRequest, ServerResponse};

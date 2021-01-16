@@ -5,11 +5,11 @@ use std::net::SocketAddr;
 
 use tokio::net::{TcpListener, TcpStream};
 
-use crate::proto::{Connection, ServerRequest, ServerResponse};
+use crate::proto::{FrameStream, ServerRequest, ServerResponse};
 
 async fn process(stream: TcpStream) -> io::Result<()> {
     let mut connection =
-        Connection::<ServerRequest, ServerResponse>::new(stream);
+        FrameStream::<ServerRequest, ServerResponse>::new(stream);
 
     let _request = match connection.read().await? {
         ServerRequest::LoginRequest(request) => request,

@@ -145,7 +145,7 @@ impl<T: ValueDecode> FrameDecoder<T> {
 }
 
 #[derive(Debug)]
-pub struct Connection<ReadFrame, WriteFrame: ?Sized> {
+pub struct FrameStream<ReadFrame, WriteFrame: ?Sized> {
     stream: TcpStream,
 
     read_buffer: BytesMut,
@@ -154,13 +154,13 @@ pub struct Connection<ReadFrame, WriteFrame: ?Sized> {
     encoder: FrameEncoder<WriteFrame>,
 }
 
-impl<ReadFrame, WriteFrame> Connection<ReadFrame, WriteFrame>
+impl<ReadFrame, WriteFrame> FrameStream<ReadFrame, WriteFrame>
 where
     ReadFrame: ValueDecode,
     WriteFrame: ValueEncode + ?Sized,
 {
     pub fn new(stream: TcpStream) -> Self {
-        Connection {
+        FrameStream {
             stream,
             read_buffer: BytesMut::new(),
             decoder: FrameDecoder::new(),
@@ -188,7 +188,7 @@ mod tests {
     use bytes::BytesMut;
     use tokio::net::{TcpListener, TcpStream};
 
-    use super::{Connection, FrameDecoder, FrameEncoder};
+    use super::{FrameStream, FrameDecoder, FrameEncoder};
 
     // Test value: [1, 3, 3, 7] in little-endian.
     const U32_1337: u32 = 1 + (3 << 8) + (3 << 16) + (7 << 24);
@@ -342,21 +342,21 @@ mod tests {
 
         let server_task = tokio::spawn(async move {
             let (stream, _peer_address) = listener.accept().await.unwrap();
-            let mut connection = Connection::<String, str>::new(stream);
+            let mut frame_stream = FrameStream::<String, str>::new(stream);
 
-            assert_eq!(connection.read().await.unwrap(), "ping");
-            connection.write("pong").await.unwrap();
-            assert_eq!(connection.read().await.unwrap(), "ping");
-            connection.write("pong").await.unwrap();
+            assert_eq!(frame_stream.read().await.unwrap(), "ping");
+            frame_stream.write("pong").await.unwrap();
+            assert_eq!(frame_stream.read().await.unwrap(), "ping");
+            frame_stream.write("pong").await.unwrap();
         });
 
         let stream = TcpStream::connect(address).await.unwrap();
-        let mut connection = Connection::<String, str>::new(stream);
+        let mut frame_stream = FrameStream::<String, str>::new(stream);
 
-        connection.write("ping").await.unwrap();
-        assert_eq!(connection.read().await.unwrap(), "pong");
-        connection.write("ping").await.unwrap();
-        assert_eq!(connection.read().await.unwrap(), "pong");
+        frame_stream.write("ping").await.unwrap();
+        assert_eq!(frame_stream.read().await.unwrap(), "pong");
+        frame_stream.write("ping").await.unwrap();
+        assert_eq!(frame_stream.read().await.unwrap(), "pong");
 
         server_task.await.unwrap();
     }
@@ -368,17 +368,17 @@ mod tests {
 
         let server_task = tokio::spawn(async move {
             let (stream, _peer_address) = listener.accept().await.unwrap();
-            let mut connection = Connection::<String, Vec<u32>>::new(stream);
+            let mut frame_stream = FrameStream::<String, Vec<u32>>::new(stream);
 
-            assert_eq!(connection.read().await.unwrap(), "ping");
-            connection.write(&vec![0; 10 * 4096]).await.unwrap();
+            assert_eq!(frame_stream.read().await.unwrap(), "ping");
+            frame_stream.write(&vec![0; 10 * 4096]).await.unwrap();
         });
 
         let stream = TcpStream::connect(address).await.unwrap();
-        let mut connection = Connection::<Vec<u32>, str>::new(stream);
+        let mut frame_stream = FrameStream::<Vec<u32>, str>::new(stream);
 
-        connection.write("ping").await.unwrap();
-        assert_eq!(connection.read().await.unwrap(), vec![0; 10 * 4096]);
+        frame_stream.write("ping").await.unwrap();
+        assert_eq!(frame_stream.read().await.unwrap(), vec![0; 10 * 4096]);
 
         server_task.await.unwrap();
     }
