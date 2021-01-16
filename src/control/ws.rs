@@ -37,8 +37,12 @@ pub enum SendError {
 impl fmt::Display for SendError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            SendError::JSONEncoderError(ref err) => write!(fmt, "JSONEncoderError: {}", err),
-            SendError::WebSocketError(ref err) => write!(fmt, "WebSocketError: {}", err),
+            SendError::JSONEncoderError(ref err) => {
+                write!(fmt, "JSONEncoderError: {}", err)
+            }
+            SendError::WebSocketError(ref err) => {
+                write!(fmt, "WebSocketError: {}", err)
+            }
         }
     }
 }
@@ -141,7 +145,10 @@ impl ws::Handler for Handler {
             Ok(control_request) => control_request,
             Err(e) => {
                 error!("Received invalid JSON message from controller: {}", e);
-                return Err(ws::Error::new(ws::ErrorKind::Protocol, "Invalid JSON"));
+                return Err(ws::Error::new(
+                    ws::ErrorKind::Protocol,
+                    "Invalid JSON",
+                ));
             }
         };
 
@@ -179,7 +186,8 @@ pub fn listen(client_tx: crossbeam_channel::Sender<Notification>) {
         }
     };
 
-    let listen_result = websocket.listen((config::CONTROL_HOST, config::CONTROL_PORT));
+    let listen_result =
+        websocket.listen((config::CONTROL_HOST, config::CONTROL_PORT));
 
     match listen_result {
         Ok(_) => (),

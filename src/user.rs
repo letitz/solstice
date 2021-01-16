@@ -50,7 +50,10 @@ impl UserMap {
 
     /// Looks up the given user name in the map, returning a mutable reference
     /// to the associated data if found, or an error if not found.
-    pub fn get_mut_strict(&mut self, user_name: &str) -> Result<&mut User, UserNotFoundError> {
+    pub fn get_mut_strict(
+        &mut self,
+        user_name: &str,
+    ) -> Result<&mut User, UserNotFoundError> {
         match self.map.get_mut(user_name) {
             Some(user) => Ok(user),
             None => Err(UserNotFoundError {
@@ -130,7 +133,8 @@ mod tests {
     fn set_get_all_privileged() {
         let mut users = UserMap::new();
 
-        users.set_all_privileged(vec!["bleep".to_string(), "bloop".to_string()]);
+        users
+            .set_all_privileged(vec!["bleep".to_string(), "bloop".to_string()]);
 
         let mut privileged = users.get_all_privileged();
         privileged.sort();

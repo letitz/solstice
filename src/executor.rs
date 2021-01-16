@@ -136,7 +136,8 @@ mod tests {
 
         let context = executor.join();
 
-        let expected_users = vec![(user1.name.clone(), user1), (user2.name.clone(), user2)];
+        let expected_users =
+            vec![(user1.name.clone(), user1), (user2.name.clone(), user2)];
 
         let mut users = context.users.lock().get_list();
         users.sort();

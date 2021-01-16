@@ -201,7 +201,8 @@ impl<T: SendPacket> Stream<T> {
 
         // We're always interested in reading more.
         #[allow(deprecated)]
-        let mut event_set = mio::Ready::readable() | mio::Ready::hup() | mio::Ready::error();
+        let mut event_set =
+            mio::Ready::readable() | mio::Ready::hup() | mio::Ready::error();
         // If there is still stuff to write in the queue, we're interested in
         // the socket becoming writable too.
         if self.queue.len() > 0 {

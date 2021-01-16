@@ -21,6 +21,6 @@ pub use self::server::{ServerRequest, ServerResponse};
 pub use self::stream::*;
 pub use self::user::{User, UserStatus};
 pub use self::value_codec::{
-    Decode, ValueDecode, ValueDecodeError, ValueDecoder, ValueEncode, ValueEncodeError,
-    ValueEncoder,
+    Decode, ValueDecode, ValueDecodeError, ValueDecoder, ValueEncode,
+    ValueEncodeError, ValueEncoder,
 };

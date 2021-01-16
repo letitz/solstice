@@ -92,13 +92,17 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::RoomNotFound(ref room_name) => write!(f, "room {:?} not found", room_name),
+            Error::RoomNotFound(ref room_name) => {
+                write!(f, "room {:?} not found", room_name)
+            }
 
-            Error::MembershipChangeInvalid(old_membership, new_membership) => write!(
-                f,
-                "cannot change membership from {:?} to {:?}",
-                old_membership, new_membership
-            ),
+            Error::MembershipChangeInvalid(old_membership, new_membership) => {
+                write!(
+                    f,
+                    "cannot change membership from {:?} to {:?}",
+                    old_membership, new_membership
+                )
+            }
         }
     }
 }
@@ -172,7 +176,8 @@ impl RoomMap {
     /// server response.
     pub fn set_room_list(&mut self, mut response: server::RoomListResponse) {
         // Replace the old mapping with an empty one.
-        let mut old_map = mem::replace(&mut self.map, collections::HashMap::new());
+        let mut old_map =
+            mem::replace(&mut self.map, collections::HashMap::new());
 
         // Add all public rooms.
         for (name, user_count) in response.rooms.drain(..) {
@@ -181,12 +186,22 @@ impl RoomMap {
 
         // Add all private, owned, rooms.
         for (name, user_count) in response.owned_private_rooms.drain(..) {
-            self.update_one(name, Visibility::PrivateOwned, user_count, &mut old_map);
+            self.update_one(
+                name,
+                Visibility::PrivateOwned,
+                user_count,
+                &mut old_map,
+            );
         }
 
         // Add all private, unowned, rooms.
         for (name, user_count) in response.other_private_rooms.drain(..) {
-            self.update_one(name, Visibility::PrivateOther, user_count, &mut old_map);
+            self.update_one(
+                name,
+                Visibility::PrivateOther,
+                user_count,
+                &mut old_map,
+            );
         }
 
         // Mark all operated rooms as necessary.
@@ -303,7 +318,11 @@ impl RoomMap {
     }
 
     /// Saves the given message as the last one in the given room.
-    pub fn add_message(&mut self, room_name: &str, message: Message) -> Result<(), Error> {
+    pub fn add_message(
+        &mut self,
+        room_name: &str,
+        message: Message,
+    ) -> Result<(), Error> {
         let room = self.get_mut_strict(room_name)?;
         room.messages.push(message);
         Ok(())
@@ -311,7 +330,11 @@ impl RoomMap {
 
     /// Inserts the given user in the given room's set of members.
     /// Returns an error if the room is not found.
-    pub fn insert_member(&mut self, room_name: &str, user_name: String) -> Result<(), Error> {
+    pub fn insert_member(
+        &mut self,
+        room_name: &str,
+        user_name: String,
+    ) -> Result<(), Error> {
         let room = self.get_mut_strict(room_name)?;
         room.members.insert(user_name);
         Ok(())
@@ -319,7 +342,11 @@ impl RoomMap {
 
     /// Removes the given user from the given room's set of members.
     /// Returns an error if the room is not found.
-    pub fn remove_member(&mut self, room_name: &str, user_name: &str) -> Result<(), Error> {
+    pub fn remove_member(
+        &mut self,
+        room_name: &str,
+        user_name: &str,
+    ) -> Result<(), Error> {
         let room = self.get_mut_strict(room_name)?;
         room.members.remove(user_name);
         Ok(())
@@ -355,7 +382,10 @@ mod tests {
     fn room_map_get_strict() {
         let mut rooms = RoomMap::new();
         rooms.set_room_list(RoomListResponse {
-            rooms: vec![("room a".to_string(), 42), ("room b".to_string(), 1337)],
+            rooms: vec![
+                ("room a".to_string(), 42),
+                ("room b".to_string(), 1337),
+            ],
             owned_private_rooms: vec![],
             other_private_rooms: vec![],
             operated_private_room_names: vec![],

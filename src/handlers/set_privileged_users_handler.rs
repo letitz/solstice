@@ -8,7 +8,11 @@ use crate::proto::server::PrivilegedUsersResponse;
 pub struct SetPrivilegedUsersHandler;
 
 impl MessageHandler<PrivilegedUsersResponse> for SetPrivilegedUsersHandler {
-    fn run(self, context: &Context, message: &PrivilegedUsersResponse) -> io::Result<()> {
+    fn run(
+        self,
+        context: &Context,
+        message: &PrivilegedUsersResponse,
+    ) -> io::Result<()> {
         let users = message.users.clone();
         context.users.lock().set_all_privileged(users);
         Ok(())

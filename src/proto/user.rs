@@ -1,8 +1,9 @@
 use std::io;
 
 use crate::proto::{
-    MutPacket, Packet, PacketReadError, ReadFromPacket, ValueDecode, ValueDecodeError,
-    ValueDecoder, ValueEncode, ValueEncodeError, ValueEncoder, WriteToPacket,
+    MutPacket, Packet, PacketReadError, ReadFromPacket, ValueDecode,
+    ValueDecodeError, ValueDecoder, ValueEncode, ValueEncodeError,
+    ValueEncoder, WriteToPacket,
 };
 
 const STATUS_OFFLINE: u32 = 1;
@@ -10,7 +11,17 @@ const STATUS_AWAY: u32 = 2;
 const STATUS_ONLINE: u32 = 3;
 
 /// This enumeration is the list of possible user statuses.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, RustcDecodable, RustcEncodable)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Ord,
+    PartialEq,
+    PartialOrd,
+    RustcDecodable,
+    RustcEncodable,
+)]
 pub enum UserStatus {
     /// The user if offline.
     Offline,
@@ -45,7 +56,10 @@ impl WriteToPacket for UserStatus {
 }
 
 impl ValueEncode for UserStatus {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         let value = match *self {
             UserStatus::Offline => STATUS_OFFLINE,
             UserStatus::Away => STATUS_AWAY,
@@ -56,7 +70,9 @@ impl ValueEncode for UserStatus {
 }
 
 impl ValueDecode for UserStatus {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let position = decoder.position();
         let value: u32 = decoder.decode()?;
         match value {
@@ -73,7 +89,9 @@ impl ValueDecode for UserStatus {
 }
 
 /// This structure contains the last known information about a fellow user.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, RustcDecodable, RustcEncodable)]
+#[derive(
+    Clone, Debug, Eq, Ord, PartialEq, PartialOrd, RustcDecodable, RustcEncodable,
+)]
 pub struct User {
     /// The name of the user.
     pub name: String,

@@ -3,8 +3,8 @@ use std::net;
 use crate::proto::packet::{Packet, PacketReadError, ReadFromPacket};
 use crate::proto::server::constants::*;
 use crate::proto::{
-    User, UserStatus, ValueDecode, ValueDecodeError, ValueDecoder, ValueEncode, ValueEncodeError,
-    ValueEncoder,
+    User, UserStatus, ValueDecode, ValueDecodeError, ValueDecoder, ValueEncode,
+    ValueEncodeError, ValueEncoder,
 };
 
 /*=================*
@@ -40,39 +40,67 @@ impl ReadFromPacket for ServerResponse {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
         let code: u32 = packet.read_value()?;
         let resp = match code {
-            CODE_CONNECT_TO_PEER => ServerResponse::ConnectToPeerResponse(packet.read_value()?),
+            CODE_CONNECT_TO_PEER => {
+                ServerResponse::ConnectToPeerResponse(packet.read_value()?)
+            }
 
-            CODE_FILE_SEARCH => ServerResponse::FileSearchResponse(packet.read_value()?),
+            CODE_FILE_SEARCH => {
+                ServerResponse::FileSearchResponse(packet.read_value()?)
+            }
 
             CODE_LOGIN => ServerResponse::LoginResponse(packet.read_value()?),
 
-            CODE_PEER_ADDRESS => ServerResponse::PeerAddressResponse(packet.read_value()?),
+            CODE_PEER_ADDRESS => {
+                ServerResponse::PeerAddressResponse(packet.read_value()?)
+            }
 
-            CODE_PRIVILEGED_USERS => ServerResponse::PrivilegedUsersResponse(packet.read_value()?),
+            CODE_PRIVILEGED_USERS => {
+                ServerResponse::PrivilegedUsersResponse(packet.read_value()?)
+            }
 
-            CODE_ROOM_JOIN => ServerResponse::RoomJoinResponse(packet.read_value()?),
+            CODE_ROOM_JOIN => {
+                ServerResponse::RoomJoinResponse(packet.read_value()?)
+            }
 
-            CODE_ROOM_LEAVE => ServerResponse::RoomLeaveResponse(packet.read_value()?),
+            CODE_ROOM_LEAVE => {
+                ServerResponse::RoomLeaveResponse(packet.read_value()?)
+            }
 
-            CODE_ROOM_LIST => ServerResponse::RoomListResponse(packet.read_value()?),
+            CODE_ROOM_LIST => {
+                ServerResponse::RoomListResponse(packet.read_value()?)
+            }
 
-            CODE_ROOM_MESSAGE => ServerResponse::RoomMessageResponse(packet.read_value()?),
+            CODE_ROOM_MESSAGE => {
+                ServerResponse::RoomMessageResponse(packet.read_value()?)
+            }
 
-            CODE_ROOM_TICKERS => ServerResponse::RoomTickersResponse(packet.read_value()?),
+            CODE_ROOM_TICKERS => {
+                ServerResponse::RoomTickersResponse(packet.read_value()?)
+            }
 
-            CODE_ROOM_USER_JOINED => ServerResponse::RoomUserJoinedResponse(packet.read_value()?),
+            CODE_ROOM_USER_JOINED => {
+                ServerResponse::RoomUserJoinedResponse(packet.read_value()?)
+            }
 
-            CODE_ROOM_USER_LEFT => ServerResponse::RoomUserLeftResponse(packet.read_value()?),
+            CODE_ROOM_USER_LEFT => {
+                ServerResponse::RoomUserLeftResponse(packet.read_value()?)
+            }
 
-            CODE_USER_INFO => ServerResponse::UserInfoResponse(packet.read_value()?),
+            CODE_USER_INFO => {
+                ServerResponse::UserInfoResponse(packet.read_value()?)
+            }
 
-            CODE_USER_STATUS => ServerResponse::UserStatusResponse(packet.read_value()?),
+            CODE_USER_STATUS => {
+                ServerResponse::UserStatusResponse(packet.read_value()?)
+            }
 
             CODE_WISHLIST_INTERVAL => {
                 ServerResponse::WishlistIntervalResponse(packet.read_value()?)
             }
 
-            CODE_PARENT_MIN_SPEED => ServerResponse::ParentMinSpeedResponse(packet.read_value()?),
+            CODE_PARENT_MIN_SPEED => {
+                ServerResponse::ParentMinSpeedResponse(packet.read_value()?)
+            }
 
             CODE_PARENT_SPEED_RATIO => {
                 ServerResponse::ParentSpeedRatioResponse(packet.read_value()?)
@@ -92,7 +120,10 @@ impl ReadFromPacket for ServerResponse {
 }
 
 impl ValueEncode for ServerResponse {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         match *self {
             ServerResponse::ConnectToPeerResponse(ref response) => {
                 encoder.encode_u32(CODE_CONNECT_TO_PEER)?;
@@ -171,7 +202,9 @@ impl ValueEncode for ServerResponse {
 }
 
 impl ValueDecode for ServerResponse {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let position = decoder.position();
         let code: u32 = decoder.decode()?;
         let response = match code {
@@ -290,7 +323,10 @@ impl ReadFromPacket for ConnectToPeerResponse {
 }
 
 impl ValueEncode for ConnectToPeerResponse {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode(&self.user_name)?;
         encoder.encode(&self.connection_type)?;
         encoder.encode(&self.ip)?;
@@ -301,7 +337,9 @@ impl ValueEncode for ConnectToPeerResponse {
 }
 
 impl ValueDecode for ConnectToPeerResponse {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let user_name = decoder.decode()?;
         let connection_type = decoder.decode()?;
         let ip = decoder.decode()?;
@@ -346,7 +384,10 @@ impl ReadFromPacket for FileSearchResponse {
 }
 
 impl ValueEncode for FileSearchResponse {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.user_name)?;
         encoder.encode_u32(self.ticket)?;
         encoder.encode_string(&self.query)
@@ -354,7 +395,9 @@ impl ValueEncode for FileSearchResponse {
 }
 
 impl ValueDecode for FileSearchResponse {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let user_name = decoder.decode()?;
         let ticket = decoder.decode()?;
         let query = decoder.decode()?;
@@ -409,7 +452,10 @@ impl ReadFromPacket for LoginResponse {
 }
 
 impl ValueEncode for LoginResponse {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         match *self {
             LoginResponse::LoginOk {
                 ref motd,
@@ -430,7 +476,9 @@ impl ValueEncode for LoginResponse {
 }
 
 impl ValueDecode for LoginResponse {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let ok: bool = decoder.decode()?;
         if !ok {
             let reason = decoder.decode()?;
@@ -471,13 +519,18 @@ impl ReadFromPacket for ParentMinSpeedResponse {
 }
 
 impl ValueEncode for ParentMinSpeedResponse {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_u32(self.value)
     }
 }
 
 impl ValueDecode for ParentMinSpeedResponse {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let value = decoder.decode()?;
         Ok(ParentMinSpeedResponse { value })
     }
@@ -500,13 +553,18 @@ impl ReadFromPacket for ParentSpeedRatioResponse {
 }
 
 impl ValueEncode for ParentSpeedRatioResponse {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_u32(self.value)
     }
 }
 
 impl ValueDecode for ParentSpeedRatioResponse {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let value = decoder.decode()?;
         Ok(ParentSpeedRatioResponse { value })
     }
@@ -534,7 +592,10 @@ impl ReadFromPacket for PeerAddressResponse {
 }
 
 impl ValueEncode for PeerAddressResponse {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode(&self.username)?;
         encoder.encode(&self.ip)?;
         encoder.encode_u16(self.port)
@@ -542,7 +603,9 @@ impl ValueEncode for PeerAddressResponse {
 }
 
 impl ValueDecode for PeerAddressResponse {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let username = decoder.decode()?;
         let ip = decoder.decode()?;
         let port = decoder.decode()?;
@@ -567,13 +630,18 @@ impl ReadFromPacket for PrivilegedUsersResponse {
 }
 
 impl ValueEncode for PrivilegedUsersResponse {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode(&self.users)
     }
 }
 
 impl ValueDecode for PrivilegedUsersResponse {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let users = decoder.decode()?;
         Ok(PrivilegedUsersResponse { users })
     }
@@ -633,7 +701,10 @@ impl ReadFromPacket for RoomJoinResponse {
 }
 
 impl RoomJoinResponse {
-    fn read_user_infos(&mut self, packet: &mut Packet) -> Result<(), PacketReadError> {
+    fn read_user_infos(
+        &mut self,
+        packet: &mut Packet,
+    ) -> Result<(), PacketReadError> {
         let num_statuses: usize = packet.read_value()?;
         for i in 0..num_statuses {
             if let Some(user) = self.users.get_mut(i) {
@@ -674,7 +745,11 @@ impl RoomJoinResponse {
         {
             warn!(
                 "RoomJoinResponse: mismatched vector sizes {}, {}, {}, {}, {}",
-                num_users, num_statuses, num_infos, num_free_slots, num_countries
+                num_users,
+                num_statuses,
+                num_infos,
+                num_free_slots,
+                num_countries
             );
         }
 
@@ -727,7 +802,10 @@ fn build_user(
 }
 
 impl ValueEncode for UserInfo {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_u32(self.average_speed)?;
         encoder.encode_u32(self.num_downloads)?;
         encoder.encode_u32(self.unknown)?;
@@ -737,7 +815,9 @@ impl ValueEncode for UserInfo {
 }
 
 impl ValueDecode for UserInfo {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let average_speed = decoder.decode()?;
         let num_downloads = decoder.decode()?;
         let unknown = decoder.decode()?;
@@ -754,7 +834,10 @@ impl ValueDecode for UserInfo {
 }
 
 impl ValueEncode for RoomJoinResponse {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         let mut user_names = vec![];
         let mut user_statuses = vec![];
         let mut user_infos = vec![];
@@ -801,9 +884,13 @@ fn build_users(
         let country_opt = countries.pop();
 
         match (name_opt, status_opt, info_opt, slots_opt, country_opt) {
-            (Some(name), Some(status), Some(info), Some(slots), Some(country)) => {
-                users.push(build_user(name, status, info, slots, country))
-            }
+            (
+                Some(name),
+                Some(status),
+                Some(info),
+                Some(slots),
+                Some(country),
+            ) => users.push(build_user(name, status, info, slots, country)),
             _ => break,
         }
     }
@@ -813,7 +900,9 @@ fn build_users(
 }
 
 impl ValueDecode for RoomJoinResponse {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let room_name = decoder.decode()?;
         let user_names = decoder.decode()?;
         let user_statuses = decoder.decode()?;
@@ -863,13 +952,18 @@ impl ReadFromPacket for RoomLeaveResponse {
 }
 
 impl ValueEncode for RoomLeaveResponse {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.room_name)
     }
 }
 
 impl ValueDecode for RoomLeaveResponse {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let room_name = decoder.decode()?;
         Ok(RoomLeaveResponse { room_name })
     }
@@ -903,7 +997,9 @@ impl ReadFromPacket for RoomListResponse {
 }
 
 impl RoomListResponse {
-    fn read_rooms(packet: &mut Packet) -> Result<Vec<(String, u32)>, PacketReadError> {
+    fn read_rooms(
+        packet: &mut Packet,
+    ) -> Result<Vec<(String, u32)>, PacketReadError> {
         let num_rooms: usize = packet.read_value()?;
         let mut rooms = Vec::new();
         for _ in 0..num_rooms {
@@ -928,7 +1024,10 @@ impl RoomListResponse {
         Ok(rooms)
     }
 
-    fn build_rooms(mut room_names: Vec<String>, mut user_counts: Vec<u32>) -> Vec<(String, u32)> {
+    fn build_rooms(
+        mut room_names: Vec<String>,
+        mut user_counts: Vec<u32>,
+    ) -> Vec<(String, u32)> {
         let mut rooms = vec![];
 
         loop {
@@ -936,7 +1035,9 @@ impl RoomListResponse {
             let user_count_opt = user_counts.pop();
 
             match (room_name_opt, user_count_opt) {
-                (Some(room_name), Some(user_count)) => rooms.push((room_name, user_count)),
+                (Some(room_name), Some(user_count)) => {
+                    rooms.push((room_name, user_count))
+                }
                 _ => break,
             }
         }
@@ -958,7 +1059,9 @@ impl RoomListResponse {
         rooms
     }
 
-    fn decode_rooms(decoder: &mut ValueDecoder) -> Result<Vec<(String, u32)>, ValueDecodeError> {
+    fn decode_rooms(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Vec<(String, u32)>, ValueDecodeError> {
         let room_names = decoder.decode()?;
         let user_counts = decoder.decode()?;
         Ok(Self::build_rooms(room_names, user_counts))
@@ -982,7 +1085,10 @@ impl RoomListResponse {
 }
 
 impl ValueEncode for RoomListResponse {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         Self::encode_rooms(&self.rooms, encoder)?;
         Self::encode_rooms(&self.owned_private_rooms, encoder)?;
         Self::encode_rooms(&self.other_private_rooms, encoder)?;
@@ -991,7 +1097,9 @@ impl ValueEncode for RoomListResponse {
 }
 
 impl ValueDecode for RoomListResponse {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let rooms = RoomListResponse::decode_rooms(decoder)?;
         let owned_private_rooms = RoomListResponse::decode_rooms(decoder)?;
         let other_private_rooms = RoomListResponse::decode_rooms(decoder)?;
@@ -1030,7 +1138,10 @@ impl ReadFromPacket for RoomMessageResponse {
 }
 
 impl ValueEncode for RoomMessageResponse {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.room_name)?;
         encoder.encode_string(&self.user_name)?;
         encoder.encode_string(&self.message)
@@ -1038,7 +1149,9 @@ impl ValueEncode for RoomMessageResponse {
 }
 
 impl ValueDecode for RoomMessageResponse {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let room_name = decoder.decode()?;
         let user_name = decoder.decode()?;
         let message = decoder.decode()?;
@@ -1077,14 +1190,19 @@ impl ReadFromPacket for RoomTickersResponse {
 }
 
 impl ValueEncode for RoomTickersResponse {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.room_name)?;
         encoder.encode(&self.tickers)
     }
 }
 
 impl ValueDecode for RoomTickersResponse {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let room_name = decoder.decode()?;
         let tickers = decoder.decode()?;
         Ok(RoomTickersResponse { room_name, tickers })
@@ -1135,7 +1253,10 @@ impl ReadFromPacket for RoomUserJoinedResponse {
 }
 
 impl ValueEncode for RoomUserJoinedResponse {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.room_name)?;
         encoder.encode_string(&self.user.name)?;
         self.user.status.encode(encoder)?;
@@ -1146,7 +1267,9 @@ impl ValueEncode for RoomUserJoinedResponse {
 }
 
 impl ValueDecode for RoomUserJoinedResponse {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let room_name = decoder.decode()?;
         let user_name = decoder.decode()?;
         let status = decoder.decode()?;
@@ -1182,14 +1305,19 @@ impl ReadFromPacket for RoomUserLeftResponse {
 }
 
 impl ValueEncode for RoomUserLeftResponse {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.room_name)?;
         encoder.encode_string(&self.user_name)
     }
 }
 
 impl ValueDecode for RoomUserLeftResponse {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let room_name = decoder.decode()?;
         let user_name = decoder.decode()?;
         Ok(RoomUserLeftResponse {
@@ -1230,7 +1358,10 @@ impl ReadFromPacket for UserInfoResponse {
 }
 
 impl ValueEncode for UserInfoResponse {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.user_name)?;
         encoder.encode_u32(self.average_speed as u32)?;
         encoder.encode_u32(self.num_downloads as u32)?;
@@ -1240,7 +1371,9 @@ impl ValueEncode for UserInfoResponse {
 }
 
 impl ValueDecode for UserInfoResponse {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let user_name = decoder.decode()?;
         let average_speed: u32 = decoder.decode()?;
         let num_downloads: u32 = decoder.decode()?;
@@ -1281,7 +1414,10 @@ impl ReadFromPacket for UserStatusResponse {
 }
 
 impl ValueEncode for UserStatusResponse {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.user_name)?;
         self.status.encode(encoder)?;
         encoder.encode_bool(self.is_privileged)
@@ -1289,7 +1425,9 @@ impl ValueEncode for UserStatusResponse {
 }
 
 impl ValueDecode for UserStatusResponse {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let user_name = decoder.decode()?;
         let status = decoder.decode()?;
         let is_privileged = decoder.decode()?;
@@ -1318,13 +1456,18 @@ impl ReadFromPacket for WishlistIntervalResponse {
 }
 
 impl ValueEncode for WishlistIntervalResponse {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_u32(self.seconds)
     }
 }
 
 impl ValueDecode for WishlistIntervalResponse {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let seconds = decoder.decode()?;
         Ok(WishlistIntervalResponse { seconds })
     }
@@ -1492,9 +1635,18 @@ mod tests {
     fn roundtrip_room_list() {
         roundtrip(ServerResponse::RoomListResponse(RoomListResponse {
             rooms: vec![("red".to_string(), 12), ("blue".to_string(), 13)],
-            owned_private_rooms: vec![("green".to_string(), 14), ("purple".to_string(), 15)],
-            other_private_rooms: vec![("yellow".to_string(), 16), ("orange".to_string(), 17)],
-            operated_private_room_names: vec!["brown".to_string(), "pink".to_string()],
+            owned_private_rooms: vec![
+                ("green".to_string(), 14),
+                ("purple".to_string(), 15),
+            ],
+            other_private_rooms: vec![
+                ("yellow".to_string(), 16),
+                ("orange".to_string(), 17),
+            ],
+            operated_private_room_names: vec![
+                "brown".to_string(),
+                "pink".to_string(),
+            ],
         }))
     }
 

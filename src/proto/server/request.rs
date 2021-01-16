@@ -6,7 +6,8 @@ use crypto::md5::Md5;
 use crate::proto::packet::{MutPacket, WriteToPacket};
 use crate::proto::server::constants::*;
 use crate::proto::{
-    ValueDecode, ValueDecodeError, ValueDecoder, ValueEncode, ValueEncodeError, ValueEncoder,
+    ValueDecode, ValueDecodeError, ValueDecoder, ValueEncode, ValueEncodeError,
+    ValueEncoder,
 };
 
 /* ------- *
@@ -100,7 +101,10 @@ impl WriteToPacket for ServerRequest {
 }
 
 impl ValueEncode for ServerRequest {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         match *self {
             ServerRequest::CannotConnectRequest(ref request) => {
                 encoder.encode_u32(CODE_CANNOT_CONNECT)?;
@@ -151,7 +155,9 @@ impl ValueEncode for ServerRequest {
 }
 
 impl ValueDecode for ServerRequest {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let position = decoder.position();
         let code: u32 = decoder.decode()?;
         let request = match code {
@@ -227,14 +233,19 @@ impl WriteToPacket for CannotConnectRequest {
 }
 
 impl ValueEncode for CannotConnectRequest {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_u32(self.token)?;
         encoder.encode_string(&self.user_name)
     }
 }
 
 impl ValueDecode for CannotConnectRequest {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let token = decoder.decode()?;
         let user_name = decoder.decode()?;
         Ok(CannotConnectRequest { token, user_name })
@@ -262,7 +273,10 @@ impl WriteToPacket for ConnectToPeerRequest {
 }
 
 impl ValueEncode for ConnectToPeerRequest {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_u32(self.token)?;
         encoder.encode_string(&self.user_name)?;
         encoder.encode_string(&self.connection_type)
@@ -270,7 +284,9 @@ impl ValueEncode for ConnectToPeerRequest {
 }
 
 impl ValueDecode for ConnectToPeerRequest {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let token = decoder.decode()?;
         let user_name = decoder.decode()?;
         let connection_type = decoder.decode()?;
@@ -301,14 +317,19 @@ impl WriteToPacket for FileSearchRequest {
 }
 
 impl ValueEncode for FileSearchRequest {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_u32(self.ticket)?;
         encoder.encode_string(&self.query)
     }
 }
 
 impl ValueDecode for FileSearchRequest {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let ticket = decoder.decode()?;
         let query = decoder.decode()?;
         Ok(FileSearchRequest { ticket, query })
@@ -370,7 +391,10 @@ impl WriteToPacket for LoginRequest {
 }
 
 impl ValueEncode for LoginRequest {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.username)?;
         encoder.encode_string(&self.password)?;
         encoder.encode_u32(self.major)?;
@@ -380,7 +404,9 @@ impl ValueEncode for LoginRequest {
 }
 
 impl ValueDecode for LoginRequest {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let username = decoder.decode()?;
         let password = decoder.decode()?;
         let major = decoder.decode()?;
@@ -413,13 +439,18 @@ impl WriteToPacket for PeerAddressRequest {
 }
 
 impl ValueEncode for PeerAddressRequest {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.username)
     }
 }
 
 impl ValueDecode for PeerAddressRequest {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let username = decoder.decode()?;
         Ok(PeerAddressRequest { username: username })
     }
@@ -442,13 +473,18 @@ impl WriteToPacket for RoomJoinRequest {
 }
 
 impl ValueEncode for RoomJoinRequest {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.room_name)
     }
 }
 
 impl ValueDecode for RoomJoinRequest {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let room_name = decoder.decode()?;
         Ok(RoomJoinRequest {
             room_name: room_name,
@@ -473,13 +509,18 @@ impl WriteToPacket for RoomLeaveRequest {
 }
 
 impl ValueEncode for RoomLeaveRequest {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.room_name)
     }
 }
 
 impl ValueDecode for RoomLeaveRequest {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let room_name = decoder.decode()?;
         Ok(RoomLeaveRequest {
             room_name: room_name,
@@ -506,14 +547,19 @@ impl WriteToPacket for RoomMessageRequest {
 }
 
 impl ValueEncode for RoomMessageRequest {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.room_name)?;
         encoder.encode_string(&self.message)
     }
 }
 
 impl ValueDecode for RoomMessageRequest {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let room_name = decoder.decode()?;
         let message = decoder.decode()?;
         Ok(RoomMessageRequest { room_name, message })
@@ -537,13 +583,18 @@ impl WriteToPacket for SetListenPortRequest {
 }
 
 impl ValueEncode for SetListenPortRequest {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode(&self.port)
     }
 }
 
 impl ValueDecode for SetListenPortRequest {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let port = decoder.decode()?;
         Ok(SetListenPortRequest { port: port })
     }
@@ -566,13 +617,18 @@ impl WriteToPacket for UserStatusRequest {
 }
 
 impl ValueEncode for UserStatusRequest {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.user_name)
     }
 }
 
 impl ValueDecode for UserStatusRequest {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let user_name = decoder.decode()?;
         Ok(UserStatusRequest {
             user_name: user_name,
@@ -643,7 +699,8 @@ mod tests {
 
     #[test]
     fn new_login_request_has_correct_digest() {
-        let request = LoginRequest::new("alice", "password1234", 1337, 42).unwrap();
+        let request =
+            LoginRequest::new("alice", "password1234", 1337, 42).unwrap();
         assert!(request.has_correct_digest());
     }
 

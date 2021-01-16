@@ -56,12 +56,18 @@ impl Dispatcher {
     /// Dispatches the given message by wrapping it with a handler.
     pub fn dispatch(&self, message: Message) -> Box<dyn Job> {
         match message {
-            Message::ServerResponse(ServerResponse::LoginResponse(response)) => {
-                Box::new(DispatchedMessage::new(response, LoginHandler::default()))
-            }
-            Message::ServerResponse(ServerResponse::PrivilegedUsersResponse(response)) => Box::new(
-                DispatchedMessage::new(response, SetPrivilegedUsersHandler::default()),
-            ),
+            Message::ServerResponse(ServerResponse::LoginResponse(
+                response,
+            )) => Box::new(DispatchedMessage::new(
+                response,
+                LoginHandler::default(),
+            )),
+            Message::ServerResponse(
+                ServerResponse::PrivilegedUsersResponse(response),
+            ) => Box::new(DispatchedMessage::new(
+                response,
+                SetPrivilegedUsersHandler::default(),
+            )),
             _ => panic!("Unimplemented"),
         }
     }
@@ -76,18 +82,26 @@ mod tests {
     #[test]
     fn dispatcher_privileged_users_response() {
         Dispatcher::new().dispatch(Message::ServerResponse(
-            server::ServerResponse::PrivilegedUsersResponse(server::PrivilegedUsersResponse {
-                users: vec!["foo".to_string(), "bar".to_string(), "baz".to_string()],
-            }),
+            server::ServerResponse::PrivilegedUsersResponse(
+                server::PrivilegedUsersResponse {
+                    users: vec![
+                        "foo".to_string(),
+                        "bar".to_string(),
+                        "baz".to_string(),
+                    ],
+                },
+            ),
         ));
     }
 
     #[test]
     fn dispatcher_login_response() {
         Dispatcher::new().dispatch(Message::ServerResponse(
-            server::ServerResponse::LoginResponse(server::LoginResponse::LoginFail {
-                reason: "bleep bloop".to_string(),
-            }),
+            server::ServerResponse::LoginResponse(
+                server::LoginResponse::LoginFail {
+                    reason: "bleep bloop".to_string(),
+                },
+            ),
         ));
     }
 }

@@ -95,7 +95,9 @@ pub enum ValueDecodeError {
 impl From<ValueDecodeError> for io::Error {
     fn from(error: ValueDecodeError) -> Self {
         let kind = match &error {
-            &ValueDecodeError::NotEnoughData { .. } => io::ErrorKind::UnexpectedEof,
+            &ValueDecodeError::NotEnoughData { .. } => {
+                io::ErrorKind::UnexpectedEof
+            }
             _ => io::ErrorKind::InvalidData,
         };
         let message = format!("{}", &error);
@@ -125,7 +127,9 @@ pub struct ValueDecoder<'a> {
 /// a `ValueDecoder`.
 pub trait ValueDecode: Sized {
     /// Attempts to decode a value of this type with the given decoder.
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError>;
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError>;
 }
 
 impl<'a> ValueDecoder<'a> {
@@ -225,11 +229,13 @@ impl<'a> ValueDecoder<'a> {
         let position = self.position;
         let bytes = self.consume(length)?;
 
-        let result = WINDOWS_1252.decode_without_bom_handling_and_without_replacement(bytes);
+        let result = WINDOWS_1252
+            .decode_without_bom_handling_and_without_replacement(bytes);
         match result {
             Some(string) => Ok(string.into_owned()),
             None => Err(ValueDecodeError::InvalidString {
-                cause: "malformed sequence in Windows-1252-encoded string".to_string(),
+                cause: "malformed sequence in Windows-1252-encoded string"
+                    .to_string(),
                 position: position,
             }),
         }
@@ -248,38 +254,50 @@ impl<'a> ValueDecoder<'a> {
 }
 
 impl ValueDecode for u32 {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         decoder.decode_u32()
     }
 }
 
 impl ValueDecode for u16 {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         decoder.decode_u16()
     }
 }
 
 impl ValueDecode for bool {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         decoder.decode_bool()
     }
 }
 
 impl ValueDecode for net::Ipv4Addr {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let ip = decoder.decode_u32()?;
         Ok(net::Ipv4Addr::from(ip))
     }
 }
 
 impl ValueDecode for String {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         decoder.decode_string()
     }
 }
 
 impl<T: ValueDecode, U: ValueDecode> ValueDecode for (T, U) {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let first = decoder.decode()?;
         let second = decoder.decode()?;
         Ok((first, second))
@@ -287,7 +305,9 @@ impl<T: ValueDecode, U: ValueDecode> ValueDecode for (T, U) {
 }
 
 impl<T: ValueDecode> ValueDecode for Vec<T> {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let len = decoder.decode_u32()? as usize;
         let mut vec = Vec::with_capacity(len);
         for _ in 0..len {
@@ -328,7 +348,10 @@ pub struct ValueEncoder<'a> {
 pub trait ValueEncode {
     // TODO: Rename to encode_to().
     /// Attempts to encode `self` with the given encoder.
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError>;
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError>;
 }
 
 impl<'a> ValueEncoder<'a> {
@@ -388,31 +411,46 @@ impl<'a> ValueEncoder<'a> {
     /// ```
     /// encoder.encode(&Foo::new(bar))?;
     /// ```
-    pub fn encode<T: ValueEncode + ?Sized>(&mut self, val: &T) -> Result<(), ValueEncodeError> {
+    pub fn encode<T: ValueEncode + ?Sized>(
+        &mut self,
+        val: &T,
+    ) -> Result<(), ValueEncodeError> {
         val.encode(self)
     }
 }
 
 impl ValueEncode for u32 {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_u32(*self)
     }
 }
 
 impl ValueEncode for u16 {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_u16(*self)
     }
 }
 
 impl ValueEncode for bool {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_bool(*self)
     }
 }
 
 impl ValueEncode for net::Ipv4Addr {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_u32(u32::from(*self))
     }
 }
@@ -426,32 +464,47 @@ impl ValueEncode for net::Ipv4Addr {
 // Value{De,En}code) but it is not really worth the hassle.
 
 impl ValueEncode for str {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_string(self)
     }
 }
 
 impl ValueEncode for String {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_string(self)
     }
 }
 
 impl<'a> ValueEncode for &'a String {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_string(*self)
     }
 }
 
 impl<T: ValueEncode, U: ValueEncode> ValueEncode for (T, U) {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         self.0.encode(encoder)?;
         self.1.encode(encoder)
     }
 }
 
 impl<T: ValueEncode> ValueEncode for [T] {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_u32(self.len() as u32)?;
         for ref item in self {
             item.encode(encoder)?;
@@ -461,7 +514,10 @@ impl<T: ValueEncode> ValueEncode for [T] {
 }
 
 impl<T: ValueEncode> ValueEncode for Vec<T> {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         let slice: &[T] = &*self;
         slice.encode(encoder)
     }
@@ -480,7 +536,9 @@ pub mod tests {
 
     use bytes::{BufMut, BytesMut};
 
-    use super::{ValueDecode, ValueDecodeError, ValueDecoder, ValueEncode, ValueEncoder};
+    use super::{
+        ValueDecode, ValueDecodeError, ValueDecoder, ValueEncode, ValueEncoder,
+    };
 
     // Declared here because assert_eq!(bytes, &[]) fails to infer types.
     const EMPTY_BYTES: &'static [u8] = &[];
@@ -864,7 +922,13 @@ pub mod tests {
         let mut vec = vec![];
 
         let mut expected_bytes = BytesMut::new();
-        expected_bytes.extend_from_slice(&[13, U32_ENCODINGS.len() as u8, 0, 0, 0]);
+        expected_bytes.extend_from_slice(&[
+            13,
+            U32_ENCODINGS.len() as u8,
+            0,
+            0,
+            0,
+        ]);
 
         for &(val, ref encoded_bytes) in &U32_ENCODINGS {
             vec.push(val);

@@ -9,7 +9,11 @@ use crate::proto::server::LoginResponse;
 pub struct LoginHandler;
 
 impl MessageHandler<LoginResponse> for LoginHandler {
-    fn run(self, context: &Context, _message: &LoginResponse) -> io::Result<()> {
+    fn run(
+        self,
+        context: &Context,
+        _message: &LoginResponse,
+    ) -> io::Result<()> {
         let lock = context.login.lock();
 
         match *lock {

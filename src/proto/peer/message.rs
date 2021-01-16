@@ -2,8 +2,9 @@ use std::io;
 
 use crate::proto::peer::constants::*;
 use crate::proto::{
-    MutPacket, Packet, PacketReadError, ReadFromPacket, ValueDecode, ValueDecodeError,
-    ValueDecoder, ValueEncode, ValueEncodeError, ValueEncoder, WriteToPacket,
+    MutPacket, Packet, PacketReadError, ReadFromPacket, ValueDecode,
+    ValueDecodeError, ValueDecoder, ValueEncode, ValueEncodeError,
+    ValueEncoder, WriteToPacket,
 };
 
 /*=========*
@@ -22,7 +23,9 @@ impl ReadFromPacket for Message {
     fn read_from_packet(packet: &mut Packet) -> Result<Self, PacketReadError> {
         let code: u32 = packet.read_value()?;
         let message = match code {
-            CODE_PIERCE_FIREWALL => Message::PierceFirewall(packet.read_value()?),
+            CODE_PIERCE_FIREWALL => {
+                Message::PierceFirewall(packet.read_value()?)
+            }
 
             CODE_PEER_INIT => Message::PeerInit(packet.read_value()?),
 
@@ -42,7 +45,9 @@ impl ReadFromPacket for Message {
 }
 
 impl ValueDecode for Message {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let position = decoder.position();
         let code: u32 = decoder.decode()?;
         let message = match code {
@@ -67,7 +72,10 @@ impl ValueDecode for Message {
 }
 
 impl ValueEncode for Message {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         match *self {
             Message::PierceFirewall(token) => {
                 encoder.encode_u32(CODE_PIERCE_FIREWALL)?;
@@ -132,7 +140,10 @@ impl WriteToPacket for PeerInit {
 }
 
 impl ValueEncode for PeerInit {
-    fn encode(&self, encoder: &mut ValueEncoder) -> Result<(), ValueEncodeError> {
+    fn encode(
+        &self,
+        encoder: &mut ValueEncoder,
+    ) -> Result<(), ValueEncodeError> {
         encoder.encode_string(&self.user_name)?;
         encoder.encode_string(&self.connection_type)?;
         encoder.encode_u32(self.token)?;
@@ -141,7 +152,9 @@ impl ValueEncode for PeerInit {
 }
 
 impl ValueDecode for PeerInit {
-    fn decode_from(decoder: &mut ValueDecoder) -> Result<Self, ValueDecodeError> {
+    fn decode_from(
+        decoder: &mut ValueDecoder,
+    ) -> Result<Self, ValueDecodeError> {
         let user_name = decoder.decode()?;
         let connection_type = decoder.decode()?;
         let token = decoder.decode()?;

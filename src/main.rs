@@ -29,7 +29,8 @@ fn main() {
         }
     };
 
-    let (proto_to_client_tx, proto_to_client_rx) = crossbeam_channel::unbounded();
+    let (proto_to_client_tx, proto_to_client_rx) =
+        crossbeam_channel::unbounded();
 
     let mut proto_agent = match proto::Agent::new(proto_to_client_tx) {
         Ok(agent) => agent,
@@ -40,10 +41,14 @@ fn main() {
     };
 
     let client_to_proto_tx = proto_agent.channel();
-    let (control_to_client_tx, control_to_client_rx) = crossbeam_channel::unbounded();
+    let (control_to_client_tx, control_to_client_rx) =
+        crossbeam_channel::unbounded();
 
-    let mut client =
-        client::Client::new(client_to_proto_tx, proto_to_client_rx, control_to_client_rx);
+    let mut client = client::Client::new(
+        client_to_proto_tx,
+        proto_to_client_rx,
+        control_to_client_rx,
+    );
 
     thread::spawn(move || control::listen(control_to_client_tx));
     thread::spawn(move || proto_agent.run().unwrap());

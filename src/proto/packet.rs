@@ -132,15 +132,21 @@ pub enum PacketReadError {
 impl fmt::Display for PacketReadError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            PacketReadError::InvalidBoolError(n) => write!(fmt, "InvalidBoolError: {}", n),
-            PacketReadError::InvalidU16Error(n) => write!(fmt, "InvalidU16Error: {}", n),
+            PacketReadError::InvalidBoolError(n) => {
+                write!(fmt, "InvalidBoolError: {}", n)
+            }
+            PacketReadError::InvalidU16Error(n) => {
+                write!(fmt, "InvalidU16Error: {}", n)
+            }
             PacketReadError::InvalidStringError(ref bytes) => {
                 write!(fmt, "InvalidStringError: {:?}", bytes)
             }
             PacketReadError::InvalidUserStatusError(n) => {
                 write!(fmt, "InvalidUserStatusError: {}", n)
             }
-            PacketReadError::IOError(ref err) => write!(fmt, "IOError: {}", err),
+            PacketReadError::IOError(ref err) => {
+                write!(fmt, "IOError: {}", err)
+            }
         }
     }
 }
@@ -151,7 +157,9 @@ impl error::Error for PacketReadError {
             PacketReadError::InvalidBoolError(_) => "InvalidBoolError",
             PacketReadError::InvalidU16Error(_) => "InvalidU16Error",
             PacketReadError::InvalidStringError(_) => "InvalidStringError",
-            PacketReadError::InvalidUserStatusError(_) => "InvalidUserStatusError",
+            PacketReadError::InvalidUserStatusError(_) => {
+                "InvalidUserStatusError"
+            }
             PacketReadError::IOError(_) => "IOError",
         }
     }
@@ -383,7 +391,8 @@ impl Parser {
                 // If we have finished reading the length prefix, then
                 // deserialize it, switch states and try to read the packet
                 // bytes.
-                let message_len = LittleEndian::read_u32(&mut self.buffer) as usize;
+                let message_len =
+                    LittleEndian::read_u32(&mut self.buffer) as usize;
                 if message_len > MAX_MESSAGE_SIZE {
                     unimplemented!();
                 };

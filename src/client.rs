@@ -114,7 +114,9 @@ impl Client {
 
         loop {
             match self.recv() {
-                IncomingMessage::Proto(response) => self.handle_proto_response(response),
+                IncomingMessage::Proto(response) => {
+                    self.handle_proto_response(response)
+                }
 
                 IncomingMessage::ControlNotification(notif) => {
                     self.handle_control_notification(notif)
@@ -186,7 +188,9 @@ impl Client {
                 self.control_tx = None;
             }
 
-            control::Notification::Request(req) => self.handle_control_request(req),
+            control::Notification::Request(req) => {
+                self.handle_control_request(req)
+            }
         }
     }
 
@@ -196,7 +200,9 @@ impl Client {
 
     fn handle_control_request(&mut self, request: control::Request) {
         match request {
-            control::Request::LoginStatusRequest => self.handle_login_status_request(),
+            control::Request::LoginStatusRequest => {
+                self.handle_login_status_request()
+            }
 
             control::Request::RoomJoinRequest(room_name) => {
                 self.handle_room_join_request(room_name)
@@ -206,13 +212,17 @@ impl Client {
                 self.handle_room_leave_request(room_name)
             }
 
-            control::Request::RoomListRequest => self.handle_room_list_request(),
+            control::Request::RoomListRequest => {
+                self.handle_room_list_request()
+            }
 
             control::Request::RoomMessageRequest(request) => {
                 self.handle_room_message_request(request)
             }
 
-            control::Request::UserListRequest => self.handle_user_list_request(),
+            control::Request::UserListRequest => {
+                self.handle_user_list_request()
+            }
             /*
             _ =>{
                 error!("Unhandled control request: {:?}", request);
@@ -225,22 +235,30 @@ impl Client {
         let username = config::USERNAME.to_string();
 
         let response = match self.login_status {
-            LoginStatus::Todo => control::LoginStatusResponse::Pending { username: username },
+            LoginStatus::Todo => {
+                control::LoginStatusResponse::Pending { username: username }
+            }
             LoginStatus::AwaitingResponse => {
                 control::LoginStatusResponse::Pending { username: username }
             }
 
-            LoginStatus::Success(ref motd) => control::LoginStatusResponse::Success {
-                username: username,
-                motd: motd.clone(),
-            },
+            LoginStatus::Success(ref motd) => {
+                control::LoginStatusResponse::Success {
+                    username: username,
+                    motd: motd.clone(),
+                }
+            }
 
-            LoginStatus::Failure(ref reason) => control::LoginStatusResponse::Failure {
-                username: username,
-                reason: reason.clone(),
-            },
+            LoginStatus::Failure(ref reason) => {
+                control::LoginStatusResponse::Failure {
+                    username: username,
+                    reason: reason.clone(),
+                }
+            }
         };
-        self.send_to_controller(control::Response::LoginStatusResponse(response));
+        self.send_to_controller(control::Response::LoginStatusResponse(
+            response,
+        ));
     }
 
     fn handle_room_join_request(&mut self, room_name: String) {
@@ -284,7 +302,10 @@ impl Client {
         self.send_to_server(server::ServerRequest::RoomListRequest);
     }
 
-    fn handle_room_message_request(&mut self, request: control::RoomMessageRequest) {
+    fn handle_room_message_request(
+        &mut self,
+        request: control::RoomMessageRequest,
+    ) {
         self.send_to_server(server::ServerRequest::RoomMessageRequest(
             server::RoomMessageRequest {
                 room_name: request.room_name,
@@ -363,11 +384,13 @@ impl Client {
                 #[allow(deprecated)]
                 self.proto_tx
                     .send(proto::Request::ServerRequest(
-                        server::ServerRequest::ConnectToPeerRequest(server::ConnectToPeerRequest {
-                            token: peer.token,
-                            user_name: peer.user_name.clone(),
-                            connection_type: peer.connection_type.clone(),
-                        }),
+                        server::ServerRequest::ConnectToPeerRequest(
+                            server::ConnectToPeerRequest {
+                                token: peer.token,
+                                user_name: peer.user_name.clone(),
+                                connection_type: peer.connection_type.clone(),
+                            },
+                        ),
                     ))
                     .unwrap();
             }
@@ -382,10 +405,12 @@ impl Client {
                 #[allow(deprecated)]
                 self.proto_tx
                     .send(proto::Request::ServerRequest(
-                        server::ServerRequest::CannotConnectRequest(server::CannotConnectRequest {
-                            token: peer.token,
-                            user_name: peer.user_name,
-                        }),
+                        server::ServerRequest::CannotConnectRequest(
+                            server::CannotConnectRequest {
+                                token: peer.token,
+                                user_name: peer.user_name,
+                            },
+                        ),
                     ))
                     .unwrap();
             }
@@ -407,7 +432,10 @@ impl Client {
                     ..
                 },
             ) => {
-                error!("Peer connection {} was already open: {:?}", peer_id, peer);
+                error!(
+                    "Peer connection {} was already open: {:?}",
+                    peer_id, peer
+                );
                 return;
             }
 
@@ -471,7 +499,9 @@ impl Client {
                 self.handle_connect_to_peer_response(response)
             }
 
-            server::ServerResponse::LoginResponse(response) => self.handle_login_response(response),
+            server::ServerResponse::LoginResponse(response) => {
+                self.handle_login_response(response)
+            }
 
             server::ServerResponse::PrivilegedUsersResponse(response) => {
                 self.handle_privileged_users_response(response)
@@ -521,7 +551,10 @@ impl Client {
         }
     }
 
-    fn handle_connect_to_peer_response(&mut self, response: server::ConnectToPeerResponse) {
+    fn handle_connect_to_peer_response(
+        &mut self,
+        response: server::ConnectToPeerResponse,
+    ) {
         let peer = Peer {
             user_name: response.user_name,
             ip: response.ip,
@@ -596,11 +629,17 @@ impl Client {
         }
     }
 
-    fn handle_privileged_users_response(&mut self, response: server::PrivilegedUsersResponse) {
+    fn handle_privileged_users_response(
+        &mut self,
+        response: server::PrivilegedUsersResponse,
+    ) {
         self.users.set_all_privileged(response.users);
     }
 
-    fn handle_room_join_response(&mut self, mut response: server::RoomJoinResponse) {
+    fn handle_room_join_response(
+        &mut self,
+        mut response: server::RoomJoinResponse,
+    ) {
         // Join the room and store the received information.
         let result = self.rooms.join(
             &response.room_name,
@@ -621,10 +660,15 @@ impl Client {
         let control_response = control::RoomJoinResponse {
             room_name: response.room_name,
         };
-        self.send_to_controller(control::Response::RoomJoinResponse(control_response));
+        self.send_to_controller(control::Response::RoomJoinResponse(
+            control_response,
+        ));
     }
 
-    fn handle_room_leave_response(&mut self, response: server::RoomLeaveResponse) {
+    fn handle_room_leave_response(
+        &mut self,
+        response: server::RoomLeaveResponse,
+    ) {
         if let Err(err) = self.rooms.leave(&response.room_name) {
             error!("RoomLeaveResponse: {}", err);
         }
@@ -636,7 +680,10 @@ impl Client {
         ));
     }
 
-    fn handle_room_list_response(&mut self, response: server::RoomListResponse) {
+    fn handle_room_list_response(
+        &mut self,
+        response: server::RoomListResponse,
+    ) {
         // Update the room map in memory.
         self.rooms.set_room_list(response);
         // Send the updated version to the controller.
@@ -646,7 +693,10 @@ impl Client {
         ));
     }
 
-    fn handle_room_message_response(&mut self, response: server::RoomMessageResponse) {
+    fn handle_room_message_response(
+        &mut self,
+        response: server::RoomMessageResponse,
+    ) {
         let result = self.rooms.add_message(
             &response.room_name,
             room::Message {
@@ -668,7 +718,10 @@ impl Client {
         ));
     }
 
-    fn handle_room_tickers_response(&mut self, response: server::RoomTickersResponse) {
+    fn handle_room_tickers_response(
+        &mut self,
+        response: server::RoomTickersResponse,
+    ) {
         let result = self
             .rooms
             .set_tickers(&response.room_name, response.tickers);
@@ -677,7 +730,10 @@ impl Client {
         }
     }
 
-    fn handle_room_user_joined_response(&mut self, response: server::RoomUserJoinedResponse) {
+    fn handle_room_user_joined_response(
+        &mut self,
+        response: server::RoomUserJoinedResponse,
+    ) {
         let result = self
             .rooms
             .insert_member(&response.room_name, response.user.name.clone());
@@ -693,7 +749,10 @@ impl Client {
         ));
     }
 
-    fn handle_room_user_left_response(&mut self, response: server::RoomUserLeftResponse) {
+    fn handle_room_user_left_response(
+        &mut self,
+        response: server::RoomUserLeftResponse,
+    ) {
         let result = self
             .rooms
             .remove_member(&response.room_name, &response.user_name);
@@ -709,7 +768,10 @@ impl Client {
         ));
     }
 
-    fn handle_user_info_response(&mut self, response: server::UserInfoResponse) {
+    fn handle_user_info_response(
+        &mut self,
+        response: server::UserInfoResponse,
+    ) {
         let c_response = match self.users.get_mut_strict(&response.user_name) {
             Ok(user) => {
                 user.average_speed = response.average_speed;
@@ -726,11 +788,17 @@ impl Client {
                 return;
             }
         };
-        self.send_to_controller(control::Response::UserInfoResponse(c_response));
+        self.send_to_controller(control::Response::UserInfoResponse(
+            c_response,
+        ));
     }
 
-    fn handle_user_status_response(&mut self, response: server::UserStatusResponse) {
-        let result = self.users.set_status(&response.user_name, response.status);
+    fn handle_user_status_response(
+        &mut self,
+        response: server::UserStatusResponse,
+    ) {
+        let result =
+            self.users.set_status(&response.user_name, response.status);
         if let Err(err) = result {
             error!("UserStatusResponse: {}", err);
             return;

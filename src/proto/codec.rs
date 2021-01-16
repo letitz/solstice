@@ -12,7 +12,8 @@ use thiserror::Error;
 use super::prefix::Prefixer;
 use super::u32::{decode_u32, U32_BYTE_LEN};
 use super::value_codec::{
-    ValueDecode, ValueDecodeError, ValueDecoder, ValueEncode, ValueEncodeError, ValueEncoder,
+    ValueDecode, ValueDecodeError, ValueDecoder, ValueEncode, ValueEncodeError,
+    ValueEncoder,
 };
 
 #[derive(Debug, Error, PartialEq)]
@@ -45,7 +46,11 @@ impl<T: ValueEncode + ?Sized> FrameEncoder<T> {
         }
     }
 
-    pub fn encode_to(&mut self, value: &T, buffer: &mut BytesMut) -> Result<(), FrameEncodeError> {
+    pub fn encode_to(
+        &mut self,
+        value: &T,
+        buffer: &mut BytesMut,
+    ) -> Result<(), FrameEncodeError> {
         let mut prefixer = Prefixer::new(buffer);
 
         ValueEncoder::new(prefixer.suffix_mut()).encode(value)?;
@@ -83,7 +88,10 @@ impl<T: ValueDecode> FrameDecoder<T> {
     ///
     /// Returns an error if the length prefix or the framed value are malformed,
     /// in which case `bytes` is untouched.
-    pub fn decode_from(&mut self, bytes: &mut BytesMut) -> Result<Option<T>, ValueDecodeError> {
+    pub fn decode_from(
+        &mut self,
+        bytes: &mut BytesMut,
+    ) -> Result<Option<T>, ValueDecodeError> {
         if bytes.len() < U32_BYTE_LEN {
             return Ok(None); // Not enough bytes yet.
         }
@@ -205,7 +213,8 @@ mod tests {
         let mut bytes = BytesMut::new();
         bytes.extend_from_slice(&initial_bytes);
 
-        let value: Option<u32> = FrameDecoder::new().decode_from(&mut bytes).unwrap();
+        let value: Option<u32> =
+            FrameDecoder::new().decode_from(&mut bytes).unwrap();
 
         assert_eq!(value, None);
         assert_eq!(bytes, initial_bytes); // Untouched.
@@ -221,7 +230,8 @@ mod tests {
         let mut bytes = BytesMut::new();
         bytes.extend_from_slice(&initial_bytes);
 
-        let value: Option<u32> = FrameDecoder::new().decode_from(&mut bytes).unwrap();
+        let value: Option<u32> =
+            FrameDecoder::new().decode_from(&mut bytes).unwrap();
 
         assert_eq!(value, None);
         assert_eq!(bytes, initial_bytes); // Untouched.

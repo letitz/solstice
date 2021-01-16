@@ -123,11 +123,13 @@ impl Handler {
     ) -> io::Result<Self> {
         let host = config::SERVER_HOST;
         let port = config::SERVER_PORT;
-        let server_stream = Stream::new((host, port), ServerResponseSender(client_tx.clone()))?;
+        let server_stream =
+            Stream::new((host, port), ServerResponseSender(client_tx.clone()))?;
 
         info!("Connected to server at {}:{}", host, port);
 
-        let listener = listener_bind((config::LISTEN_HOST, config::LISTEN_PORT))?;
+        let listener =
+            listener_bind((config::LISTEN_HOST, config::LISTEN_PORT))?;
         info!(
             "Listening for connections on {}:{}",
             config::LISTEN_HOST,
@@ -311,10 +313,16 @@ impl mio::deprecated::Handler for Handler {
         }
     }
 
-    fn notify(&mut self, event_loop: &mut mio::deprecated::EventLoop<Self>, request: Request) {
+    fn notify(
+        &mut self,
+        event_loop: &mut mio::deprecated::EventLoop<Self>,
+        request: Request,
+    ) {
         match request {
             Request::PeerConnect(peer_id, ip, port) => {
-                if let Err(err) = self.connect_to_peer(peer_id, ip, port, event_loop) {
+                if let Err(err) =
+                    self.connect_to_peer(peer_id, ip, port, event_loop)
+                {
                     error!(
                         "Cannot open peer connection {} to {}:{}: {}",
                         peer_id, ip, port, err
@@ -336,7 +344,11 @@ impl mio::deprecated::Handler for Handler {
                         return;
                     }
                 };
-                self.process_peer_intent(intent, mio::Token(peer_id), event_loop);
+                self.process_peer_intent(
+                    intent,
+                    mio::Token(peer_id),
+                    event_loop,
+                );
             }
 
             Request::ServerRequest(server_request) => {
@@ -357,7 +369,9 @@ pub struct Agent {
 }
 
 impl Agent {
-    pub fn new(client_tx: crossbeam_channel::Sender<Response>) -> io::Result<Self> {
+    pub fn new(
+        client_tx: crossbeam_channel::Sender<Response>,
+    ) -> io::Result<Self> {
         // Create the event loop.
         #[allow(deprecated)]
         let mut event_loop = mio::deprecated::EventLoop::new()?;
