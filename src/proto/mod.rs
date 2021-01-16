@@ -1,5 +1,5 @@
-mod codec;
 mod constants;
+mod frame;
 mod handler;
 mod packet;
 pub mod peer;
@@ -12,7 +12,7 @@ pub mod u32;
 mod user;
 mod value_codec;
 
-pub use self::codec::FrameStream;
+pub use self::frame::FrameStream;
 pub use self::handler::*;
 pub use self::packet::*;
 pub use self::server::{ServerRequest, ServerResponse};
