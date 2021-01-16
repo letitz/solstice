@@ -170,7 +170,9 @@ where
 
     pub async fn read(&mut self) -> io::Result<ReadFrame> {
         loop {
-            if let Some(frame) = self.decoder.decode_from(&mut self.read_buffer)? {
+            if let Some(frame) =
+                self.decoder.decode_from(&mut self.read_buffer)?
+            {
                 return Ok(frame);
             }
             self.stream.read_buf(&mut self.read_buffer).await?;
@@ -188,7 +190,7 @@ mod tests {
     use bytes::BytesMut;
     use tokio::net::{TcpListener, TcpStream};
 
-    use super::{FrameStream, FrameDecoder, FrameEncoder};
+    use super::{FrameDecoder, FrameEncoder, FrameStream};
 
     // Test value: [1, 3, 3, 7] in little-endian.
     const U32_1337: u32 = 1 + (3 << 8) + (3 << 16) + (7 << 24);

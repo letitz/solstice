@@ -222,12 +222,11 @@ impl Client {
 
             control::Request::UserListRequest => {
                 self.handle_user_list_request()
-            }
-            /*
-            _ =>{
-                error!("Unhandled control request: {:?}", request);
-            },
-            */
+            } /*
+              _ =>{
+                  error!("Unhandled control request: {:?}", request);
+              },
+              */
         }
     }
 
