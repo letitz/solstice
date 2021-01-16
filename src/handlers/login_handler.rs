@@ -9,44 +9,40 @@ use crate::proto::server::LoginResponse;
 pub struct LoginHandler;
 
 impl MessageHandler<LoginResponse> for LoginHandler {
-    fn run(
-        self,
-        context: &Context,
-        _message: &LoginResponse,
-    ) -> io::Result<()> {
-        let lock = context.login.lock();
+  fn run(self, context: &Context, _message: &LoginResponse) -> io::Result<()> {
+    let lock = context.login.lock();
 
-        match *lock {
-            LoginStatus::AwaitingResponse => (),
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("unexpected login response, status = {:?}", *lock),
-                ));
-            }
-        };
+    match *lock {
+      LoginStatus::AwaitingResponse => (),
+      _ => {
+        return Err(io::Error::new(
+          io::ErrorKind::Other,
+          format!("unexpected login response, status = {:?}", *lock),
+        ));
+      }
+    };
 
-        unimplemented!();
-    }
+    unimplemented!();
+  }
 
-    fn name() -> String {
-        "LoginHandler".to_string()
-    }
+  fn name() -> String {
+    "LoginHandler".to_string()
+  }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+  use super::*;
 
-    #[test]
-    #[should_panic]
-    fn run_fails_on_wrong_status() {
-        let context = Context::new();
+  #[test]
+  #[should_panic]
+  fn run_fails_on_wrong_status() {
+    let context = Context::new();
 
-        let response = LoginResponse::LoginFail {
-            reason: "bleep bloop".to_string(),
-        };
+    let response = LoginResponse::LoginFail {
+      reason: "bleep bloop".to_string(),
+    };
 
-        LoginHandler::default().run(&context, &response).unwrap();
-    }
+    LoginHandler::default().run(&context, &response).unwrap();
+  }
 }

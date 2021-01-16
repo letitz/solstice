@@ -6,17 +6,17 @@
 /// successfully logged in, the client can interact with the server.
 #[derive(Clone, Debug)]
 pub enum LoginStatus {
-    /// Request not sent yet.
-    Todo,
+  /// Request not sent yet.
+  Todo,
 
-    /// Sent request, awaiting response.
-    AwaitingResponse,
+  /// Sent request, awaiting response.
+  AwaitingResponse,
 
-    /// Logged in.
-    /// Stores the MOTD as received from the server.
-    Success(String),
+  /// Logged in.
+  /// Stores the MOTD as received from the server.
+  Success(String),
 
-    /// Failed to log in.
-    /// Stores the error message as received from the server.
-    Failure(String),
+  /// Failed to log in.
+  /// Stores the error message as received from the server.
+  Failure(String),
 }
