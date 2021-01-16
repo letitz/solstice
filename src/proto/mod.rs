@@ -1,5 +1,4 @@
 mod codec;
-mod connection;
 mod constants;
 mod handler;
 mod packet;
@@ -13,8 +12,7 @@ pub mod u32;
 mod user;
 mod value_codec;
 
-pub use self::codec::*;
-pub use self::connection::Connection;
+pub use self::codec::Connection;
 pub use self::handler::*;
 pub use self::packet::*;
 pub use self::server::{ServerRequest, ServerResponse};
